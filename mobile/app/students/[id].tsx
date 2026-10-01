@@ -245,7 +245,7 @@ export default function StudentDetailsScreen() {
                 <View key={cert.id} style={styles.listRow}>
                   <View style={styles.listInfo}>
                     <ThemedText style={styles.listTitle}>{cert.type_name || 'Certificate'}</ThemedText>
-                    {cert.issue_date && (
+                    {!!cert.issue_date && (
                       <ThemedText style={styles.listSub}>
                         Issued: {new Date(cert.issue_date).toLocaleDateString()}
                       </ThemedText>

@@ -50,6 +50,7 @@ export default function TimeTableEditor() {
   const [selectedSection, setSelectedSection] = useState<{ id: string; name: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [includeSaturday, setIncludeSaturday] = useState(false);
+  const [activeDay, setActiveDay] = useState<string | null>(null);
   const [rows, setRows] = useState<RowData[]>([]);
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -127,7 +128,7 @@ export default function TimeTableEditor() {
   // Only show subjects mapped to the selected class/section (like web app)
   const subjectOptions: DropdownOption[] = useMemo(() => {
     if (!subjectsData) return [];
-    const all = subjectsData.map(subject => ({ label: subject.name, value: subject.id }));
+    const all = subjectsData.map(subject => ({ label: subject.name || '', value: subject.id }));
     const filtered = classSubjectIds ? all.filter(s => classSubjectIds.has(s.value)) : all;
     return [{ label: 'Select Subject', value: '' }, ...filtered];
   }, [subjectsData, classSubjectIds]);
@@ -177,7 +178,7 @@ export default function TimeTableEditor() {
         time: item.time,
         type: item.type,
         subjects: item.subjects || {},
-        label: item.label
+        label: item.label || ''
       }));
       setRows(rows);
       const hasSaturday = timetableData.timetable_data.some(
@@ -534,6 +535,7 @@ export default function TimeTableEditor() {
     const baseDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
     return includeSaturday ? [...baseDays, 'Saturday'] : baseDays;
   }, [includeSaturday]);
+  const viewDay = activeDay && days.includes(activeDay) ? activeDay : days[0];
 
   const renderTimetableRow = useCallback(({ item, index }: { item: RowData; index: number }) => (
     <View style={[styles.rowCard, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
@@ -644,7 +646,7 @@ export default function TimeTableEditor() {
           <ThemedView style={styles.container}>
             <View style={styles.centerContainer}>
               <ThemedText type="title">Access Denied</ThemedText>
-              <ThemedText>You don't have permission to view timetables</ThemedText>
+              <ThemedText>You don&apos;t have permission to view timetables</ThemedText>
             </View>
           </ThemedView>
         }
@@ -793,6 +795,7 @@ export default function TimeTableEditor() {
               <Ionicons name="document-text" size={18} color={themeColors['card-foreground']} />
               <ThemedText style={styles.exportOptionText}>Export CSV</ThemedText>
             </TouchableOpacity>
+            {Platform.OS === 'web' && (
             <TouchableOpacity
               style={styles.exportOption}
               onPress={() => {
@@ -803,6 +806,8 @@ export default function TimeTableEditor() {
               <Ionicons name="grid" size={18} color={themeColors['card-foreground']} />
               <ThemedText style={styles.exportOptionText}>Export Excel</ThemedText>
             </TouchableOpacity>
+            )}
+            {Platform.OS === 'web' && (
             <TouchableOpacity
               style={styles.exportOption}
               onPress={() => {
@@ -813,6 +818,7 @@ export default function TimeTableEditor() {
               <Ionicons name="image" size={18} color={themeColors['card-foreground']} />
               <ThemedText style={styles.exportOptionText}>Export PNG</ThemedText>
             </TouchableOpacity>
+            )}
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
@@ -836,78 +842,72 @@ export default function TimeTableEditor() {
 
       {/* Timetable content — read-only table grid or edit cards */}
       {!isEditing ? (
-        <ScrollView
-          style={{ flex: 1 }}
-          refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={themeColors.primary} />
-          }
-        >
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View>
-              {/* Header row */}
-              <View style={[styles.tableHeaderRow, { backgroundColor: themeColors.primary + '20', borderColor: themeColors.border }]}>
-                <View style={[styles.tableTimeCell, { borderColor: themeColors.border }]}>
-                  <ThemedText style={[styles.tableHeaderText, { color: themeColors.primary }]}>Time</ThemedText>
-                </View>
-                {days.map(day => (
-                  <View key={day} style={[styles.tableDayCell, { borderColor: themeColors.border }]}>
-                    <ThemedText style={[styles.tableHeaderText, { color: themeColors.primary }]}>{day.slice(0, 3)}</ThemedText>
-                  </View>
-                ))}
-              </View>
-              {/* Data rows */}
-              {rows.map((row, idx) => (
-                <View
-                  key={row.id}
+        <View style={{ flex: 1 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            style={styles.dayTabsScroll}
+            contentContainerStyle={styles.dayTabsContent}
+          >
+            {days.map(day => {
+              const active = day === viewDay;
+              return (
+                <TouchableOpacity
+                  key={day}
+                  onPress={() => setActiveDay(day)}
                   style={[
-                    styles.tableRow,
+                    styles.dayTab,
                     {
-                      backgroundColor: idx % 2 === 0 ? themeColors.card : themeColors.background,
-                      borderColor: themeColors.border,
+                      backgroundColor: active ? themeColors.primary : themeColors.card,
+                      borderColor: active ? themeColors.primary : themeColors.border,
                     },
                   ]}
+                  accessibilityLabel={day}
                 >
-                  <View style={[styles.tableTimeCell, { borderColor: themeColors.border }]}>
-                    <ThemedText style={[styles.tableTimeCellText, { color: themeColors['card-foreground'] }]}>
-                      {formatTime12h(row.time.from)}–{formatTime12h(row.time.to)}
-                    </ThemedText>
-                  </View>
-                  {row.type === 'special' ? (
-                    <View
-                      style={[
-                        styles.tableSpecialCell,
-                        { width: 100 * days.length, backgroundColor: '#F59E0B20', borderColor: themeColors.border },
-                      ]}
-                    >
-                      <ThemedText style={styles.tableSpecialText}>{row.label}</ThemedText>
-                    </View>
-                  ) : (
-                    days.map(day => {
-                      const subjectId = row.subjects?.[day];
-                      const subjectName = subjectId ? getSubjectNameById(subjectId) : '';
-                      return (
-                        <View key={day} style={[styles.tableDayCell, { borderColor: themeColors.border }]}>
-                          {!!subjectName && (
-                            <View style={[styles.subjectPill, { backgroundColor: themeColors.primary + '20' }]}>
-                              <ThemedText style={[styles.subjectPillText, { color: themeColors.primary }]} numberOfLines={2}>
-                                {subjectName}
-                              </ThemedText>
-                            </View>
-                          )}
-                        </View>
-                      );
-                    })
-                  )}
-                </View>
-              ))}
-              {rows.length === 0 && (
-                <View style={styles.emptyTableRow}>
-                  <ThemedText style={{ color: themeColors['muted-foreground'] }}>No timetable data</ThemedText>
-                </View>
-              )}
-            </View>
+                  <ThemedText style={[styles.dayTabText, { color: active ? '#fff' : themeColors['card-foreground'] }]}>
+                    {day.slice(0, 3)}
+                  </ThemedText>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
-        </ScrollView>
+          <FlatList
+            data={rows}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.dayList}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={themeColors.primary} />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyTableRow}>
+                <ThemedText style={{ color: themeColors['muted-foreground'] }}>No timetable data</ThemedText>
+              </View>
+            }
+            renderItem={({ item: row }) => {
+              const timeLabel = `${formatTime12h(row.time.from)} - ${formatTime12h(row.time.to)}`;
+              if (row.type === 'special') {
+                return (
+                  <View style={[styles.periodCard, { backgroundColor: '#F59E0B20', borderColor: themeColors.border }]}>
+                    <ThemedText style={[styles.periodTime, { color: themeColors['muted-foreground'] }]}>{timeLabel}</ThemedText>
+                    <ThemedText style={styles.tableSpecialText}>{row.label || ''}</ThemedText>
+                  </View>
+                );
+              }
+              const subjectId = viewDay ? row.subjects?.[viewDay] : undefined;
+              const subjectName = subjectId ? getSubjectNameById(subjectId) : '';
+              return (
+                <View style={[styles.periodCard, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
+                  <ThemedText style={[styles.periodTime, { color: themeColors['muted-foreground'] }]}>{timeLabel}</ThemedText>
+                  <ThemedText style={[styles.periodSubject, { color: subjectName ? themeColors.primary : themeColors['muted-foreground'] }]}>
+                    {subjectName || 'Free period'}
+                  </ThemedText>
+                </View>
+              );
+            }}
+          />
+        </View>
       ) : (
         <FlatList
           data={rows}
@@ -1399,6 +1399,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
+  dayTabsScroll: { flexGrow: 0 },
+  dayTabsContent: { paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
+  dayTab: {
+    minHeight: 44,
+    minWidth: 60,
+    paddingHorizontal: 16,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayTabText: { fontSize: 14, fontWeight: '600' },
+  dayList: { padding: 16, gap: 10 },
+  periodCard: { borderWidth: 1, borderRadius: 12, padding: 14, gap: 4 },
+  periodTime: { fontSize: 12, fontWeight: '600' },
+  periodSubject: { fontSize: 16, fontWeight: '600' },
   // Read-only table grid styles
   tableHeaderRow: {
     flexDirection: 'row',

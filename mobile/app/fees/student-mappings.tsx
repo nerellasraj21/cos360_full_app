@@ -3,8 +3,6 @@ import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
 import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import CustomDropdown from '@/components/ui/dropdown';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAcademicYear } from '@/contexts/AcademicYearContext';
 import type {
   FeeStudentMappingResponse,
@@ -27,11 +25,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useState, useEffect, useMemo } from 'react';
-import { useAuth } from '@/contexts';
+import { useAuth, useTheme } from '@/contexts';
 import { roleBlocksFees } from '@/src/lib/menuUtils';
 import {
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -88,14 +89,12 @@ export function StudentMappingsContent() {
     }
   }, [activeAcademicYearId]);
 
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? 'dark' : 'light';
-  const colors = Colors[theme];
+  const { colors } = useTheme();
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToastContext();
   const { confirm: confirmModal, modalProps } = useConfirmModal();
 
-  const { data: mappingsRaw = [], isLoading, error } = useQuery({
+  const { data: mappingsRaw = [], isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['feeStudentMappings', filters],
     queryFn: () => feeStudentMappingsApi.getFeeStudentMappings(filters),
   });
@@ -156,7 +155,7 @@ export function StudentMappingsContent() {
     const parsed = item.total_fee ? parseFloat(item.total_fee) : NaN;
     return !isNaN(parsed)
       ? parsed
-      : item.student_fee_mapping_terms.reduce((sum, term) => sum + term.amount, 0);
+      : item.student_fee_mapping_terms.reduce((sum, term) => sum + Number(term.amount), 0);
   };
 
   // ── Search → sort → paginate ─────────────────────────────────────────────
@@ -302,7 +301,7 @@ export function StudentMappingsContent() {
   const handleEdit = (mapping: FeeStudentMappingResponse) => {
     // Calculate total fee from terms
     const parsedTotalFee = mapping.total_fee ? parseFloat(mapping.total_fee) : NaN;
-    const totalFee = !isNaN(parsedTotalFee) ? parsedTotalFee : mapping.student_fee_mapping_terms.reduce((sum, term) => sum + term.amount, 0);
+    const totalFee = !isNaN(parsedTotalFee) ? parsedTotalFee : mapping.student_fee_mapping_terms.reduce((sum, term) => sum + Number(term.amount), 0);
 
     let studentId = '';
     let studentAdmissionNum = '';
@@ -346,7 +345,6 @@ export function StudentMappingsContent() {
   };
 
   const handleDelete = (mapping: FeeStudentMappingResponse) => {
-    console.log('Delete button pressed for mapping:', mapping.id);
     const studentName = mapping.student_details?.name || `Student ${mapping.student_details?.admission_num || 'Unknown'}`;
 
     confirmModal({
@@ -355,7 +353,6 @@ export function StudentMappingsContent() {
       confirmLabel: 'Delete',
       destructive: true,
       onConfirm: () => {
-        console.log('Delete confirmed for mapping:', mapping.id);
         deleteMutation.mutate(mapping.id);
       },
     });
@@ -470,12 +467,12 @@ export function StudentMappingsContent() {
             Academic Year: {academicYearName}
           </ThemedText>
           <ThemedText style={[styles.mappingDetails, { color: colors['muted-foreground'] }]}>
-            Total Fee: ₹{totalFee}
+            Total Fee: ₹{Number(totalFee).toLocaleString('en-IN')}
           </ThemedText>
         </View>
 
         <View style={styles.actionButtons}>
-          <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS}>
+          <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS} fallback={null} loadingFallback={null}>
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: colors.primary }]}
               onPress={() => handleEdit(item)}
@@ -485,7 +482,7 @@ export function StudentMappingsContent() {
             </TouchableOpacity>
           </UpdatePermissionGuard>
 
-          <DeletePermissionGuard resource={PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS}>
+          <DeletePermissionGuard resource={PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS} fallback={null} loadingFallback={null}>
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: colors.destructive }]}
               onPress={() => handleDelete(item)}
@@ -562,7 +559,7 @@ export function StudentMappingsContent() {
     <View>
         <View style={styles.header}>
           <View style={styles.headerButtons}>
-            <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS}>
+            <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS} fallback={null} loadingFallback={null}>
               <TouchableOpacity
                 style={[styles.bulkButton, { backgroundColor: colors.secondary }]}
                 onPress={handleBulkCreate}
@@ -574,7 +571,7 @@ export function StudentMappingsContent() {
               </TouchableOpacity>
             </CreatePermissionGuard>
 
-            <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS}>
+            <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS} fallback={null} loadingFallback={null}>
               <TouchableOpacity
                 style={[styles.addButton, { backgroundColor: colors.primary }]}
                 onPress={handleCreate}
@@ -742,6 +739,7 @@ export function StudentMappingsContent() {
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={colors.primary} />}
           ListEmptyComponent={
             <ThemedView style={styles.emptyContainer}>
               <Ionicons name="people-outline" size={48} color={colors['muted-foreground']} />
@@ -794,7 +792,7 @@ export function StudentMappingsContent() {
           transparent={true}
           onRequestClose={() => setIsModalVisible(false)}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ThemedView style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <ThemedText type="subtitle">
@@ -806,7 +804,7 @@ export function StudentMappingsContent() {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.formScroll}>
+              <ScrollView style={styles.formScroll} keyboardShouldPersistTaps="handled">
                 <View style={styles.form}>
                   <ThemedText style={styles.label}>Student *</ThemedText>
                   <CustomDropdown
@@ -884,7 +882,7 @@ export function StudentMappingsContent() {
                 </TouchableOpacity>
               </View>
             </ThemedView>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Bulk Mapping Modal */}
@@ -894,7 +892,7 @@ export function StudentMappingsContent() {
           transparent={true}
           onRequestClose={() => setIsBulkModalVisible(false)}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ThemedView style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <ThemedText type="subtitle">Bulk Add Student Mappings</ThemedText>
@@ -904,7 +902,7 @@ export function StudentMappingsContent() {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.formScroll}>
+              <ScrollView style={styles.formScroll} keyboardShouldPersistTaps="handled">
                 <View style={styles.form}>
                   <ThemedText style={styles.label}>Students *</ThemedText>
                   <CustomDropdown
@@ -928,8 +926,8 @@ export function StudentMappingsContent() {
                       {bulkFormData.student_ids.map(id => {
                         const studentOption = studentOptions.find(s => s.value === id);
                         return (
-                          <View key={id} style={styles.selectedStudentChip}>
-                            <ThemedText style={styles.chipText}>{studentOption?.label}</ThemedText>
+                          <View key={id} style={[styles.selectedStudentChip, { backgroundColor: colors.secondary }]}>
+                            <ThemedText style={styles.chipText}>{studentOption?.label ?? ''}</ThemedText>
                             <TouchableOpacity
                               onPress={() => setBulkFormData(prev => ({
                                 ...prev,
@@ -1005,7 +1003,7 @@ export function StudentMappingsContent() {
                 </TouchableOpacity>
               </View>
             </ThemedView>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
       </ThemedView>
@@ -1059,7 +1057,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 12,
     borderRadius: 6,
   },
   bulkButtonText: {
@@ -1070,7 +1068,7 @@ const styles = StyleSheet.create({
   addButton: {
     flexDirection: 'row',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 12,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1104,9 +1102,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 18,
     borderWidth: 1,
   },
   sortChipText: {
@@ -1127,8 +1125,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderRadius: 6,
     borderWidth: 1,
   },
@@ -1175,6 +1173,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
+    minWidth: 40,
+    minHeight: 40,
     padding: 8,
     borderRadius: 6,
     alignItems: 'center',
@@ -1253,14 +1253,14 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
   },
   submitButton: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     alignItems: 'center',
   },
@@ -1315,7 +1315,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   compactDropdown: {
-    height: 38,
+    height: 44,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
@@ -1324,7 +1324,7 @@ const styles = StyleSheet.create({
   },
   clearFiltersButton: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',

@@ -11,6 +11,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  KeyboardAvoidingView,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -74,7 +75,7 @@ function EditClassModal({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: themeColors.border }]}>
             <ThemedText type="title" style={styles.modalTitle}>Edit Class</ThemedText>
@@ -142,7 +143,7 @@ function EditClassModal({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -192,7 +193,7 @@ function SectionModal({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: themeColors.border }]}>
             <View>
@@ -247,7 +248,7 @@ function SectionModal({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -350,7 +351,7 @@ function CreateClassModal({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: themeColors.border }]}>
             <ThemedText type="title" style={styles.modalTitle}>{stepTitle}</ThemedText>
@@ -544,7 +545,7 @@ function CreateClassModal({
             )}
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -933,7 +934,7 @@ export default function ClassesAndSectionsScreen() {
         <ThemedView style={styles.container}>
           <View style={styles.center}>
             <ThemedText type="title">Access Denied</ThemedText>
-            <ThemedText>You don't have permission to view classes and sections</ThemedText>
+            <ThemedText>You don&apos;t have permission to view classes and sections</ThemedText>
           </View>
         </ThemedView>
       }
@@ -1198,7 +1199,7 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 12 },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   badgeText: { fontSize: 11, fontWeight: '600' },
-  iconBtn: { width: 28, height: 28, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  iconBtn: { width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
 
   // Sections
   sectionsContainer: { borderTopWidth: 1, paddingHorizontal: 12, paddingVertical: 8, gap: 6 },

@@ -8,6 +8,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -515,7 +517,7 @@ function AdminTransportView() {
           animationType="fade"
           onRequestClose={() => { setShowAssignModal(false); resetForm(); }}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={[styles.modalDialog, { backgroundColor: colors.card }]}>
               {/* Header */}
               <View style={styles.modalHeader}>
@@ -610,7 +612,7 @@ function AdminTransportView() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       </AppLayout>
     </ReadOrListPermissionGuard>

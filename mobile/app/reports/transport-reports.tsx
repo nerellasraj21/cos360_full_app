@@ -47,7 +47,7 @@ function TransportReportsScreenContent() {
       'transport_report.csv',
       ['Type', 'Name', 'Details', 'Status'],
       [
-        ...(routes as any[]).map(r => ['Route', r.route_name, `${r.starting_stop} → ${r.ending_stop}`, r.is_active ? 'Active' : 'Inactive']),
+        ...(routes as any[]).map(r => ['Route', r.route_name, `${r.starting_stop} to ${r.ending_stop}`, r.is_active ? 'Active' : 'Inactive']),
         ...(vehicles as any[]).map(v => ['Vehicle', v.name, v.registration_number, v.is_active ? 'Active' : 'Inactive']),
         ...(trips as any[]).map(t => ['Trip', `Trip #${t.trip_number}`, t.id, '']),
       ],
@@ -116,7 +116,7 @@ function TransportReportsScreenContent() {
                 </View>
               </View>
               <Text style={[styles.rowSub, { color: colors['muted-foreground'] }]} numberOfLines={1}>
-                {route.starting_stop} → {route.ending_stop}
+                {route.starting_stop} to {route.ending_stop}
               </Text>
             </View>
           ))}
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   bannerDecor: { position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.12)' },
   bannerIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700', flex: 1 },
-  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 11, borderRadius: 8 },
   exportBtnText: { color: 'white', fontSize: 12, fontWeight: '700' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   loadingText: { fontSize: 14 },

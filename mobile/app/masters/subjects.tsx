@@ -3,15 +3,16 @@
 import { useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-    FlatList,
-    Modal,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+  KeyboardAvoidingView,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -387,7 +388,7 @@ export default function SubjectsScreen() {
         <ThemedView style={styles.container}>
           <View style={styles.centerContainer}>
             <ThemedText type="title">Access Denied</ThemedText>
-            <ThemedText>You don't have permission to view subjects</ThemedText>
+            <ThemedText>You don&apos;t have permission to view subjects</ThemedText>
           </View>
         </ThemedView>
       }
@@ -581,7 +582,7 @@ export default function SubjectsScreen() {
         transparent={true}
         onRequestClose={() => setIsModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
             <View style={styles.modalHeader}>
               <ThemedText type="title" style={styles.modalTitle}>
@@ -622,7 +623,7 @@ export default function SubjectsScreen() {
                   </ThemedText>
                 )}
                 <CustomDropdown
-                  data={(categoriesData || []).map((category: SubjectCategory) => ({ label: category.name, value: category.id }))}
+                  data={(categoriesData || []).map((category: SubjectCategory) => ({ label: category.name || '', value: category.id }))}
                   value={formData.category_id}
                   onChange={(v) => setFormData(prev => ({ ...prev, category_id: v?.toString() ?? '' }))}
                   placeholder="Select Category"
@@ -672,7 +673,7 @@ export default function SubjectsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Create Category Modal */}
@@ -682,7 +683,7 @@ export default function SubjectsScreen() {
         transparent={true}
         onRequestClose={() => setIsCategoryModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
             <View style={styles.modalHeader}>
               <ThemedText type="title" style={styles.modalTitle}>
@@ -725,7 +726,7 @@ export default function SubjectsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
       <ConfirmModal {...modalProps} />
       </ThemedView>
@@ -917,9 +918,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },

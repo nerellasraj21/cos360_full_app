@@ -248,7 +248,7 @@ export default function HomeScreen() {
           <View style={styles.heroTop}>
             <View style={{ flex: 1 }}>
               <Text style={styles.heroGreeting}>{getGreeting()},</Text>
-              <Text style={styles.heroName}>{user?.username || 'User'} 👋</Text>
+              <Text style={styles.heroName}>{user?.username || 'User'}</Text>
               <View style={styles.heroDateRow}>
                 <Ionicons name="calendar-outline" size={13} color="rgba(255,255,255,0.65)" />
                 <Text style={styles.heroDate}>{getFormattedDate()}</Text>

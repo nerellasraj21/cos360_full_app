@@ -53,7 +53,6 @@ export default function MastersScreen() {
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
-  const comingSoonBorderCol = theme === 'dark' ? 'rgba(255,255,255,0.15)' : '#cbd5e1';
 
   // Sections come from the backend menu (same source as the web dashboard),
   // so a user only sees what their role's menu actually grants.
@@ -86,17 +85,6 @@ export default function MastersScreen() {
             <Text style={styles.bannerTitle}>Masters Dashboard</Text>
             <Text style={styles.bannerSub}>Configure and manage all master data for the school system</Text>
           </View>
-        </View>
-
-        {/* Coming Soon card */}
-        <View style={[styles.comingSoonCard, { borderColor: comingSoonBorderCol, backgroundColor: cardBg }]}>
-          <Ionicons name="settings" size={44} color={colors['muted-foreground']} />
-          <Text style={[styles.comingSoonTitle, { color: colors.foreground }]}>
-            Masters Dashboard — Coming Soon
-          </Text>
-          <Text style={[styles.comingSoonDesc, { color: colors['muted-foreground'] }]}>
-            A unified overview and quick-access dashboard is being built. Use the sections below to navigate individual master data sections.
-          </Text>
         </View>
 
         {/* Section label */}
@@ -170,13 +158,6 @@ const styles = StyleSheet.create({
   },
   bannerTitle: { color: 'white', fontSize: 18, fontWeight: '700', marginBottom: 3 },
   bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 11, lineHeight: 16 },
-  comingSoonCard: {
-    borderRadius: 14, borderWidth: 1.5,
-    borderStyle: 'dashed', padding: 28,
-    marginBottom: 20, alignItems: 'center', gap: 10,
-  },
-  comingSoonTitle: { fontSize: 16, fontWeight: '600', textAlign: 'center', marginTop: 4 },
-  comingSoonDesc: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
   sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 12 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   sectionCard: {

@@ -30,7 +30,7 @@ class ErrorHandler {
     retryDelay: 1000,
   };
 
-  private retryTimeouts = new Map<string, number>();
+  private retryTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
   configure(config: Partial<ErrorHandlerConfig>) {
     this.config = { ...this.config, ...config };

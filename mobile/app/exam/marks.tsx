@@ -53,7 +53,7 @@ interface SummaryGroup {
 }
 
 const EMPTY_STUDENT_SET: Set<string> = new Set();
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 200;
 
 function MarkEntryScreenContent() {
   const { examId } = useLocalSearchParams<{ examId?: string }>();
@@ -121,13 +121,13 @@ function MarkEntryScreenContent() {
   const classNameMap = Object.fromEntries(classList.map(c => [c.id, c.name]));
   const sectionNameMap = Object.fromEntries(classList.flatMap(c => (c.sections ?? []).map(s => [s.id, s.name])));
   const csLabel = (classId: string, sectionId?: string) =>
-    [classNameMap[classId], sectionId ? sectionNameMap[sectionId] : null].filter(Boolean).join(' – ') || classId;
+    [classNameMap[classId], sectionId ? sectionNameMap[sectionId] : null].filter(Boolean).join(' – ') || 'Class';
   const subjectLabel = (cfg: ExamSubjectConfig) =>
-    cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? cfg.subject_id;
+    cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? 'Subject';
   const totalComponentsOf = (cfg: ExamSubjectConfig) =>
     cfg.components.filter(c => c.include_in_total && c.entry_type === 'marks');
   const totalMarks = (cfg: ExamSubjectConfig) =>
-    totalComponentsOf(cfg).reduce((sum, c) => sum + (c.max_marks ?? 0), 0);
+    totalComponentsOf(cfg).reduce((sum, c) => sum + Number(c.max_marks ?? 0), 0);
 
   // Group subject-configs by class-section for the web-style summary
   const summaryGroups: SummaryGroup[] = useMemo(() => {
@@ -485,9 +485,9 @@ function MarkEntryScreenContent() {
         <View style={{ flex: 1 }}>
           <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</Text>
           <Text style={[styles.studentName, { color: colors.foreground }]}>
-            {item.student_name ?? item.student_id}
+            {item.student_name ?? 'Student'}
           </Text>
-          {item.admission_number && (
+          {!!item.admission_number && (
             <Text style={[styles.admNo, { color: colors['muted-foreground'] }]}>{item.admission_number}</Text>
           )}
         </View>
@@ -580,7 +580,7 @@ function MarkEntryScreenContent() {
                 <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>No subjects configured for this exam</Text>
               </View>
             ) : (
-              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
                 {summaryGroups.map(group => {
                   const roster = rosterByGroup.get(group.key) ?? [];
                   const selected = studentSelectionByGroup[group.key] ?? EMPTY_STUDENT_SET;
@@ -629,7 +629,7 @@ function MarkEntryScreenContent() {
                             return (
                               <View key={s.student_id} style={styles.grandTotalRow}>
                                 <Text style={[styles.grandTotalName, { color: colors.foreground }]} numberOfLines={1}>
-                                  {s.student_name ?? s.student_id}
+                                  {s.student_name ?? 'Student'}
                                 </Text>
                                 <Text style={[styles.grandTotalValue, { color: colors.primary as string }]}>
                                   {gt !== null ? gt : '–'}
@@ -688,6 +688,7 @@ function MarkEntryScreenContent() {
               keyExtractor={(item, index) => (item.student_id && item.component_id) ? item.student_id + item.component_id : String(index)}
               renderItem={renderRow}
               style={{ flex: 1 }}
+              keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ paddingTop: 8, paddingBottom: 120, flexGrow: 1 }}
               ListHeaderComponent={
                 <>
@@ -824,11 +825,11 @@ function MarkEntryScreenContent() {
               animationType="slide"
               onRequestClose={() => setStudentPickerOpenFor('')}
             >
-              <View style={styles.modalOverlay}>
+              <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <View style={[styles.modalSheet, { backgroundColor: colors.background }]}>
                   <View style={styles.modalHeader}>
                     <Text style={[styles.modalTitle, { color: colors.foreground }]}>Select Students</Text>
-                    <TouchableOpacity onPress={() => setStudentPickerOpenFor('')}>
+                    <TouchableOpacity onPress={() => setStudentPickerOpenFor('')} accessibilityLabel="Close" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                       <Ionicons name="close" size={22} color={colors['muted-foreground']} />
                     </TouchableOpacity>
                   </View>
@@ -858,6 +859,7 @@ function MarkEntryScreenContent() {
                     data={filteredPickerRoster}
                     keyExtractor={s => s.student_id}
                     style={{ maxHeight: 320 }}
+                    keyboardShouldPersistTaps="handled"
                     renderItem={({ item }) => {
                       const checked = pickerSelected.has(item.student_id);
                       return (
@@ -873,9 +875,9 @@ function MarkEntryScreenContent() {
                           />
                           <View style={{ flex: 1 }}>
                             <Text style={[styles.studentRowName, { color: colors.foreground }]}>
-                              {item.student_name ?? item.student_id}
+                              {item.student_name ?? 'Student'}
                             </Text>
-                            {item.admission_number && (
+                            {!!item.admission_number && (
                               <Text style={[styles.admNo, { color: colors['muted-foreground'] }]}>{item.admission_number}</Text>
                             )}
                           </View>
@@ -896,7 +898,7 @@ function MarkEntryScreenContent() {
                     <Text style={styles.doneBtnText}>Done ({pickerSelected.size} selected)</Text>
                   </TouchableOpacity>
                 </View>
-              </View>
+              </KeyboardAvoidingView>
             </Modal>
           );
         })()}
@@ -930,11 +932,11 @@ const styles = StyleSheet.create({
   filterRow: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
   filterLabel: { fontSize: 12, fontWeight: '600', marginBottom: 6 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
+  chip: { paddingHorizontal: 14, minHeight: 40, justifyContent: 'center', borderRadius: 20, borderWidth: 1 },
   chipText: { fontSize: 12, fontWeight: '500' },
   studentsSummaryBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1,
+    paddingHorizontal: 12, minHeight: 44, borderRadius: 10, borderWidth: 1,
   },
   studentsSummaryText: { flex: 1, fontSize: 13, fontWeight: '600' },
   headerRow: {
@@ -956,7 +958,7 @@ const styles = StyleSheet.create({
   },
   absentText: { fontSize: 11, fontWeight: '700', color: 'white' },
   marksInput: {
-    width: 64, height: 36, borderWidth: 1, borderRadius: 8,
+    width: 64, height: 44, borderWidth: 1, borderRadius: 8,
     textAlign: 'center', fontSize: 14, fontWeight: '600',
   },
   totalCell: { width: 56, alignItems: 'center', justifyContent: 'center' },
@@ -989,7 +991,7 @@ const styles = StyleSheet.create({
   },
   grandTotalName: { flex: 1, fontSize: 13, fontWeight: '500' },
   grandTotalValue: { fontSize: 14, fontWeight: '700' },
-  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderTopWidth: 1 },
+  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, minHeight: 56, borderTopWidth: 1 },
   summarySubject: { fontSize: 14, fontWeight: '600' },
   componentWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 6 },
   componentBadge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
@@ -998,7 +1000,7 @@ const styles = StyleSheet.create({
   enterMarks: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   enterMarksText: { fontSize: 12, fontWeight: '600' },
   bulkRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
-  bulkBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
+  bulkBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, minHeight: 44 },
   bulkBtnText: { fontSize: 12, fontWeight: '600' },
   saveBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
@@ -1018,17 +1020,17 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   modalTitle: { fontSize: 16, fontWeight: '700' },
   searchInput: {
-    height: 40, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12,
+    height: 44, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12,
     fontSize: 13, marginBottom: 10,
   },
   selectAllRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 8, marginBottom: 4,
+    minHeight: 44, marginBottom: 4,
   },
   selectAllText: { fontSize: 14, fontWeight: '600' },
   studentRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.15)',
+    minHeight: 48, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.15)',
   },
   studentRowName: { fontSize: 14, fontWeight: '600' },
   doneBtn: {

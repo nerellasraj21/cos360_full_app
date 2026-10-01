@@ -29,7 +29,7 @@ function ParentAttendanceScreenContent() {
   const [startDate] = useState(toYYYYMMDD(monthAgo));
   const [endDate] = useState(toYYYYMMDD(today));
 
-  const { data: records, isLoading, error, refetch } = useQuery({
+  const { data: records, isLoading, isRefetching, error, refetch } = useQuery({
     queryKey: ['parentAttendance', selectedStudent?.id, startDate, endDate],
     queryFn: () =>
       studentAttendanceApi.getStudentAttendanceFilter(selectedStudent!.id, {
@@ -65,6 +65,22 @@ function ParentAttendanceScreenContent() {
     );
   }
 
+  if (error) {
+    return (
+      <AppLayout title="Attendance">
+        <View style={styles.centered}>
+          <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+          <Text style={[styles.centeredText, { color: colors['muted-foreground'] }]}>
+            Could not load attendance.
+          </Text>
+          <TouchableOpacity style={styles.linkBtn} onPress={() => refetch()}>
+            <Text style={{ color: '#556ee6', fontWeight: '600' }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </AppLayout>
+    );
+  }
+
   const rows = records ?? [];
   const present = rows.filter((r) => r.status === 'present').length;
   const absent = rows.filter((r) => r.status === 'absent').length;
@@ -76,6 +92,8 @@ function ParentAttendanceScreenContent() {
       <FlatList
         data={[...rows].reverse()}
         keyExtractor={(item) => item.id}
+        refreshing={isRefetching}
+        onRefresh={refetch}
         contentContainerStyle={styles.list}
         ListHeaderComponent={
           <>
@@ -99,7 +117,7 @@ function ParentAttendanceScreenContent() {
               </View>
             </View>
             <Text style={[styles.rangeLabel, { color: colors['muted-foreground'] }]}>
-              Last 30 days ({startDate} → {endDate})
+              Last 30 days ({startDate} to {endDate})
             </Text>
           </>
         }
@@ -132,7 +150,7 @@ function ParentAttendanceScreenContent() {
                   { color: STATUS_COLOR[item.status] ?? '#94a3b8' },
                 ]}
               >
-                {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                {(item.status ?? '').charAt(0).toUpperCase() + (item.status ?? '').slice(1)}
               </Text>
             </View>
             {item.remarks ? (

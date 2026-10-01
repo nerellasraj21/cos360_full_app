@@ -19,7 +19,9 @@ import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -42,6 +44,7 @@ export default function StudentTransportScreen() {
   const isStudent = roleName === 'student';
   const isParent = ['parent', 'guardian', 'father', 'mother'].includes(roleName);
 
+  const [refreshing, setRefreshing] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editing, setEditing] = useState<StudentTransportOut | null>(null);
   const [form, setForm] = useState({ student_id: '', trip_id: '', stop_id: '', fee_per_term: '' });
@@ -106,7 +109,7 @@ export default function StudentTransportScreen() {
   // ── Dropdown options ───────────────────────────────────────────────────────
   const studentOptions = useMemo(
     () => (studentsDropdown as any[]).map(s => ({
-      label: `${s.display_name} (${s.admission_number})` || '',
+      label: s.admission_number ? `${s.display_name} (${s.admission_number})` : (s.display_name || ''),
       value: s.id,
     })),
     [studentsDropdown],
@@ -222,9 +225,9 @@ export default function StudentTransportScreen() {
             <View style={[styles.readCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
               <InfoRow icon="bus-outline" label={`Route: ${myTransport.trip?.route?.route_name ?? '—'} · Trip #${myTransport.trip?.trip_number ?? '—'}`} colors={colors} />
               <InfoRow icon="location-outline" label={`Stop: ${myTransport.stop?.name ?? '—'}`} colors={colors} />
-              {myTransport.stop?.pickup_time && <InfoRow icon="time-outline" label={`Pickup: ${myTransport.stop.pickup_time}`} colors={colors} />}
-              {myTransport.stop?.drop_time   && <InfoRow icon="time-outline" label={`Drop: ${myTransport.stop.drop_time}`} colors={colors} />}
-              <InfoRow icon="cash-outline" label={`₹${myTransport.fee_per_term}/term`} colors={colors} />
+              {!!myTransport.stop?.pickup_time && <InfoRow icon="time-outline" label={`Pickup: ${myTransport.stop.pickup_time}`} colors={colors} />}
+              {!!myTransport.stop?.drop_time && <InfoRow icon="time-outline" label={`Drop: ${myTransport.stop.drop_time}`} colors={colors} />}
+              <InfoRow icon="cash-outline" label={`₹${Number(myTransport.fee_per_term).toLocaleString('en-IN')}/term`} colors={colors} />
             </View>
           </View>
         ) : (
@@ -260,9 +263,9 @@ export default function StudentTransportScreen() {
             <View style={[styles.readCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
               <InfoRow icon="bus-outline" label={`Route: ${childTransport.trip?.route?.route_name ?? '—'} · Trip #${childTransport.trip?.trip_number ?? '—'}`} colors={colors} />
               <InfoRow icon="location-outline" label={`Stop: ${childTransport.stop?.name ?? '—'}`} colors={colors} />
-              {childTransport.stop?.pickup_time && <InfoRow icon="time-outline" label={`Pickup: ${childTransport.stop.pickup_time}`} colors={colors} />}
-              {childTransport.stop?.drop_time   && <InfoRow icon="time-outline" label={`Drop: ${childTransport.stop.drop_time}`} colors={colors} />}
-              <InfoRow icon="cash-outline" label={`₹${childTransport.fee_per_term}/term`} colors={colors} />
+              {!!childTransport.stop?.pickup_time && <InfoRow icon="time-outline" label={`Pickup: ${childTransport.stop.pickup_time}`} colors={colors} />}
+              {!!childTransport.stop?.drop_time && <InfoRow icon="time-outline" label={`Drop: ${childTransport.stop.drop_time}`} colors={colors} />}
+              <InfoRow icon="cash-outline" label={`₹${Number(childTransport.fee_per_term).toLocaleString('en-IN')}/term`} colors={colors} />
             </View>
           </View>
         ) : (
@@ -281,7 +284,7 @@ export default function StudentTransportScreen() {
   const renderItem = ({ item, index }: { item: StudentTransportOut; index: number }) => {
     const studentName = item.student
       ? `${item.student.first_name} ${item.student.last_name}`
-      : item.student_id;
+      : 'Unknown student';
     return (
       <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
         <View style={styles.cardTop}>
@@ -295,15 +298,15 @@ export default function StudentTransportScreen() {
               {item.trip?.route?.route_name ?? '—'} · Trip #{item.trip?.trip_number ?? '—'}
             </Text>
           </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
-              <TouchableOpacity onPress={() => openEdit(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          <View style={{ flexDirection: 'row' }}>
+            <UpdatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT} fallback={null} loadingFallback={null}>
+              <TouchableOpacity style={styles.iconBtn} onPress={() => openEdit(item)}
               accessibilityLabel="Edit">
                 <Ionicons name="create-outline" size={18} color={colors['muted-foreground']} />
               </TouchableOpacity>
             </UpdatePermissionGuard>
-            <DeletePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
-              <TouchableOpacity onPress={() => handleDelete(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            <DeletePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT} fallback={null} loadingFallback={null}>
+              <TouchableOpacity style={styles.iconBtn} onPress={() => handleDelete(item)}
               accessibilityLabel="Delete">
                 <Ionicons name="trash-outline" size={18} color="#EF4444" />
               </TouchableOpacity>
@@ -312,9 +315,9 @@ export default function StudentTransportScreen() {
         </View>
         <View style={[styles.cardBody, { borderTopColor: borderCol }]}>
           <InfoRow icon="location-outline" label={`Stop: ${item.stop?.name ?? '—'}`} colors={colors} small />
-          {item.stop?.pickup_time && <InfoRow icon="time-outline" label={`Pickup: ${item.stop.pickup_time}`} colors={colors} small />}
-          {item.stop?.drop_time   && <InfoRow icon="time-outline" label={`Drop: ${item.stop.drop_time}`} colors={colors} small />}
-          <InfoRow icon="cash-outline" label={`₹${item.fee_per_term}/term`} colors={colors} small />
+          {!!item.stop?.pickup_time && <InfoRow icon="time-outline" label={`Pickup: ${item.stop.pickup_time}`} colors={colors} small />}
+          {!!item.stop?.drop_time && <InfoRow icon="time-outline" label={`Drop: ${item.stop.drop_time}`} colors={colors} small />}
+          <InfoRow icon="cash-outline" label={`₹${Number(item.fee_per_term).toLocaleString('en-IN')}/term`} colors={colors} small />
         </View>
       </View>
     );
@@ -327,7 +330,7 @@ export default function StudentTransportScreen() {
       <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
         {/* Action bar */}
         <View style={styles.topBar}>
-          <CreatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT}>
+          <CreatePermissionGuard resource={PERMISSION_RESOURCES.STUDENT_TRANSPORT} fallback={null} loadingFallback={null}>
             <TouchableOpacity style={[styles.addBtn, { backgroundColor: AMBER }]} onPress={openCreate}>
               <Ionicons name="add" size={16} color="white" />
               <Text style={styles.addBtnText}>Add Assignment</Text>
@@ -344,7 +347,17 @@ export default function StudentTransportScreen() {
             renderItem={renderItem}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={AMBER} />}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                tintColor={AMBER}
+                onRefresh={async () => {
+                  setRefreshing(true);
+                  try { await refetch(); } finally { setRefreshing(false); }
+                }}
+              />
+            }
             ListEmptyComponent={
               <View style={styles.centered}>
                 <Ionicons name="bus-outline" size={48} color={colors['muted-foreground']} />
@@ -358,7 +371,7 @@ export default function StudentTransportScreen() {
 
         {/* Create / Edit Modal */}
         <Modal visible={isModalVisible} animationType="slide" transparent onRequestClose={() => setIsModalVisible(false)}>
-          <View style={styles.overlay}>
+          <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={[styles.modal, { backgroundColor: colors.background }]}>
               <View style={styles.modalTop}>
                 <Text style={[styles.modalTitle, { color: colors.foreground }]}>
@@ -370,7 +383,7 @@ export default function StudentTransportScreen() {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Text style={[styles.label, { color: colors.foreground }]}>Student *</Text>
                 <CustomDropdown
                   data={studentOptions}
@@ -418,7 +431,7 @@ export default function StudentTransportScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
         <ConfirmModal {...confirmModalProps} />
       </ReadOrListPermissionGuard>
@@ -441,9 +454,10 @@ function InfoRow({ icon, label, colors, small }: {
 const styles = StyleSheet.create({
   serialNo: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
   topBar: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8, alignItems: 'flex-end' },
-  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 9 },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12 },
   addBtnText: { color: 'white', fontSize: 13, fontWeight: '600' },
   list: { padding: 16, paddingTop: 8, gap: 12 },
+  iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   card: { borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
   iconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
@@ -454,12 +468,12 @@ const styles = StyleSheet.create({
   centered: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48 },
   emptyText: { marginTop: 12, fontSize: 14 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modal: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '90%' },
+  modal: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32, maxHeight: '90%' },
   modalTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 17, fontWeight: '700' },
   label: { fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 14 },
   input: { borderWidth: 1, borderRadius: 10, padding: 11, fontSize: 14 },
   modalFooter: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  cancelBtn: { flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
-  submitBtn: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
+  cancelBtn: { flex: 1, padding: 14, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
+  submitBtn: { flex: 1, padding: 14, borderRadius: 10, alignItems: 'center' },
 });

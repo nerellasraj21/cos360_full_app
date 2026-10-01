@@ -4,7 +4,9 @@ import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -246,7 +248,7 @@ export default function CommunicationTab() {
 
   // ── Queries ─────────────────────────────────────────────────────────────
 
-  const { data: templates } = useQuery({
+  const { data: templates, refetch: refetchTemplates, isRefetching: templatesRefetching } = useQuery({
     queryKey: ['comm-templates'],
     queryFn: () => communicationApi.getTemplates(),
   });
@@ -268,7 +270,7 @@ export default function CommunicationTab() {
     page_size: LOG_PAGE_SIZE,
   };
 
-  const { data: logsPage, isLoading: logsLoading } = useQuery<LogsPage>({
+  const { data: logsPage, isLoading: logsLoading, refetch: refetchLogs, isRefetching: logsRefetching } = useQuery<LogsPage>({
     queryKey: ['comm-logs', logsFilters],
     queryFn: () => communicationApi.getLogs(logsFilters),
     enabled: activeTab === 'logs',
@@ -473,13 +475,13 @@ export default function CommunicationTab() {
     ? []
     : (composeTemplates ?? [])
         .filter((t) => t.is_active)
-        .map((t) => ({ label: t.name, value: t.id }));
+        .map((t) => ({ label: t.name ?? '', value: t.id }));
 
   const filteredTemplates = HIDE_TEMPLATES ? [] : (templates ?? []).filter((t) => {
     const matchChannel = !filterChannel || t.channel === filterChannel;
     const matchStatus =
       !filterStatus || (filterStatus === 'active' ? t.is_active : !t.is_active);
-    const matchSearch = !searchText || t.name.toLowerCase().includes(searchText.toLowerCase());
+    const matchSearch = !searchText || (t.name ?? '').toLowerCase().includes(searchText.toLowerCase());
     return matchChannel && matchStatus && matchSearch;
   });
 
@@ -750,7 +752,7 @@ export default function CommunicationTab() {
                     search={false}
                   />
 
-                  {classId && sectionId && (
+                  {!!classId && !!sectionId && (
                     <View style={[styles.studentListBox, { borderColor: borderCol }]}>
                       <View style={styles.studentListHeader}>
                         <Text style={{ fontSize: 13, fontWeight: '600', color: colors.foreground }}>Students</Text>
@@ -1044,6 +1046,8 @@ export default function CommunicationTab() {
           <FlatList
             data={filteredTemplates}
             keyExtractor={(t) => t.id}
+            refreshing={templatesRefetching}
+            onRefresh={refetchTemplates}
             contentContainerStyle={{ padding: 12, gap: 8, paddingBottom: 32 }}
             ListEmptyComponent={
               <View style={styles.centered}>
@@ -1180,6 +1184,8 @@ export default function CommunicationTab() {
               <FlatList
                 data={logs}
                 keyExtractor={(item) => item.id}
+                refreshing={logsRefetching}
+                onRefresh={refetchLogs}
                 contentContainerStyle={styles.logList}
                 ListEmptyComponent={
                   <View style={styles.centered}>
@@ -1211,14 +1217,14 @@ export default function CommunicationTab() {
                         <Text style={[styles.cardMeta, { color: colors['muted-foreground'] }]}>
                           {item.target_type.replace(/_/g, ' ')}
                         </Text>
-                        {item.recipient_phone && (
+                        {!!item.recipient_phone && (
                           <Text style={[styles.cardMeta, { color: colors['muted-foreground'] }]}>
-                            📱 {item.recipient_phone}
+                            Phone: {item.recipient_phone}
                           </Text>
                         )}
-                        {item.recipient_email && (
+                        {!!item.recipient_email && (
                           <Text style={[styles.cardMeta, { color: colors['muted-foreground'] }]}>
-                            ✉ {item.recipient_email}
+                            Email: {item.recipient_email}
                           </Text>
                         )}
                         <Text style={[styles.cardDate, { color: colors['muted-foreground'] }]}>
@@ -1279,7 +1285,7 @@ export default function CommunicationTab() {
         transparent
         onRequestClose={() => setShowModal(false)}
       >
-        <View style={styles.overlay}>
+        <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modal, { backgroundColor: colors.background }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
@@ -1386,7 +1392,7 @@ export default function CommunicationTab() {
 
               {/* Variables tip */}
               <Text style={[styles.hint, { color: colors['muted-foreground'] }]}>
-                💡 Common: {'{{name}}'}, {'{{parent_name}}'}, {'{{class_name}}'}, {'{{amount}}'}, {'{{due_date}}'}
+                Common: {'{{name}}'}, {'{{parent_name}}'}, {'{{class_name}}'}, {'{{amount}}'}, {'{{due_date}}'}
               </Text>
 
               {/* Channel selector — disabled when editing */}
@@ -1417,13 +1423,13 @@ export default function CommunicationTab() {
               </View>
               {editing && (
                 <Text style={[styles.hint, { color: colors['muted-foreground'] }]}>
-                  ⚠ Channel cannot be changed on existing templates.
+                  Channel cannot be changed on existing templates.
                 </Text>
               )}
             </ScrollView>
 
             <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowModal(false)}>
+              <TouchableOpacity style={[styles.cancelBtn, { backgroundColor: inputBg }]} onPress={() => setShowModal(false)}>
                 <Text style={{ color: colors.foreground }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1437,7 +1443,7 @@ export default function CommunicationTab() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ════════════════════════════════════
@@ -1520,7 +1526,7 @@ export default function CommunicationTab() {
 
             <View style={styles.modalFooter}>
               <TouchableOpacity
-                style={styles.cancelBtn}
+                style={[styles.cancelBtn, { backgroundColor: inputBg }]}
                 onPress={() => setShowConfirm(false)}
                 disabled={sendMutation.isPending}
               >
@@ -1588,7 +1594,7 @@ export default function CommunicationTab() {
                 </View>
 
                 {/* Error box */}
-                {logDetail.error_message && (
+                {!!logDetail.error_message && (
                   <View style={[styles.errorBox, { backgroundColor: '#EF444418', borderColor: '#EF444440' }]}>
                     <Ionicons name="alert-circle-outline" size={16} color="#EF4444" />
                     <Text style={[styles.errorText, { color: '#EF4444' }]}>{logDetail.error_message}</Text>
@@ -1739,7 +1745,7 @@ const styles = StyleSheet.create({
   cardMeta: { fontSize: 12, lineHeight: 17, marginBottom: 2 },
   cardDate: { fontSize: 11, marginTop: 2 },
   rowActions: { flexDirection: 'column', gap: 6 },
-  iconBtn: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  iconBtn: { width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
 
   // Logs
   logList: { padding: 12, gap: 8, paddingBottom: 32 },
@@ -1799,7 +1805,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1,
   },
   pageBtn: {
-    width: 36, height: 36, borderRadius: 10, alignItems: 'center',
+    width: 44, height: 44, borderRadius: 10, alignItems: 'center',
     justifyContent: 'center', backgroundColor: '#556ee618',
   },
   pageInfo: { fontSize: 13, fontWeight: '600' },

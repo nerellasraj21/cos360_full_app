@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  ActivityIndicator, Modal, ScrollView, StyleSheet, Text,
+  ActivityIndicator, KeyboardAvoidingView, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text,
   TextInput, TouchableOpacity, View,
 } from 'react-native';
 
@@ -71,7 +71,7 @@ export default function ExamDetailScreen() {
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
   const inputBg = theme === 'dark' ? '#0f0f23' : '#f8fafc';
 
-  const { data: exam, isLoading, error } = useQuery({
+  const { data: exam, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['exam', id],
     queryFn: () => examsApi.getById(id),
     enabled: !!id,
@@ -278,7 +278,12 @@ export default function ExamDetailScreen() {
 
   return (
     <AppLayout title={exam.exam_name}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
+      >
 
         {/* Header Card */}
         <View style={[styles.headerCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
@@ -299,7 +304,7 @@ export default function ExamDetailScreen() {
             <View style={styles.metaItem}>
               <Ionicons name="school-outline" size={16} color={colors['muted-foreground']} />
               <Text style={[styles.metaText, { color: colors['muted-foreground'] }]}>
-                {exam.board} · {exam.level.replace('_', ' ')}
+                {exam.board} · {exam.level.replace(/_/g, ' ')}
               </Text>
             </View>
             <View style={styles.metaItem}>
@@ -307,10 +312,10 @@ export default function ExamDetailScreen() {
               <Text style={[styles.metaText, { color: colors['muted-foreground'] }]}>
                 {exam.academic_year_title
                   ?? academicYears.find(y => y.id === exam.academic_year_id)?.title
-                  ?? exam.academic_year_id}
+                  ?? ''}
               </Text>
             </View>
-            {exam.mark_entry_deadline && (
+            {!!exam.mark_entry_deadline && (
               <View style={styles.metaItem}>
                 <Ionicons name="time-outline" size={16} color="#F59E0B" />
                 <Text style={[styles.metaText, { color: '#F59E0B' }]}>
@@ -442,7 +447,7 @@ export default function ExamDetailScreen() {
                 <Text style={[styles.statValue, { color: colors.foreground }]}>
                   {exam.academic_year_title
                     ?? academicYears.find(y => y.id === exam.academic_year_id)?.title
-                    ?? exam.academic_year_id}
+                    ?? ''}
                 </Text>
               </View>
               <View style={[styles.statCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
@@ -505,7 +510,7 @@ export default function ExamDetailScreen() {
                   const configs = subjectConfigs.filter(cfg => cfg.class_id === cs.class_id && cfg.section_id === cs.section_id);
                   if (configs.length === 0) return null;
                   const sectionLabel = cs.section_name ?? (cs.section_id ? sectionNameMap[cs.section_id] : null);
-                  const csLabel = [cs.class_name ?? classNameMap[cs.class_id], sectionLabel].filter(Boolean).join(' – ') || cs.class_id;
+                  const csLabel = [cs.class_name ?? classNameMap[cs.class_id], sectionLabel].filter(Boolean).join(' – ') || 'Class';
                   return (
                     <View key={cs.id} style={[styles.groupRow, { borderBottomColor: borderCol }]}>
                       <View style={styles.rowBetween}>
@@ -527,7 +532,7 @@ export default function ExamDetailScreen() {
                         {configs.map(cfg => (
                           <View key={cfg.id} style={[styles.badge, { backgroundColor: borderCol }]}>
                             <Text style={[styles.badgeText, { color: colors.foreground }]}>
-                              {cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? cfg.subject_id}
+                              {cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? 'Subject'}
                             </Text>
                           </View>
                         ))}
@@ -540,7 +545,7 @@ export default function ExamDetailScreen() {
                   {subjectConfigs.map(cfg => (
                     <View key={cfg.id} style={[styles.badge, { backgroundColor: borderCol }]}>
                       <Text style={[styles.badgeText, { color: colors.foreground }]}>
-                        {cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? cfg.subject_id}
+                        {cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? 'Subject'}
                       </Text>
                     </View>
                   ))}
@@ -583,7 +588,7 @@ export default function ExamDetailScreen() {
             ) : (
               dates.map((d, idx) => {
                 const sectionLabel = d.section_id ? sectionNameMap[d.section_id] : null;
-                const classLabel = [classNameMap[d.class_id] ?? d.class_id, sectionLabel].filter(Boolean).join(' – ');
+                const classLabel = [classNameMap[d.class_id] ?? 'Class', sectionLabel].filter(Boolean).join(' – ');
                 return (
                   <View key={d.id} style={[styles.rowCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
                     <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{idx + 1}</Text>
@@ -592,7 +597,7 @@ export default function ExamDetailScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.rowCardTitle, { color: colors.foreground }]}>
-                        {d.subject_name ?? subjectNameMap[d.subject_id] ?? d.subject_id}
+                        {d.subject_name ?? subjectNameMap[d.subject_id] ?? 'Subject'}
                       </Text>
                       <Text style={[styles.rowCardMeta, { color: colors['muted-foreground'] }]}>{classLabel}</Text>
                       <Text style={[styles.rowCardMeta, { color: colors['muted-foreground'] }]}>
@@ -624,7 +629,7 @@ export default function ExamDetailScreen() {
               </TouchableOpacity>
             </View>
             <Text style={[styles.emptyHint, { color: colors['muted-foreground'], marginTop: 10 }]}>
-              Click "View Summary" to see mark entry completion status across all classes and subjects.
+              Tap &quot;View Summary&quot; to see mark entry completion status across all classes and subjects.
             </Text>
             {canEnterMarks && (
               <TouchableOpacity
@@ -672,7 +677,7 @@ export default function ExamDetailScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.rowCardTitle, { color: colors.foreground }]}>
-                      {perm.user_display_name ?? perm.user_id ?? perm.teacher_id}
+                      {perm.user_display_name ?? 'Teacher'}
                     </Text>
                     <Text style={[styles.rowCardMeta, { color: colors['muted-foreground'] }]}>
                       {perm.is_active ? 'Active' : 'Inactive'}
@@ -688,8 +693,8 @@ export default function ExamDetailScreen() {
                         onConfirm: () => revokePermissionMutation.mutate(perm.id),
                       });
                     }}
-                    style={{ padding: 6 }}
-              accessibilityLabel="Close"
+                    style={{ padding: 12 }}
+              accessibilityLabel="Revoke permission"
                   >
                     <Ionicons name="close-circle" size={20} color="#EF4444" />
                   </TouchableOpacity>
@@ -733,9 +738,9 @@ export default function ExamDetailScreen() {
                       <Ionicons name="time" size={18} color="#F59E0B" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.rowCardTitle, { color: colors.foreground }]}>{entry.action}</Text>
+                      <Text style={[styles.rowCardTitle, { color: colors.foreground }]}>{entry.action.replace(/_/g, ' ')}</Text>
                       <Text style={[styles.rowCardMeta, { color: colors['muted-foreground'] }]}>
-                        {entry.performed_by} · {new Date(entry.performed_at).toLocaleString()}
+                        {entry.actor_name ?? 'User'} · {new Date(entry.performed_at).toLocaleString()}
                       </Text>
                       {entry.reason ? (
                         <Text style={[styles.rowCardMeta, { color: colors['muted-foreground'] }]}>
@@ -787,7 +792,7 @@ export default function ExamDetailScreen() {
 
       {/* Unlock Reason Modal — Fix #8 */}
       <Modal visible={unlockModalVisible} animationType="slide" transparent onRequestClose={() => setUnlockModalVisible(false)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalSheet, { backgroundColor: cardBg }]}>
             <View style={styles.rowBetween}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>Unlock for Corrections</Text>
@@ -819,12 +824,12 @@ export default function ExamDetailScreen() {
               <Text style={styles.saveBtnText}>Unlock Exam</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Edit Modal — mirrors web Edit Exam dialog */}
       <Modal visible={editModalVisible} animationType="slide" transparent onRequestClose={() => setEditModalVisible(false)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
             style={{ maxHeight: '85%' }}
             contentContainerStyle={[styles.modalSheet, { backgroundColor: cardBg }]}
@@ -934,7 +939,7 @@ export default function ExamDetailScreen() {
               <Text style={styles.saveBtnText}>{updateMutation.isPending ? 'Saving…' : 'Save Changes'}</Text>
             </TouchableOpacity>
           </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
         <DatePickerModal
           visible={showEditDatePicker}
           initialDate={
@@ -949,7 +954,7 @@ export default function ExamDetailScreen() {
 
       {/* Clone Modal */}
       <Modal visible={cloneModalVisible} animationType="slide" transparent onRequestClose={() => setCloneModalVisible(false)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalSheet, { backgroundColor: cardBg }]}>
             <View style={styles.rowBetween}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>Clone Exam</Text>
@@ -981,7 +986,7 @@ export default function ExamDetailScreen() {
               <Text style={styles.saveBtnText}>{cloneMutation.isPending ? 'Cloning…' : 'Clone Exam'}</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <ConfirmModal {...modalProps} />

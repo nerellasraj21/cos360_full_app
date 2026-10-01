@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
 import { useAuth, useTheme } from '@/contexts';
@@ -14,7 +14,7 @@ function ParentFeesScreenContent() {
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
-  const { data: summary, isLoading, error, refetch } = useChildFeeCollectionSummary(
+  const { data: summary, isLoading, isRefetching, error, refetch } = useChildFeeCollectionSummary(
     selectedStudent?.id ?? '',
   );
 
@@ -67,7 +67,11 @@ function ParentFeesScreenContent() {
 
   return (
     <AppLayout title={`Fee Summary — ${selectedStudent.name ?? ''}`}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.container}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+      >
 
         {/* Summary cards */}
         <View style={styles.statsRow}>
@@ -98,7 +102,7 @@ function ParentFeesScreenContent() {
                   <Text style={[styles.feeType, { color: colors.foreground }]} numberOfLines={1}>
                     {item.fee_type_name}
                   </Text>
-                  {item.last_paid_date && (
+                  {!!item.last_paid_date && (
                     <Text style={[styles.feeMeta, { color: colors['muted-foreground'] }]}>
                       Last paid: {item.last_paid_date}
                     </Text>
@@ -110,7 +114,7 @@ function ParentFeesScreenContent() {
                   </Text>
                   {parseFloat(item.due_amount ?? '0') > 0 && (
                     <Text style={[styles.feeAmountDue, { color: '#EF4444' }]}>
-                      −₹{parseFloat(item.due_amount ?? '0').toLocaleString('en-IN')} due
+                      -₹{parseFloat(item.due_amount ?? '0').toLocaleString('en-IN')} due
                     </Text>
                   )}
                 </View>

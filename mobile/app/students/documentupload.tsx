@@ -37,7 +37,7 @@ const documentTypes = [
 function DocumentUploadPageContent() {
   const { colors } = useTheme();
   const { showError } = useToastContext();
-  const { studentId, selectedStudent, role } = useAuth();
+  const { studentId, selectedStudent } = useAuth();
   const [selectedFile, setSelectedFile] = useState<MockFile | null>(null);
   const [formData, setFormData] = useState<DocumentForm>({
     documentName: '',
@@ -85,12 +85,6 @@ function DocumentUploadPageContent() {
   };
 
   const handleSubmit = async () => {
-    console.log('handleSubmit called');
-    console.log('selectedFile:', selectedFile);
-    console.log('formData:', formData);
-    console.log('studentId from auth:', studentId);
-    console.log('selectedStudent:', selectedStudent);
-    console.log('role:', role);
 
     if (!selectedFile) {
       showError('Error', 'Please select a document file');
@@ -98,13 +92,7 @@ function DocumentUploadPageContent() {
     }
 
     const currentStudentId = studentId || selectedStudent?.id;
-    console.log('currentStudentId determined as:', currentStudentId);
     if (!formData.documentName || !formData.documentType || !currentStudentId) {
-      console.log('Validation failed:', {
-        documentName: formData.documentName,
-        documentType: formData.documentType,
-        studentId: currentStudentId
-      });
       showError('Error', 'Please fill in all required fields');
       return;
     }
@@ -120,8 +108,6 @@ function DocumentUploadPageContent() {
         } as any,
       };
 
-      console.log('Upload data being sent:', uploadData);
-      console.log('Current student ID being used:', currentStudentId);
 
       await uploadMutation.mutateAsync(uploadData);
 
@@ -162,7 +148,7 @@ function DocumentUploadPageContent() {
             </ThemedText>
           </TouchableOpacity>
 
-          {selectedFile && (
+          {!!selectedFile && (
             <View style={styles.fileInfo}>
               <Ionicons name="document" size={20} color={colors.primary} />
               <View style={styles.fileDetails}>

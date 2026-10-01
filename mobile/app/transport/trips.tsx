@@ -11,7 +11,9 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -208,7 +210,7 @@ function TripsScreenContent() {
             <View style={styles.detailRow}>
               <Ionicons name="calendar" size={16} color={colors['muted-foreground']} />
               <ThemedText style={styles.detailText}>
-                Created: {new Date(item.created_at).toLocaleDateString()}
+                Created: {new Date(item.created_at).toLocaleDateString('en-IN')}
               </ThemedText>
             </View>
           ) : null}
@@ -279,6 +281,7 @@ function TripsScreenContent() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={isLoading}
@@ -308,7 +311,7 @@ function TripsScreenContent() {
           transparent={true}
           onRequestClose={() => setIsModalVisible(false)}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
               <View style={styles.modalHeader}>
                 <ThemedText type="title" style={styles.modalTitle}>
@@ -382,7 +385,7 @@ function TripsScreenContent() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
         <ConfirmModal
           visible={pendingDeleteTrip !== null}
@@ -422,7 +425,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: 8,
   },
   addButtonText: {
@@ -473,9 +476,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -559,7 +562,7 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     alignItems: 'center',
   },

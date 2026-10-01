@@ -2,7 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -43,6 +46,7 @@ function ExpenseDepartmentsScreenContent() {
   const [editing, setEditing] = useState<ExpenseDepartment | null>(null);
   const [form, setForm] = useState({ name: '', description: '' });
   const { confirm, modalProps } = useConfirmModal();
+  const [refreshing, setRefreshing] = useState(false);
 
   const canCreate = hasPermission('expense_departments', 'create');
   const canUpdate = hasPermission('expense_departments', 'update');
@@ -52,7 +56,7 @@ function ExpenseDepartmentsScreenContent() {
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
   const inputBg = theme === 'dark' ? '#0f0f23' : '#f8fafc';
 
-  const { data: raw, isLoading } = useExpenseDepartmentsProtected();
+  const { data: raw, isLoading, refetch } = useExpenseDepartmentsProtected();
   const createMutation = useCreateExpenseDepartmentProtected();
   const updateMutation = useUpdateExpenseDepartmentProtected();
   const deleteMutation = useDeleteExpenseDepartmentProtected();
@@ -133,7 +137,20 @@ function ExpenseDepartmentsScreenContent() {
         )}
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={ORANGE}
+            onRefresh={async () => {
+              setRefreshing(true);
+              try { await refetch(); } finally { setRefreshing(false); }
+            }}
+          />
+        }
+      >
         {isLoading ? (
           <View style={styles.centered}><ActivityIndicator color={ORANGE} /></View>
         ) : departments.length === 0 ? (
@@ -184,7 +201,7 @@ function ExpenseDepartmentsScreenContent() {
       </ScrollView>
 
       <Modal visible={showModal} animationType="slide" transparent onRequestClose={() => setShowModal(false)}>
-        <View style={styles.overlay}>
+        <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modal, { backgroundColor: colors.background }]}>
             <View style={styles.modalTop}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
@@ -235,7 +252,7 @@ function ExpenseDepartmentsScreenContent() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
       <ConfirmModal {...modalProps} />
     </AppLayout>
@@ -249,12 +266,12 @@ const styles = StyleSheet.create({
   },
   searchBox: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, height: 38,
+    borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, height: 44,
   },
   searchInput: { flex: 1, fontSize: 13, padding: 0 },
   newBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12,
   },
   newBtnText: { color: 'white', fontSize: 13, fontWeight: '600' },
   listContent: { padding: 12 },
@@ -265,21 +282,21 @@ const styles = StyleSheet.create({
   cardDesc: { fontSize: 13, marginBottom: 4 },
   cardDate: { fontSize: 11, marginBottom: 6 },
   cardFooter: { flexDirection: 'row', gap: 4, paddingTop: 8, borderTopWidth: 1, marginTop: 4 },
-  cardAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  cardAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 8 },
   cardActionText: { fontSize: 13, fontWeight: '600' },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, alignSelf: 'flex-start' },
   badgeText: { fontSize: 11, fontWeight: '600' },
   centered: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modal: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '80%' },
+  modal: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32, maxHeight: '90%' },
   modalTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 17, fontWeight: '700' },
   label: { fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 14 },
   input: { borderWidth: 1, borderRadius: 10, padding: 11, fontSize: 14 },
   textarea: { height: 80, textAlignVertical: 'top' },
   modalFooter: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  cancelBtn: { flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
-  submitBtn: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
+  cancelBtn: { flex: 1, padding: 14, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
+  submitBtn: { flex: 1, padding: 14, borderRadius: 10, alignItems: 'center' },
 });
 
 export default function ExpenseDepartmentsScreen() {

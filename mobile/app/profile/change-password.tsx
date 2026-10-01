@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  StyleSheet, Text, TextInput, View, ScrollView,
+  StyleSheet, Text, TextInput, View, ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 
@@ -44,13 +44,13 @@ export default function ChangePasswordScreen() {
     changeMutation.mutate();
   };
 
-  const Field = ({
+  const renderField = ({
     label, value, onChange, show, onToggle, placeholder,
   }: {
     label: string; value: string; onChange: (v: string) => void;
     show: boolean; onToggle: () => void; placeholder: string;
   }) => (
-    <View style={styles.fieldWrap}>
+    <View key={label} style={styles.fieldWrap}>
       <Text style={[styles.label, { color: colors.foreground }]}>{label}</Text>
       <View style={[styles.inputRow, { borderColor: borderCol, backgroundColor: inputBg }]}>
         <TextInput
@@ -75,36 +75,37 @@ export default function ChangePasswordScreen() {
 
   return (
     <AppLayout title="Change Password">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
         <View style={[styles.card, { backgroundColor: theme === 'dark' ? '#1a1a2e' : '#fff', borderColor: borderCol }]}>
-          <Field
-            label="Current Password *"
-            value={current}
-            onChange={setCurrent}
-            show={showCurrent}
-            onToggle={() => setShowCurrent((v) => !v)}
-            placeholder="Enter current password"
-          />
-          <Field
-            label="New Password *"
-            value={next}
-            onChange={setNext}
-            show={showNext}
-            onToggle={() => setShowNext((v) => !v)}
-            placeholder="Min 8 characters"
-          />
-          <Field
-            label="Confirm New Password *"
-            value={confirm}
-            onChange={setConfirm}
-            show={showNext}
-            onToggle={() => setShowNext((v) => !v)}
-            placeholder="Re-enter new password"
-          />
+          {renderField({
+            label: 'Current Password *',
+            value: current,
+            onChange: setCurrent,
+            show: showCurrent,
+            onToggle: () => setShowCurrent((v) => !v),
+            placeholder: 'Enter current password',
+          })}
+          {renderField({
+            label: 'New Password *',
+            value: next,
+            onChange: setNext,
+            show: showNext,
+            onToggle: () => setShowNext((v) => !v),
+            placeholder: 'Min 8 characters',
+          })}
+          {renderField({
+            label: 'Confirm New Password *',
+            value: confirm,
+            onChange: setConfirm,
+            show: showNext,
+            onToggle: () => setShowNext((v) => !v),
+            placeholder: 'Re-enter new password',
+          })}
 
           {next.length > 0 && next !== confirm && (
             <Text style={styles.mismatch}>Passwords do not match</Text>
@@ -123,6 +124,7 @@ export default function ChangePasswordScreen() {
         </PrimaryButton>
 
       </ScrollView>
+      </KeyboardAvoidingView>
     </AppLayout>
   );
 }

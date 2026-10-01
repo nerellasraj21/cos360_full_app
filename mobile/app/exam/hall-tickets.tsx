@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
 import { useAcademicYear, useTheme } from '@/contexts';
@@ -35,7 +35,7 @@ export default function HallTicketsListScreen() {
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
   const inputBg = theme === 'dark' ? '#0f0f23' : '#f8fafc';
 
-  const { data: examsData, isLoading } = useQuery({
+  const { data: examsData, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['exams', 'hall-tickets-list', activeAcademicYearId],
     queryFn: () => examsApi.list({ academic_year_id: activeAcademicYearId || undefined, size: 100 }),
   });
@@ -56,7 +56,13 @@ export default function HallTicketsListScreen() {
 
   return (
     <AppLayout title="Hall Tickets">
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
+      >
 
         <View style={styles.headerRow}>
           <Ionicons name="ticket" size={20} color="#F59E0B" />

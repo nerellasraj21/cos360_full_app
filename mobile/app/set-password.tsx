@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAuth } from '../contexts';
 import { authApi } from '../src/api/auth';
 import { getChangePasswordToken, clearChangePasswordToken } from '../services/authUtils';
@@ -84,8 +84,7 @@ const SetPasswordScreen: React.FC = () => {
           <View style={styles.brandDecorCircle1} />
           <View style={styles.brandDecorCircle2} />
           <View style={styles.logoCircle}>
-            <Text style={styles.logoInitials}>COS</Text>
-            <Text style={styles.logo360}>360</Text>
+            <Image source={require('../assets/images/cos360-logo.jpg')} style={{ width: 72, height: 72 }} resizeMode="contain" />
           </View>
           <Text style={styles.appName}>COS360</Text>
           <Text style={styles.appTagline}>School Management System</Text>

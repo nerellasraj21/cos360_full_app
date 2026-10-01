@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Platform } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -46,7 +47,7 @@ const downloadAuthenticatedFile = async (
   filename: string,
   mimeType: string,
   showError: (title: string, message?: string) => void,
-) => {
+): Promise<boolean> => {
   try {
     const token = await getValidAccessToken(false);
     const headers: Record<string, string> = {};
@@ -54,6 +55,7 @@ const downloadAuthenticatedFile = async (
 
     if (Platform.OS === 'web') {
       const response = await fetch(url, { headers });
+      if (!response.ok) throw new Error('Download failed');
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -66,10 +68,13 @@ const downloadAuthenticatedFile = async (
       const Sharing = await import('expo-sharing');
       const localUri = FileSystem.documentDirectory + filename;
       const result = await FileSystem.downloadAsync(url, localUri, { headers });
+      if (result.status && result.status >= 400) throw new Error('Download failed');
       await Sharing.shareAsync(result.uri, { mimeType, UTI: mimeType });
     }
+    return true;
   } catch {
     showError('Download Failed', 'Could not download file. Please try again.');
+    return false;
   }
 };
 
@@ -117,9 +122,9 @@ function SelfServiceHallTicketView({ examId, childId, childName }: { examId: str
     setDownloading(true);
     const baseUrl = (apiClient.defaults.baseURL ?? '').replace(/\/$/, '');
     const url = `${baseUrl}${examHallTicketsApi.downloadUrl(examId, ticket.student_id)}`;
-    await downloadAuthenticatedFile(url, 'hall-ticket.pdf', 'application/pdf', showError);
+    const ok = await downloadAuthenticatedFile(url, 'hall-ticket.pdf', 'application/pdf', showError);
     setDownloading(false);
-    showSuccess('Hall ticket downloaded');
+    if (ok) showSuccess('Hall ticket downloaded');
   };
 
   const accentColor = ticket?.is_eligible ? '#10B981' : '#EF4444';
@@ -270,13 +275,13 @@ function AdminHallTicketView({ examId }: { examId: string }) {
     downloadAuthed(url, `hall_tickets_${examId}.zip`, 'application/zip');
   };
 
-  const { data: eligibleData, isLoading: loadingEligible } = useQuery({
+  const { data: eligibleData, isLoading: loadingEligible, refetch: refetchEligible, isRefetching: refetchingEligible } = useQuery({
     queryKey: ['hall-tickets-eligible', examId],
     queryFn: () => examHallTicketsApi.getEligible(examId),
     enabled: !!examId,
   });
 
-  const { data: ineligibleData, isLoading: loadingIneligible } = useQuery({
+  const { data: ineligibleData, isLoading: loadingIneligible, refetch: refetchIneligible } = useQuery({
     queryKey: ['hall-tickets-ineligible', examId],
     queryFn: () => examHallTicketsApi.getIneligible(examId),
     enabled: !!examId,
@@ -437,7 +442,13 @@ function AdminHallTicketView({ examId }: { examId: string }) {
             )}
           </View>
         ) : (
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={<RefreshControl refreshing={refetchingEligible} onRefresh={() => { refetchEligible(); refetchIneligible(); }} />}
+          >
             {activeData.map((item, index) => {
               const attColor = item.attendance_percent != null
                 ? (item.attendance_percent >= 75 ? '#10B981' : '#EF4444')
@@ -474,7 +485,7 @@ function AdminHallTicketView({ examId }: { examId: string }) {
                     </View>
 
                     {!!item.ineligibility_reason && !item.is_eligible ? (
-                      <Text style={styles.reasonText}>{item.ineligibility_reason}</Text>
+                      <Text style={styles.reasonText}>{ineligibilityText(item.ineligibility_reason)}</Text>
                     ) : null}
 
                     <View style={styles.cardStats}>
@@ -606,10 +617,10 @@ const styles = StyleSheet.create({
   },
 
   /* Actions bar */
-  actionsBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8 },
+  actionsBar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8 },
   actionBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, minHeight: 40,
   },
   actionBtnText: { color: 'white', fontWeight: '600', fontSize: 12 },
   countChip: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -652,7 +663,7 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, height: 16, marginHorizontal: 4 },
 
   cardFooter: { flexDirection: 'row', gap: 4, paddingTop: 8, borderTopWidth: 1, marginTop: 6 },
-  cardAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  cardAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, minHeight: 44 },
   cardActionText: { fontSize: 13, fontWeight: '600' },
 
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },

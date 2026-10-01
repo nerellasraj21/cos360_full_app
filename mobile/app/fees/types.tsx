@@ -18,7 +18,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Switch,
@@ -61,7 +64,7 @@ function FeeTypesScreenContent() {
   const { showSuccess, showError } = useToastContext();
   const { confirm, modalProps: confirmModalProps } = useConfirmModal();
 
-  const { data: types = [], isLoading, error } = useQuery({
+  const { data: types = [], isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['feeTypes'],
     queryFn: () => feeTypesApi.getFeeTypes(),
   });
@@ -228,7 +231,7 @@ function FeeTypesScreenContent() {
                 ? `${filtered.length} of ${totalCount} types`
                 : `Showing ${totalCount} ${totalCount === 1 ? 'type' : 'types'}`}
             </ThemedText>
-            <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TYPES}>
+            <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TYPES} fallback={null} loadingFallback={null}>
               <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.primary }]} onPress={handleCreate}>
                 <Ionicons name="add" size={16} color="white" />
                 <ThemedText style={styles.addButtonText}>Add New Type</ThemedText>
@@ -237,7 +240,12 @@ function FeeTypesScreenContent() {
           </View>
 
           {/* Card list */}
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContainer}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContainer}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={colors.primary} />}
+          >
             {filtered.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons name="list-outline" size={48} color={colors['muted-foreground']} />
@@ -278,7 +286,7 @@ function FeeTypesScreenContent() {
                       </View>
 
                       <View style={styles.actionButtons}>
-                        <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TYPES}>
+                        <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TYPES} fallback={null} loadingFallback={null}>
                           <TouchableOpacity
                             style={[styles.actionBtn, { backgroundColor: colors.primary + '18' }]}
                             onPress={() => handleEdit(item)}
@@ -288,7 +296,7 @@ function FeeTypesScreenContent() {
                             <Ionicons name="create-outline" size={16} color={colors.primary} />
                           </TouchableOpacity>
                         </UpdatePermissionGuard>
-                        <DeletePermissionGuard resource={PERMISSION_RESOURCES.FEE_TYPES}>
+                        <DeletePermissionGuard resource={PERMISSION_RESOURCES.FEE_TYPES} fallback={null} loadingFallback={null}>
                           <TouchableOpacity
                             style={[styles.actionBtn, { backgroundColor: '#EF444422' }]}
                             onPress={() => handleDelete(item)}
@@ -313,7 +321,7 @@ function FeeTypesScreenContent() {
             transparent
             onRequestClose={() => setIsModalVisible(false)}
           >
-            <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
               <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
                 <View style={styles.modalHeader}>
                   <ThemedText type="subtitle">
@@ -325,7 +333,7 @@ function FeeTypesScreenContent() {
                   </TouchableOpacity>
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false}>
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <ThemedText style={styles.label}>Type Name *</ThemedText>
                   <TextInput
                     style={[styles.input, { backgroundColor: colors.background, color: colors.foreground, borderColor: colors.border }]}
@@ -388,7 +396,7 @@ function FeeTypesScreenContent() {
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
+            </KeyboardAvoidingView>
           </Modal>
 
           <ConfirmModal {...confirmModalProps} />
@@ -437,7 +445,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: 8,
     gap: 5,
   },
@@ -464,7 +472,7 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 12 },
 
   actionButtons: { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 8 },
-  actionBtn: { padding: 7, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  actionBtn: { minWidth: 40, minHeight: 40, padding: 7, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
 
   emptyContainer: { alignItems: 'center', paddingVertical: 48 },
   emptyText: { marginTop: 12, textAlign: 'center', fontSize: 14 },
@@ -475,8 +483,8 @@ const styles = StyleSheet.create({
   label: { marginBottom: 8, fontWeight: '600', fontSize: 13 },
   input: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 16, fontSize: 15 },
   modalActions: { flexDirection: 'row', gap: 12, marginTop: 20 },
-  cancelButton: { flex: 1, padding: 12, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
-  submitButton: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
+  cancelButton: { flex: 1, padding: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+  submitButton: { flex: 1, padding: 14, borderRadius: 8, alignItems: 'center' },
   submitButtonText: { color: 'white', fontWeight: '600' },
   retryBtn: { marginTop: 16, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 8 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },

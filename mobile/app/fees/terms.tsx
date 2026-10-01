@@ -2,8 +2,6 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
 import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { FeeTermResponse, FeeTermRequest, feeTermsApi } from '@/src/api/fees';
 import {
   ReadOrListPermissionGuard,
@@ -17,14 +15,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/contexts';
+import { useAuth, useTheme } from '@/contexts';
 import { roleBlocksFees } from '@/src/lib/menuUtils';
 import { useAcademicYear } from '@/contexts/AcademicYearContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { IOSDatePickerModal } from '@/components/ui';
 import {
+    KeyboardAvoidingView,
     Modal,
     Platform,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Switch,
@@ -107,15 +107,13 @@ function FeeTermsScreenContent() {
   const [dateDisplayValue, setDateDisplayValue] = useState('');
   const [showPicker, setShowPicker] = useState(false);
 
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? 'dark' : 'light';
-  const colors = Colors[theme];
+  const { colors } = useTheme();
   const queryClient = useQueryClient();
   const { activeAcademicYearId, activeAcademicYear } = useAcademicYear();
   const { showSuccess, showError } = useToastContext();
   const { confirm: confirmModal, modalProps } = useConfirmModal();
 
-  const { data: terms = [], isLoading, error } = useQuery({
+  const { data: terms = [], isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['feeTerms', activeAcademicYearId],
     queryFn: () => feeTermsApi.getFeeTerms(activeAcademicYearId ? { academic_year_id: activeAcademicYearId } : undefined),
   });
@@ -360,7 +358,7 @@ function FeeTermsScreenContent() {
                 {terms.length} record{terms.length !== 1 ? 's' : ''}
               </ThemedText>
             </View>
-            <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TERMS}>
+            <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TERMS} fallback={null} loadingFallback={null}>
               <TouchableOpacity
                 style={[styles.addButton, { backgroundColor: colors.primary }]}
                 onPress={handleCreate}
@@ -372,7 +370,7 @@ function FeeTermsScreenContent() {
           </View>
 
           {/* Cards */}
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent} keyboardShouldPersistTaps="handled">
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={colors.primary} />}>
             {terms.length === 0 ? (
               <View style={styles.emptyBox}>
                 <Ionicons name="calendar-outline" size={48} color={colors['muted-foreground']} />
@@ -418,13 +416,13 @@ function FeeTermsScreenContent() {
                         <Ionicons name="calendar-outline" size={15} color={colors.primary} />
                         <ThemedText style={[styles.cardActionText, { color: colors.primary }]}>Payment Dates</ThemedText>
                       </TouchableOpacity>
-                      <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TERMS}>
+                      <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TERMS} fallback={null} loadingFallback={null}>
                         <TouchableOpacity style={styles.cardAction} onPress={() => handleEdit(item)}>
                           <Ionicons name="pencil" size={15} color={colors.primary} />
                           <ThemedText style={[styles.cardActionText, { color: colors.primary }]}>Edit</ThemedText>
                         </TouchableOpacity>
                       </UpdatePermissionGuard>
-                      <DeletePermissionGuard resource={PERMISSION_RESOURCES.FEE_TERMS}>
+                      <DeletePermissionGuard resource={PERMISSION_RESOURCES.FEE_TERMS} fallback={null} loadingFallback={null}>
                         <TouchableOpacity style={styles.cardAction} onPress={() => handleDelete(item)}>
                           <Ionicons name="trash-outline" size={15} color="#EF4444" />
                           <ThemedText style={[styles.cardActionText, { color: '#EF4444' }]}>Delete</ThemedText>
@@ -446,7 +444,7 @@ function FeeTermsScreenContent() {
           transparent={true}
           onRequestClose={() => setIsModalVisible(false)}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ThemedView style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <ThemedText type="subtitle">
@@ -458,7 +456,7 @@ function FeeTermsScreenContent() {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
+              <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={styles.form}>
                   <ThemedText style={styles.label}>Term Name</ThemedText>
                   <TextInput
@@ -668,7 +666,7 @@ function FeeTermsScreenContent() {
                 </TouchableOpacity>
               </View>
             </ThemedView>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Payment Dates viewer (mirrors web PaymentDateManager) */}
@@ -891,7 +889,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: 8,
     gap: 6,
   },
@@ -915,7 +913,7 @@ const styles = StyleSheet.create({
   outlineButton: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12, alignItems: 'center' },
   outlineButtonText: { fontSize: 14, fontWeight: '600' },
   rowActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
-  iconButton: { borderWidth: 1, borderRadius: 6, padding: 6 },
+  iconButton: { borderWidth: 1, borderRadius: 6, minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
   colActions: { flex: 0.9, alignItems: 'flex-end' },
   // -- Payment dates viewer -------------------------------------------------
   scheduleHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 },
@@ -938,8 +936,8 @@ const styles = StyleSheet.create({
   solidBadge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start' },
   solidBadgeText: { fontSize: 11, fontWeight: '700' },
   scheduleFooter: { flexDirection: 'row', justifyContent: 'flex-end', paddingTop: 12 },
-  closeButton: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
-  cardAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  closeButton: { paddingHorizontal: 24, paddingVertical: 14, borderRadius: 8, alignItems: 'center' },
+  cardAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 8 },
   cardActionText: { fontSize: 13, fontWeight: '600' },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
   statusText: { fontSize: 11, fontWeight: '700' },

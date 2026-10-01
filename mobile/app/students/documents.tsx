@@ -82,7 +82,7 @@ function MyDocumentsView({ studentId, title }: { studentId?: string; title?: str
 
   return (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-      {title && <ThemedText style={styles.viewTitle}>{title}</ThemedText>}
+      {!!title && <ThemedText style={styles.viewTitle}>{title}</ThemedText>}
 
       <View style={[styles.card, { backgroundColor: colors.card }]}>
         <ThemedText type="subtitle" style={styles.cardTitle}>Documents</ThemedText>
@@ -309,8 +309,8 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   docAction: {
-    width: 34,
-    height: 34,
+    width: 40,
+    height: 40,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',

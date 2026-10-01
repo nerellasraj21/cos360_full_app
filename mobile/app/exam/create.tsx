@@ -255,7 +255,7 @@ export default function CreateExamScreen() {
             new Map(
               mappings
                 .filter(m => !m.exclude_marks)
-                .map(m => [m.subject_id, { id: m.subject_id, name: m.subject_name ?? m.subject_id }])
+                .map(m => [m.subject_id, { id: m.subject_id, name: m.subject_name || 'Subject' }])
             ).values()
           );
           setSubjectsByClass(prev => ({ ...prev, [classId]: subjects }));
@@ -445,7 +445,7 @@ export default function CreateExamScreen() {
   };
 
   const getClassName = (classId: string) =>
-    availableClasses.find(c => c.id === classId)?.name ?? classId;
+    availableClasses.find(c => c.id === classId)?.name ?? 'Class';
 
   const getSectionName = (classId: string, sectionId: string | null) => {
     if (!sectionId) return '';
@@ -454,7 +454,7 @@ export default function CreateExamScreen() {
   };
 
   const getSubjectName = (classId: string, subjectId: string) =>
-    (subjectsByClass[classId] ?? []).find(s => s.id === subjectId)?.name ?? subjectId;
+    (subjectsByClass[classId] ?? []).find(s => s.id === subjectId)?.name ?? 'Subject';
 
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -464,7 +464,7 @@ export default function CreateExamScreen() {
   return (
     <AppLayout title="Create Exam">
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* Top bar */}
           <TouchableOpacity style={styles.backRow} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={18} color={colors['muted-foreground'] as string} />
@@ -679,7 +679,7 @@ export default function CreateExamScreen() {
                 ) : (
                   <>
                     {/* Class-section tabs */}
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll} keyboardShouldPersistTaps="handled">
                       {classSections.map(cs => {
                         const key = `${cs.class_id}|${cs.section_id ?? ''}`;
                         const clsName = getClassName(cs.class_id);
@@ -753,7 +753,7 @@ export default function CreateExamScreen() {
                                 const expanded = expandedConfigSubjects.has(subjKey);
                                 const includedTotal = (cfg?.components ?? [])
                                   .filter(c => c.include_in_total && c.entry_type === 'marks')
-                                  .reduce((sum, c) => sum + (c.max_marks ?? 0), 0);
+                                  .reduce((sum, c) => sum + Number(c.max_marks ?? 0), 0);
 
                                 return (
                                   <View key={subj.id} style={[styles.subjectRow, { borderTopColor: borderCol }]}>
@@ -791,7 +791,7 @@ export default function CreateExamScreen() {
                                               placeholder="Default"
                                               search={false}
                                               containerStyle={styles.dropdownContainerSm}
-                                              style={{ height: 30, paddingHorizontal: 8, paddingVertical: 0, borderRadius: 6, fontSize: 12 }}
+                                              style={{ height: 40, paddingHorizontal: 8, paddingVertical: 0, borderRadius: 6, fontSize: 12 }}
                                               selectedTextStyle={{ fontSize: 12 }}
                                               placeholderStyle={{ fontSize: 12 }}
                                             />
@@ -903,7 +903,7 @@ export default function CreateExamScreen() {
                                                   placeholder="Select set…"
                                                   search={false}
                                                   containerStyle={styles.dropdownContainerSm}
-                                                  style={{ height: 30, paddingHorizontal: 8, paddingVertical: 0, borderRadius: 6, fontSize: 12 }}
+                                                  style={{ height: 40, paddingHorizontal: 8, paddingVertical: 0, borderRadius: 6, fontSize: 12 }}
                                                   selectedTextStyle={{ fontSize: 12 }}
                                                   placeholderStyle={{ fontSize: 12 }}
                                                 />
@@ -1081,31 +1081,37 @@ export default function CreateExamScreen() {
                 </View>
 
                 {/* Date list */}
-                <View style={[styles.dateTable, { borderColor: borderCol }]}>
-                  <View style={[styles.dateTableHeader, { borderColor: borderCol }]}>
-                    {['Subject', 'Class-Section', 'Date', 'Start', 'End', 'Venue'].map(h => (
-                      <Text key={h} style={[styles.dateTableHead, { color: colors['muted-foreground'] as string }]}>{h}</Text>
-                    ))}
-                  </View>
-                  {examDates.length === 0 ? (
-                    <Text style={[styles.hint, { color: colors['muted-foreground'] as string, padding: 12 }]}>
-                      No dates added yet. Use the form above to add dates, or skip and add later.
-                    </Text>
-                  ) : (
-                    examDates.map((d, i) => (
-                      <View key={i} style={[styles.dateTableRow, { borderColor: borderCol }]}>
-                        <Text style={[styles.dateCell, { color: colors.foreground as string }]}>{getSubjectName(d.class_id, d.subject_id)}</Text>
-                        <Text style={[styles.dateCell, { color: colors['muted-foreground'] as string }]}>
+                {examDates.length === 0 ? (
+                  <Text style={[styles.hint, { color: colors['muted-foreground'] as string, paddingVertical: 8 }]}>
+                    No dates added yet. Use the form above to add dates, or skip and add later.
+                  </Text>
+                ) : (
+                  examDates.map((d, i) => (
+                    <View key={i} style={[styles.dateCard, { borderColor: borderCol, backgroundColor: inputBg }]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.dateCardTitle, { color: colors.foreground as string }]}>{getSubjectName(d.class_id, d.subject_id)}</Text>
+                        <Text style={[styles.dateCardMeta, { color: colors['muted-foreground'] as string }]}>
                           {getClassName(d.class_id)}{d.section_id ? ` – ${getSectionName(d.class_id, d.section_id)}` : ''}
                         </Text>
-                        <Text style={[styles.dateCell, { color: colors['muted-foreground'] as string }]}>{d.exam_date}</Text>
-                        <Text style={[styles.dateCell, { color: colors['muted-foreground'] as string }]}>{d.start_time ? formatTime12h(d.start_time) : '—'}</Text>
-                        <Text style={[styles.dateCell, { color: colors['muted-foreground'] as string }]}>{d.end_time ? formatTime12h(d.end_time) : '—'}</Text>
-                        <Text style={[styles.dateCell, { color: colors['muted-foreground'] as string }]}>{d.venue ?? '—'}</Text>
+                        <Text style={[styles.dateCardMeta, { color: colors['muted-foreground'] as string }]}>
+                          {d.exam_date}
+                          {d.start_time ? ` · ${formatTime12h(d.start_time)}` : ''}
+                          {d.end_time ? ` - ${formatTime12h(d.end_time)}` : ''}
+                        </Text>
+                        {!!d.venue && (
+                          <Text style={[styles.dateCardMeta, { color: colors['muted-foreground'] as string }]}>Venue: {d.venue}</Text>
+                        )}
                       </View>
-                    ))
-                  )}
-                </View>
+                      <TouchableOpacity
+                        style={styles.dateCardRemove}
+                        onPress={() => setExamDates(prev => prev.filter((_, idx) => idx !== i))}
+                        accessibilityLabel="Remove date"
+                      >
+                        <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
 
                 <View style={styles.nextRow}>
                   <TouchableOpacity style={styles.nextBtn} onPress={() => advance(4, 5)}>
@@ -1148,7 +1154,7 @@ export default function CreateExamScreen() {
                       ['Level', LEVEL_OPTIONS.find(l => l.value === level)?.label ?? level, true],
                       ['Exam Type', examType || '—', true],
                       ['Nature', nature, true],
-                      ['Academic Year', (academicYears.find(y => String(y.id) === academicYearId)?.title ?? academicYearId) || '—', true],
+                      ['Academic Year', academicYears.find(y => String(y.id) === academicYearId)?.title || '—', true],
                       ['Grade Scheme', gradeSchemes.find(g => g.id === gradeSchemeId)?.name ?? '—', false],
                       ['Mark Entry Deadline', markDeadline || '—', false],
                       ['Min Attendance %', minAttendance || '—', false],
@@ -1203,7 +1209,7 @@ export default function CreateExamScreen() {
                     </View>
                   </View>
                   {activeConfigs.length === 0
-                    ? <Text style={[styles.hint, { color: '#EF4444' }]}>⚠ No subjects configured — required.</Text>
+                    ? <Text style={[styles.hint, { color: '#EF4444' }]}>No subjects configured — required.</Text>
                     : activeConfigs.map(cfg => (
                         <Text key={`${cfg.class_id}|${cfg.section_id}|${cfg.subject_id}`} style={[styles.hint, { color: colors['muted-foreground'] as string }]}>
                           • {getSubjectName(cfg.class_id, cfg.subject_id)} ({cfg.components.length} component{cfg.components.length !== 1 ? 's' : ''})
@@ -1276,7 +1282,7 @@ export default function CreateExamScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 },
+  backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, minHeight: 48 },
   backText: { fontSize: 14 },
 
   accordion: { marginHorizontal: 0, borderTopWidth: 1, borderBottomWidth: 1 },
@@ -1304,19 +1310,19 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, fontWeight: '500' },
   hint: { fontSize: 12, lineHeight: 18 },
   nextRow: { alignItems: 'flex-end', marginTop: 16 },
-  nextBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#556ee6', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 9 },
+  nextBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#556ee6', borderRadius: 8, paddingHorizontal: 14, minHeight: 44 },
   nextBtnText: { color: 'white', fontWeight: '700', fontSize: 13 },
 
   // Subject config
   tabScroll: { marginBottom: 10 },
-  configTab: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1, marginRight: 8 },
+  configTab: { paddingHorizontal: 12, minHeight: 40, justifyContent: 'center', borderRadius: 8, borderWidth: 1, marginRight: 8 },
   configTabText: { fontSize: 12, fontWeight: '600' },
   subjectGroup: { borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 10 },
   subjectGroupHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   subjectGroupTitle: { fontSize: 13, fontWeight: '700' },
   bulkMarksRow: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 8, padding: 8, marginBottom: 8 },
-  bulkMarksInput: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5, fontSize: 12, width: 60 },
-  applyBulkBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#556ee6', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5 },
+  bulkMarksInput: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, minHeight: 40, fontSize: 12, width: 64 },
+  applyBulkBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#556ee6', borderRadius: 6, paddingHorizontal: 10, minHeight: 40 },
   applyBulkBtnText: { color: '#556ee6', fontSize: 11, fontWeight: '600' },
   subjectRow: { paddingTop: 10, borderTopWidth: 1, marginTop: 8 },
   subjectAccordionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -1327,30 +1333,29 @@ const styles = StyleSheet.create({
   compHeader: { fontSize: 12, fontWeight: '600' },
   compRow: { borderWidth: 1, borderRadius: 8, padding: 8, marginBottom: 6 },
   compLabel: { fontSize: 10, marginBottom: 3, fontWeight: '500' },
-  compInput: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 6, fontSize: 12 },
+  compInput: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, minHeight: 40, fontSize: 13 },
   miniChips: { flexDirection: 'row', gap: 4, flexWrap: 'wrap' },
-  miniChip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
+  miniChip: { paddingHorizontal: 8, minHeight: 40, justifyContent: 'center', borderRadius: 6, borderWidth: 1 },
   miniChipText: { fontSize: 10, fontWeight: '600' },
-  inTotalChip: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, borderWidth: 1 },
-  removeCompBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  addCompBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  inTotalChip: { paddingHorizontal: 8, minHeight: 40, justifyContent: 'center', borderRadius: 6, borderWidth: 1 },
+  removeCompBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, minHeight: 44 },
+  addCompBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 },
   subjectTotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, paddingTop: 6, marginTop: 2 },
   subjectTotalValue: { fontSize: 12, fontWeight: '700' },
-  applyAllBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: 8, paddingVertical: 8, marginTop: 10 },
+  applyAllBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: 8, minHeight: 44, marginTop: 10 },
   applyAllBtnText: { color: '#556ee6', fontSize: 12, fontWeight: '600' },
 
   // Time picker button
-  timeBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9, marginBottom: 2 },
+  timeBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, minHeight: 44, marginBottom: 2 },
   timeBtnText: { flex: 1, fontSize: 13 },
 
   // Exam dates
   dateForm: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, padding: 12, marginBottom: 12 },
-  addDateBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#556ee6', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginTop: 8, alignSelf: 'flex-start' },
-  dateTable: { borderWidth: 1, borderRadius: 8, overflow: 'hidden', marginBottom: 8 },
-  dateTableHeader: { flexDirection: 'row', borderBottomWidth: 1, backgroundColor: 'rgba(0,0,0,0.03)', padding: 8 },
-  dateTableHead: { flex: 1, fontSize: 10, fontWeight: '700' },
-  dateTableRow: { flexDirection: 'row', padding: 8, borderTopWidth: 1 },
-  dateCell: { flex: 1, fontSize: 10 },
+  addDateBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#556ee6', borderRadius: 8, paddingHorizontal: 14, minHeight: 44, marginTop: 8, alignSelf: 'flex-start' },
+  dateCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 8 },
+  dateCardTitle: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
+  dateCardMeta: { fontSize: 12, marginTop: 1 },
+  dateCardRemove: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 
   // Review
   errorBox: { borderRadius: 10, borderWidth: 1, borderColor: '#FCA5A5', backgroundColor: '#FEF2F2', padding: 12, marginBottom: 12 },
@@ -1373,9 +1378,9 @@ const styles = StyleSheet.create({
 
   // Bottom bar
   bottomBar: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderTopWidth: 1 },
-  cancelBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10 },
+  cancelBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, minHeight: 44, justifyContent: 'center' },
   cancelBtnText: { fontSize: 14, fontWeight: '600' },
   issueText: { flex: 1, color: '#F59E0B', fontSize: 11, fontWeight: '600', textAlign: 'center' },
-  createBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#556ee6', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10 },
+  createBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#556ee6', borderRadius: 8, paddingHorizontal: 16, minHeight: 44 },
   createBtnText: { color: 'white', fontWeight: '700', fontSize: 14 },
 });

@@ -19,7 +19,10 @@ import { roleBlocksFees } from '@/src/lib/menuUtils';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -48,8 +51,8 @@ function deriveStatus(transaction: FeeTransactionResponse): TxStatus {
   if (apiStatus === 'cancelled') return 'cancelled';
   const items = transaction.transaction_items ?? [];
   if (items.length === 0) return 'pending';
-  const totalDue  = items.reduce((s, i) => s + (i.amount_due  ?? 0), 0);
-  const totalPaid = items.reduce((s, i) => s + (i.amount_paid ?? 0), 0);
+  const totalDue  = items.reduce((s, i) => s + (Number(i.amount_due) || 0), 0);
+  const totalPaid = items.reduce((s, i) => s + (Number(i.amount_paid) || 0), 0);
   if (totalPaid <= 0)        return 'pending';
   if (totalPaid >= totalDue) return 'paid';
   return 'partial';
@@ -124,7 +127,7 @@ export default function FeeTransactionsScreen() {
     if (isFeeBlocked) router.replace('/(tabs)');
   }, [isFeeBlocked, router]);
 
-  const { data: transactions = [], isLoading, error } = useQuery({
+  const { data: transactions = [], isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['feeTransactions', activeAcademicYearId],
     queryFn:  () => feeTransactionsApi.getFeeTransactions(activeAcademicYearId || undefined),
   });
@@ -224,7 +227,7 @@ export default function FeeTransactionsScreen() {
       student_id:            transaction.student_id,
       student_admission_num: transaction.student_admission_num,
       academic_year_id:      transaction.academic_year_id,
-      total_amount:          transaction.total_amount,
+      total_amount:          Number(transaction.total_amount) || 0,
       payment_method:        transaction.payment_method as PaymentMethod,
       transaction_date:      transaction.transaction_date || new Date().toISOString().split('T')[0],
       remarks:               transaction.remarks     || '',
@@ -235,7 +238,7 @@ export default function FeeTransactionsScreen() {
       cheque_bank:           transaction.cheque_bank    || '',
       bank_reference:        transaction.bank_reference || '',
       bank_name:             transaction.bank_name      || '',
-      transaction_items:     (transaction.transaction_items || []).map(item => ({ ...item, amount_due: item.amount_due ?? 0, amount_paid: item.amount_paid ?? 0 })),
+      transaction_items:     (transaction.transaction_items || []).map(item => ({ ...item, amount_due: Number(item.amount_due) || 0, amount_paid: Number(item.amount_paid) || 0 })),
     });
     setStepError('');
     setIsModalVisible(true);
@@ -286,7 +289,7 @@ export default function FeeTransactionsScreen() {
 
   const handleViewOutstandingFees = (studentId: string) => {
     const student = students.find(s => s.id === studentId);
-    setOutstandingFeesModal({ visible: true, studentId, studentName: student?.display_name || studentId });
+    setOutstandingFeesModal({ visible: true, studentId, studentName: student?.display_name || '' });
   };
 
   const filteredTransactions = transactions.filter(transaction => {
@@ -316,7 +319,7 @@ export default function FeeTransactionsScreen() {
           <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</Text>
           <View style={styles.transactionHeaderRow}>
             <Text style={[styles.transactionId, { color: colors.foreground }]}>
-              #{item.id.slice(0, 8)}
+              {item.transaction_number ? `#${item.transaction_number}` : `Transaction ${index + 1}`}
             </Text>
             <View style={[styles.statusPill, { backgroundColor: statusColors.bg }]}>
               <Text style={[styles.statusPillText, { color: statusColors.text }]}>
@@ -326,14 +329,14 @@ export default function FeeTransactionsScreen() {
           </View>
           <View style={styles.transactionAmountRow}>
             <Text style={[styles.transactionDetails, { color: colors['muted-foreground'], flex: 1 }]}>
-              {student?.display_name || item.student_id}
+              {student?.display_name || item.student_admission_num || ''}
             </Text>
             <Text style={[styles.transactionAmount, { color: colors.foreground }]}>
               {formatINR(item.total_amount ?? 0)}
             </Text>
           </View>
           <Text style={[styles.transactionDetails, { color: colors['muted-foreground'] }]}>
-            Items: {item.transaction_items?.length || 0} · {item.payment_method}
+            Items: {item.transaction_items?.length || 0} · {String(item.payment_method ?? '').replace(/_/g, ' ').toUpperCase()}
           </Text>
           <Text style={[styles.transactionDetails, { color: colors['muted-foreground'] }]}>
             {item.transaction_date ? new Date(item.transaction_date).toLocaleDateString() : 'N/A'}
@@ -345,7 +348,7 @@ export default function FeeTransactionsScreen() {
           )}
         </View>
         <View style={styles.actionButtons}>
-          <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TRANSACTIONS}>
+          <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TRANSACTIONS} fallback={null} loadingFallback={null}>
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: colors.primary }]}
               onPress={() => handleEdit(item)}
@@ -415,6 +418,16 @@ export default function FeeTransactionsScreen() {
       <AppLayout title="Fee Transactions">
         <View style={styles.container}>
 
+          <FlatList
+            data={filteredTransactions}
+            keyExtractor={(item) => item.id}
+            renderItem={renderTransactionItem}
+            contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={colors.primary} />}
+            ListHeaderComponent={
+              <View>
           {/* Filters (C-14) */}
           <View style={styles.filtersContainer}>
             <CustomDropdown
@@ -447,7 +460,7 @@ export default function FeeTransactionsScreen() {
                   onChangeText={(text) => setFilters(prev => ({ ...prev, date_from: text }))}
                   placeholder="YYYY-MM-DD"
                   placeholderTextColor={colors['muted-foreground']}
-                  keyboardType="numeric"
+                  keyboardType="numbers-and-punctuation"
                 />
               </View>
               <View style={styles.dateField}>
@@ -458,7 +471,7 @@ export default function FeeTransactionsScreen() {
                   onChangeText={(text) => setFilters(prev => ({ ...prev, date_to: text }))}
                   placeholder="YYYY-MM-DD"
                   placeholderTextColor={colors['muted-foreground']}
-                  keyboardType="numeric"
+                  keyboardType="numbers-and-punctuation"
                 />
               </View>
             </View>
@@ -466,7 +479,7 @@ export default function FeeTransactionsScreen() {
 
 
           <View style={styles.header}>
-            <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TRANSACTIONS}>
+            <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TRANSACTIONS} fallback={null} loadingFallback={null}>
               <TouchableOpacity
                 style={[styles.addButton, { backgroundColor: colors.primary }]}
                 onPress={handleCreate}
@@ -477,12 +490,8 @@ export default function FeeTransactionsScreen() {
             </CreatePermissionGuard>
           </View>
 
-          <FlatList
-            data={filteredTransactions}
-            keyExtractor={(item) => item.id}
-            renderItem={renderTransactionItem}
-            contentContainerStyle={styles.listContainer}
-            showsVerticalScrollIndicator={false}
+              </View>
+            }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Ionicons name="receipt-outline" size={48} color={colors['muted-foreground']} />
@@ -496,7 +505,7 @@ export default function FeeTransactionsScreen() {
 
           {/* Multi-Step Modal */}
           <Modal visible={isModalVisible} animationType="slide" transparent={true} onRequestClose={() => setIsModalVisible(false)}>
-            <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
               <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
                 <View style={styles.modalHeader}>
                   <Text style={[styles.modalTitle, { color: colors.foreground }]}>
@@ -519,7 +528,7 @@ export default function FeeTransactionsScreen() {
                     </View>
                   ))}
                 </View>
-                <ScrollView style={styles.form}>
+                <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
 
                   {/* Step 1: Student */}
                   {currentStep === 1 && (
@@ -639,7 +648,7 @@ export default function FeeTransactionsScreen() {
                         style={[styles.input, { backgroundColor: colors.background, color: colors.foreground, borderColor: colors.border }]}
                         value={formData.transaction_date}
                         onChangeText={(text) => { setStepError(''); setFormData(prev => ({ ...prev, transaction_date: text })); }}
-                        placeholder="YYYY-MM-DD" placeholderTextColor={colors['muted-foreground']} keyboardType="numeric" editable={!isSubmitting}
+                        placeholder="YYYY-MM-DD" placeholderTextColor={colors['muted-foreground']} keyboardType="numbers-and-punctuation" editable={!isSubmitting}
                       />
                       {stepError !== '' && <Text style={styles.errorText}>{stepError}</Text>}
                       <Text style={[styles.label, { color: colors.foreground }]}>Collected By</Text>
@@ -821,24 +830,24 @@ export default function FeeTransactionsScreen() {
                   )}
                 </View>
               </View>
-            </View>
+            </KeyboardAvoidingView>
           </Modal>
 
 
           {/* Outstanding Fees Modal */}
           <Modal visible={outstandingFeesModal.visible} animationType="slide" transparent={true} onRequestClose={() => setOutstandingFeesModal(prev => ({ ...prev, visible: false }))}>
-            <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
               <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
                 <View style={styles.modalHeader}>
                   <Text style={[styles.modalTitle, { color: colors.foreground }]}>
-                    Outstanding Fees - {outstandingFeesModal.studentName}
+                    Outstanding Fees{outstandingFeesModal.studentName ? ` - ${outstandingFeesModal.studentName}` : ''}
                   </Text>
                   <TouchableOpacity onPress={() => setOutstandingFeesModal(prev => ({ ...prev, visible: false }))}
               accessibilityLabel="Close">
                     <Ionicons name="close" size={24} color={colors['muted-foreground']} />
                   </TouchableOpacity>
                 </View>
-                <ScrollView style={styles.form}>
+                <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
                   {outstandingFees.length > 0 ? (
                     outstandingFees.map((fee, index) => (
                       <View key={index} style={[styles.outstandingFeeItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
@@ -858,7 +867,7 @@ export default function FeeTransactionsScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
+            </KeyboardAvoidingView>
           </Modal>
 
         </View>
@@ -877,7 +886,7 @@ const styles = StyleSheet.create({
   dateField:               { flex: 1 },
   filterInput:             { borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 14 },
   header:                  { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16 },
-  addButton:               { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
+  addButton:               { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8 },
   addButtonText:           { color: 'white', marginLeft: 8, fontWeight: '600' },
   listContainer:           { paddingBottom: 20 },
   transactionCard:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 16, marginBottom: 8, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
@@ -891,7 +900,7 @@ const styles = StyleSheet.create({
   transactionAmount:       { fontSize: 15, fontWeight: '700' },
   transactionDetails:      { fontSize: 13, marginBottom: 2 },
   actionButtons:           { flexDirection: 'column', gap: 6 },
-  actionButton:            { padding: 8, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  actionButton:            { minWidth: 44, minHeight: 44, padding: 8, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   emptyContainer:          { alignItems: 'center', justifyContent: 'center', paddingVertical: 48 },
   emptyText:               { marginTop: 16, textAlign: 'center' },
   modalOverlay:            { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' },
@@ -903,12 +912,12 @@ const styles = StyleSheet.create({
   stepCircle:              { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   stepText:                { fontSize: 16, fontWeight: '600' },
   stepLabel:               { fontSize: 12 },
-  form:                    { marginBottom: 20 },
+  form:                    { marginBottom: 20, flexShrink: 1 },
   label:                   { marginBottom: 8, fontWeight: '600' },
   input:                   { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 16, fontSize: 16 },
   errorText:               { color: '#dc2626', fontSize: 13, marginBottom: 8, marginTop: -8 },
   itemsHeader:             { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  addItemButton:           { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  addItemButton:           { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 6 },
   addItemText:             { color: 'white', marginLeft: 4, fontSize: 14, fontWeight: '600' },
   itemCard:                { padding: 16, marginBottom: 12, borderRadius: 8, borderWidth: 1 },
   itemHeader:              { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
@@ -919,9 +928,9 @@ const styles = StyleSheet.create({
   totalContainer:          { padding: 16, borderRadius: 8, marginBottom: 16, alignItems: 'center' },
   totalText:               { fontSize: 18, fontWeight: '600' },
   modalActions:            { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  cancelButton:            { flex: 1, padding: 12, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
-  secondaryButton:         { flex: 1, padding: 12, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
-  submitButton:            { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
+  cancelButton:            { flex: 1, padding: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+  secondaryButton:         { flex: 1, padding: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+  submitButton:            { flex: 1, padding: 14, borderRadius: 8, alignItems: 'center' },
   submitButtonText:        { color: 'white', fontWeight: '600' },
   retryButton:             { marginTop: 16, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
   outstandingFeeItem:      { padding: 12, marginBottom: 8, borderRadius: 8, borderWidth: 1 },

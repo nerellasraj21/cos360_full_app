@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -273,7 +274,14 @@ function StudentFeeDetailScreenContent() {
         map.set(item.fee_type_id, { name: item.fee_type_name, items: [] });
       }
       const group = map.get(item.fee_type_id)!;
-      group.items.push({ ...item, inst_no: group.items.length + 1, adjusted_pending: item.pending_amount });
+      group.items.push({
+        ...item,
+        term_amount: Number(item.term_amount) || 0,
+        paid_amount: Number(item.paid_amount) || 0,
+        pending_amount: Number(item.pending_amount) || 0,
+        inst_no: group.items.length + 1,
+        adjusted_pending: Number(item.pending_amount) || 0,
+      });
     });
 
     // Apply concession FIFO: reduce pending from earliest installment first
@@ -329,8 +337,8 @@ function StudentFeeDetailScreenContent() {
     const map = new Map<string, { name: string; amount: number }>();
     all.forEach((item) => {
       const ex = map.get(item.fee_type_id);
-      if (ex) ex.amount += item.pending_amount;
-      else map.set(item.fee_type_id, { name: item.fee_type_name, amount: item.pending_amount });
+      if (ex) ex.amount += Number(item.pending_amount) || 0;
+      else map.set(item.fee_type_id, { name: item.fee_type_name, amount: Number(item.pending_amount) || 0 });
     });
 
     (concessionRows as any[]).forEach((c) => {
@@ -647,7 +655,7 @@ function StudentFeeDetailScreenContent() {
     const dueColor = (v: number | string) => (Number(v) > 0 ? '#EF4444' : '#10B981');
 
     return (
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {Number(summary.old_fee_pending_amount) > 0 && (
           <TouchableOpacity style={styles.oldFeeAlert} onPress={() => setActiveTab('old-fees')}>
             <Ionicons name="warning" size={14} color="#D97706" />
@@ -662,7 +670,7 @@ function StudentFeeDetailScreenContent() {
           <View style={styles.summaryHeaderRow}>
             <Text style={[styles.summaryHeaderTitle, { color: colors.foreground }]}>Fee Summary</Text>
             <Text style={[styles.summaryHeaderMeta, { color: muted }]}>
-              As of {summary.as_of_date}  •  AY: {summary.academic_year}
+              As of {summary.as_of_date ? new Date(summary.as_of_date).toLocaleDateString('en-IN') : ''}  •  AY: {summary.academic_year}
             </Text>
           </View>
 
@@ -788,7 +796,7 @@ function StudentFeeDetailScreenContent() {
     const totalRowBg = theme === 'dark' ? 'rgba(255,255,255,0.06)' : '#f1f5f9';
 
     return (
-    <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false}>
+    <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       {/* Total Due card */}
       <View style={[styles.dueCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
         <Text style={[styles.dueLabel, { color: muted }]}>Total Due Amount</Text>
@@ -1032,7 +1040,7 @@ function StudentFeeDetailScreenContent() {
     const validCount = buildConcessionItems().length;
 
     return (
-      <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Header + Save All */}
         <View style={styles.summaryHeaderRow}>
           <Text style={[styles.sectionTitle, { color: colors.foreground, paddingHorizontal: 0, marginBottom: 0 }]}>
@@ -1149,7 +1157,7 @@ function StudentFeeDetailScreenContent() {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.feeTypeName, { color: colors.foreground }]}>{con.fee_type_name || con.fee_type_id}</Text>
-                    <Text style={[styles.feeSub, { color: muted }]}>Approver: {con.approver}</Text>
+                    <Text style={[styles.feeSub, { color: muted }]}>Approver: {String(con.approver ?? '').replace(/\w/g, (c) => c.toUpperCase())}</Text>
                     {con.reason ? <Text style={[styles.feeSub, { color: muted }]}>{con.reason}</Text> : null}
                     {con.recorded_by_staff_name ? (
                       <Text style={[styles.feeSub, { color: muted }]}>Recorded by: {con.recorded_by_staff_name}</Text>
@@ -1161,7 +1169,7 @@ function StudentFeeDetailScreenContent() {
                       <View style={{ flexDirection: 'row', gap: 6 }}>
                         {canUpdateConcession && (
                           <TouchableOpacity
-                            style={[styles.iconBtn, { width: 28, height: 28, borderColor: colors.primary }]}
+                            style={[styles.iconBtn, { width: 40, height: 40, borderColor: colors.primary }]}
                             onPress={() => handleEditConcessionOpen(con)}
                             accessibilityLabel="Edit"
                           >
@@ -1170,7 +1178,7 @@ function StudentFeeDetailScreenContent() {
                         )}
                         {canDeleteConcession && (
                           <TouchableOpacity
-                            style={[styles.iconBtn, { width: 28, height: 28, borderColor: '#EF4444' }]}
+                            style={[styles.iconBtn, { width: 40, height: 40, borderColor: '#EF4444' }]}
                             onPress={() => setDeleteConcessionId(con.id)}
                             accessibilityLabel="Delete"
                           >
@@ -1216,6 +1224,7 @@ function StudentFeeDetailScreenContent() {
           data={oldFees ?? []}
           keyExtractor={(item: any, idx) => String(item.id ?? idx)}
           contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
+          keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
             <Text style={[styles.sectionTitle, { color: colors.foreground, paddingHorizontal: 0 }]}>Old Fee Records</Text>
           }
@@ -1301,7 +1310,7 @@ function StudentFeeDetailScreenContent() {
       );
     }
     return (
-      <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.historyTotalRow}>
           <Text style={[styles.sectionTitle, { color: colors.foreground, paddingHorizontal: 0, marginBottom: 0 }]}>
             Fee Payment History
@@ -1314,7 +1323,7 @@ function StudentFeeDetailScreenContent() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.feeTypeName, { color: colors.foreground }]}>{formatINR(it.amount_paid)}</Text>
                 <Text style={[styles.feeSub, { color: muted }]}>
-                  {it.transaction_date} • {String(it.payment_method || '').toUpperCase()}
+                  {it.transaction_date ? new Date(it.transaction_date).toLocaleDateString('en-IN') : ''} • {String(it.payment_method || '').replace(/_/g, ' ').toUpperCase()}
                 </Text>
                 {it.receipt_number ? (
                   <Text style={[styles.feeSub, { color: muted }]}>Receipt: {it.receipt_number}</Text>
@@ -1367,7 +1376,7 @@ function StudentFeeDetailScreenContent() {
         </View>
 
         {/* Tab bar */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar} contentContainerStyle={{ alignItems: 'center' }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar} contentContainerStyle={{ alignItems: 'center' }} keyboardShouldPersistTaps="handled">
           {TABS.map((tab) => (
             <TouchableOpacity
               key={tab.key}
@@ -1380,18 +1389,18 @@ function StudentFeeDetailScreenContent() {
         </ScrollView>
 
         {/* Tab content — invoked as functions (not <Comp/>) so inputs keep focus across re-renders */}
-        <View style={{ flex: 1 }}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           {activeTab === 'summary' && SummaryTab()}
           {activeTab === 'payment' && PaymentTab()}
           {activeTab === 'concessions' && ConcessionsTab()}
           {activeTab === 'old-fees' && OldFeesTab()}
           {activeTab === 'history' && HistoryTab()}
-        </View>
+        </KeyboardAvoidingView>
       </View>
 
       {/* Add Manual Entry modal */}
       <Modal visible={showManualEntry} transparent animationType="fade" onRequestClose={() => setShowManualEntry(false)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalCard, { backgroundColor: cardBg }]}>
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>Add Manual Entry</Text>
             <Text style={[styles.fieldLabel, { color: muted }]}>Amount (₹) *</Text>
@@ -1424,12 +1433,12 @@ function StudentFeeDetailScreenContent() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Carry Forward modal */}
       <Modal visible={showCarryForward} transparent animationType="fade" onRequestClose={() => setShowCarryForward(false)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalCard, { backgroundColor: cardBg }]}>
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>Carry Forward Old Fees</Text>
             <Text style={[styles.fieldLabel, { color: muted }]}>Source Academic Year</Text>
@@ -1470,12 +1479,12 @@ function StudentFeeDetailScreenContent() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Edit Concession modal */}
       <Modal visible={!!editConcessionItem} transparent animationType="fade" onRequestClose={() => setEditConcessionItem(null)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalCard, { backgroundColor: cardBg }]}>
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>Edit Concession</Text>
             <Text style={[styles.fieldLabel, { color: muted }]}>Concession Amount</Text>
@@ -1516,12 +1525,12 @@ function StudentFeeDetailScreenContent() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Revoke Concession confirm modal */}
       <Modal visible={!!deleteConcessionId} transparent animationType="fade" onRequestClose={() => setDeleteConcessionId(null)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalCard, { backgroundColor: cardBg }]}>
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>Revoke Concession</Text>
             <Text style={[styles.feeSub, { color: muted, marginBottom: 4 }]}>
@@ -1540,12 +1549,12 @@ function StudentFeeDetailScreenContent() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Payment success modal */}
       <Modal visible={!!paymentSuccess} animationType="fade" transparent onRequestClose={() => setPaymentSuccess(null)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.successModal, { backgroundColor: cardBg }]}>
             <Ionicons name="checkmark-circle" size={60} color="#10B981" style={{ marginBottom: 12 }} />
             <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment Recorded</Text>
@@ -1569,7 +1578,7 @@ function StudentFeeDetailScreenContent() {
               <Text style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>Done</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
       <ConfirmModal {...modalProps} />
     </AppLayout>
@@ -1581,7 +1590,7 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 22 },
 
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 12 },
-  backBtn: { padding: 6 },
+  backBtn: { padding: 10 },
   studentInfoCard: { flex: 1, borderRadius: 14, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center' },
   studentAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   studentInfoName: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
@@ -1591,7 +1600,7 @@ const styles = StyleSheet.create({
   admissionBadgeText: { fontSize: 12, fontWeight: '600' },
 
   tabBar: { flexGrow: 0, paddingHorizontal: 12, paddingVertical: 10 },
-  tab: { paddingHorizontal: 14, paddingVertical: 8, marginRight: 6 },
+  tab: { paddingHorizontal: 14, paddingVertical: 12, marginRight: 6 },
 
   totalsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginTop: 12, marginBottom: 12 },
   totalCard: { flex: 1, borderRadius: 12, borderWidth: 1, padding: 12, alignItems: 'center' },
@@ -1649,7 +1658,7 @@ const styles = StyleSheet.create({
 
   collapseHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24, marginBottom: 8 },
 
-  saveAllBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  saveAllBtn: { paddingHorizontal: 14, paddingVertical: 12, borderRadius: 8 },
   saveAllText: { color: 'white', fontWeight: '600', fontSize: 12 },
 
   oldFeeActions: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 16 },
@@ -1657,7 +1666,7 @@ const styles = StyleSheet.create({
   searchBtnText: { color: 'white', fontWeight: '600', fontSize: 14 },
   clearBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   clearBtnText: { fontWeight: '600', fontSize: 14 },
-  iconBtn: { width: 34, height: 34, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  iconBtn: { width: 44, height: 44, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 
   historyTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
 

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useState, useEffect } from 'react';
 import {
-  ActivityIndicator, Modal, ScrollView, StyleSheet,
+  ActivityIndicator, KeyboardAvoidingView, Modal, Platform, RefreshControl, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 
@@ -50,7 +50,7 @@ export default function RemarkSetsScreen() {
   const [form, setForm] = useState<RemarkGradeSetCreate>({ ...EMPTY_FORM });
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const { data: sets = [], isLoading } = useQuery({
+  const { data: sets = [], isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['remark-grade-sets'],
     queryFn: () => remarkGradesApi.list(),
   });
@@ -58,19 +58,19 @@ export default function RemarkSetsScreen() {
   const createMutation = useMutation({
     mutationFn: (d: RemarkGradeSetCreate) => remarkGradesApi.create(d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['remark-grade-sets'] }); showSuccess('Remark set created'); closeModal(); },
-    onError: (err: any) => showError(getApiErrorMessage(err, 'Failed to create remark set')),
+    onError: (err: any) => showError('Error', getApiErrorMessage(err, 'Failed to create remark set')),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: RemarkGradeSetCreate }) => remarkGradesApi.update(id, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['remark-grade-sets'] }); showSuccess('Remark set updated'); closeModal(); },
-    onError: (err: any) => showError(getApiErrorMessage(err, 'Failed to update remark set')),
+    onError: (err: any) => showError('Error', getApiErrorMessage(err, 'Failed to update remark set')),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => remarkGradesApi.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['remark-grade-sets'] }); showSuccess('Remark set deleted'); },
-    onError: (err: any) => showError(getApiErrorMessage(err, 'Failed to delete remark set')),
+    onError: (err: any) => showError('Error', getApiErrorMessage(err, 'Failed to delete remark set')),
   });
 
   const openCreate = () => {
@@ -140,7 +140,12 @@ export default function RemarkSetsScreen() {
           <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>No remark sets yet</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
+        >
           {sets.map(set => {
             const isExpanded = expandedId === set.id;
             return (
@@ -212,7 +217,7 @@ export default function RemarkSetsScreen() {
       )}
 
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={closeModal}>
-        <View style={styles.overlay}>
+        <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modal, { backgroundColor: cardBg }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
@@ -223,7 +228,7 @@ export default function RemarkSetsScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ padding: 20 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={[styles.label, { color: colors.foreground }]}>Set Name *</Text>
               <TextInput
                 style={[styles.input, { color: colors.foreground, backgroundColor: inputBg, borderColor: borderCol }]}
@@ -284,7 +289,7 @@ export default function RemarkSetsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
       <ConfirmModal {...modalProps} />
     </AppLayout>
@@ -292,7 +297,7 @@ export default function RemarkSetsScreen() {
 }
 
 const styles = StyleSheet.create({
-  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-end', margin: 16, marginBottom: 8, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-end', margin: 16, marginBottom: 8, paddingHorizontal: 14, minHeight: 44, borderRadius: 8 },
   addBtnText: { color: 'white', fontWeight: '600', fontSize: 14 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   emptyText: { fontSize: 14 },
@@ -306,7 +311,7 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 11, fontWeight: '600' },
   cardMeta: { fontSize: 12 },
   cardActions: { flexDirection: 'row', gap: 4, paddingRight: 10 },
-  actionBtn: { padding: 8 },
+  actionBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   optionsTable: { marginTop: 10, borderWidth: 1, borderRadius: 8, overflow: 'hidden' },
   optionsTableHeaderRow: { flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   optionsTableHeaderCell: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
@@ -325,11 +330,11 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 14 },
   itemsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 10 },
   sectionLabel: { fontSize: 15, fontWeight: '700' },
-  addOptBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5 },
+  addOptBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 6, paddingHorizontal: 10, minHeight: 40 },
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   gradeLetterInput: { width: 64, borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 14, textAlign: 'center' },
   labelInput: { flex: 1 },
-  removeBtn: { padding: 4 },
+  removeBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   modalFooter: { flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(0,0,0,0.1)' },
   btn: { paddingVertical: 12, borderRadius: 8, alignItems: 'center', paddingHorizontal: 20 },
 });

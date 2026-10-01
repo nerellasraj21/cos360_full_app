@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import {
-  ActivityIndicator, FlatList, Modal, ScrollView, StyleSheet,
+  ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 
@@ -84,7 +84,7 @@ export default function MarkPermissionsScreen() {
     queryFn: () => staffApi.getStaffEnrollments({ is_active: true, limit: 200 }),
   });
   const teacherOptions = (staffData?.items ?? []).map(s => ({
-    label: `${s.first_name} ${s.last_name ?? ''}`.trim(),
+    label: `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim() || 'Staff',
     value: s.user_id || s.id,
   }));
 
@@ -102,12 +102,12 @@ export default function MarkPermissionsScreen() {
   });
   const classSectionLabel = (classId: string, sectionId?: string | null) => {
     const cs = classSections.find(c => c.class_id === classId && (c.section_id ?? '') === (sectionId ?? ''));
-    return cs ? (cs.section_name ? `${cs.class_name ?? classId} – ${cs.section_name}` : (cs.class_name ?? classId)) : classId;
+    return cs ? (cs.section_name ? `${cs.class_name ?? 'Class'} – ${cs.section_name}` : (cs.class_name ?? 'Class')) : 'Class';
   };
   const scopeOptions = [
     { label: 'All subjects (full exam access)', value: '' },
     ...subjectConfigs.map(sc => ({
-      label: `${classSectionLabel(sc.class_id, sc.section_id)} · ${sc.subject_name ?? sc.subject_id}`,
+      label: `${classSectionLabel(sc.class_id, sc.section_id)} · ${sc.subject_name ?? 'Subject'}`,
       value: sc.id,
     })),
   ];
@@ -158,7 +158,7 @@ export default function MarkPermissionsScreen() {
   const handleRevoke = (perm: MarkPermission) => {
     confirm({
       title: 'Revoke Permission',
-      message: `Remove mark entry access for ${perm.user_display_name ?? perm.user_id ?? perm.teacher_id}?`,
+      message: `Remove mark entry access for ${perm.user_display_name ?? 'this teacher'}?`,
       confirmLabel: 'Revoke',
       destructive: true,
       onConfirm: () => revokeMutation.mutate(perm.id),
@@ -173,13 +173,8 @@ export default function MarkPermissionsScreen() {
       <View style={{ flex: 1 }}>
         <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</Text>
         <Text style={[styles.teacherText, { color: colors.foreground }]}>
-          {item.user_display_name ?? item.user_id ?? item.teacher_id}
+          {item.user_display_name ?? 'Teacher'}
         </Text>
-        {item.granted_by ? (
-          <Text style={[styles.metaText, { color: colors['muted-foreground'] }]}>
-            Granted by: {item.granted_by}
-          </Text>
-        ) : null}
         <Text style={[styles.metaText, { color: colors['muted-foreground'] }]}>
           Granted: {new Date(item.created_at).toLocaleDateString()}
         </Text>
@@ -194,6 +189,7 @@ export default function MarkPermissionsScreen() {
           <TouchableOpacity
             style={styles.iconBtn}
             onPress={() => toggleMutation.mutate({ permId: item.id, is_active: !item.is_active })}
+            accessibilityLabel={item.is_active ? 'Deactivate permission' : 'Activate permission'}
           >
             <Ionicons
               name={item.is_active ? 'pause-circle-outline' : 'play-circle-outline'}
@@ -204,7 +200,7 @@ export default function MarkPermissionsScreen() {
         )}
         {canRevoke && (
           <TouchableOpacity style={styles.iconBtn} onPress={() => handleRevoke(item)}
-              accessibilityLabel="Close">
+              accessibilityLabel="Revoke permission">
             <Ionicons name="close-circle-outline" size={20} color="#EF4444" />
           </TouchableOpacity>
         )}
@@ -291,7 +287,7 @@ export default function MarkPermissionsScreen() {
 
       {/* Grant Permission Modal */}
       <Modal visible={grantModalVisible} animationType="slide" transparent onRequestClose={() => setGrantModalVisible(false)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalSheet, { backgroundColor: cardBg }]}>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <View style={styles.modalHeader}>
@@ -344,7 +340,7 @@ export default function MarkPermissionsScreen() {
               <View style={{ height: 16 }} />
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
       <ConfirmModal {...modalProps} />
     </AppLayout>
@@ -357,7 +353,7 @@ const styles = StyleSheet.create({
   filterRow: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },
   filterLabel: { fontSize: 12, fontWeight: '600', marginBottom: 6 },
   chips: { flexDirection: 'row', gap: 6, paddingRight: 16 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
+  chip: { paddingHorizontal: 14, minHeight: 40, justifyContent: 'center', borderRadius: 20, borderWidth: 1 },
   chipText: { fontSize: 12, fontWeight: '500' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyText: { marginTop: 12, fontSize: 14, textAlign: 'center' },
@@ -370,10 +366,10 @@ const styles = StyleSheet.create({
   iconBox: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   teacherText: { fontSize: 13, fontWeight: '600', marginBottom: 3 },
   metaText: { fontSize: 11, marginBottom: 1 },
-  rightActions: { alignItems: 'flex-end', gap: 6 },
+  rightActions: { alignItems: 'flex-end', gap: 2 },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   statusText: { fontSize: 10, fontWeight: '700' },
-  iconBtn: { padding: 4 },
+  iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   grantCta: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, marginTop: 16,

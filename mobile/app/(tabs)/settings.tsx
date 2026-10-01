@@ -161,7 +161,7 @@ export default function SettingsScreen() {
             />
 
             {/* Username row */}
-            {user?.username && (
+            {!!user?.username && (
               <View style={[styles.infoRow, { borderTopColor: borderCol }]}>
                 <View style={styles.infoLeft}>
                   <Ionicons name="person-outline" size={16} color={labelColor} />
@@ -172,7 +172,7 @@ export default function SettingsScreen() {
             )}
 
             {/* Email row */}
-            {user?.email && (
+            {!!user?.email && (
               <View style={[styles.infoRow, { borderTopColor: borderCol }]}>
                 <View style={styles.infoLeft}>
                   <Ionicons name="mail-outline" size={16} color={labelColor} />
@@ -185,7 +185,7 @@ export default function SettingsScreen() {
             )}
 
             {/* Role row */}
-            {role?.name && (
+            {!!role?.name && (
               <View style={[styles.infoRow, { borderTopColor: borderCol }]}>
                 <View style={styles.infoLeft}>
                   <Ionicons name="shield-checkmark-outline" size={16} color={labelColor} />

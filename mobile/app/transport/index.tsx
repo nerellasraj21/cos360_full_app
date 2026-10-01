@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 
 import { AppLayout } from '@/components';
@@ -43,9 +43,9 @@ function TransportIndexScreenContent() {
   });
 
   const stats = [
-    { label: 'Active Routes', value: routes?.length ?? '…', icon: 'map' as const, color: '#3B82F6' },
-    { label: 'Vehicles', value: vehicles?.length ?? '…', icon: 'bus' as const, color: '#10B981' },
-    { label: 'Students', value: studentTransports?.length ?? '…', icon: 'people' as const, color: '#F59E0B' },
+    { label: 'Active Routes', value: routes?.length ?? '-', icon: 'map' as const, color: '#3B82F6' },
+    { label: 'Vehicles', value: vehicles?.length ?? '-', icon: 'bus' as const, color: '#10B981' },
+    { label: 'Students', value: studentTransports?.length ?? '-', icon: 'people' as const, color: '#F59E0B' },
   ];
 
   return (

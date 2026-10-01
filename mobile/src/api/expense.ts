@@ -165,12 +165,9 @@ export const expenseAttachmentsApi = {
   ): Promise<ExpenseAttachment> => {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('document_type', documentType);
-    if (departmentId) {
-      formData.append('department_id', departmentId);
-    }
 
     const response = await apiClient.post(`/expense/attachments/transactions/${transactionId}/upload`, formData, {
+      params: { document_type: documentType, department_id: departmentId },
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;

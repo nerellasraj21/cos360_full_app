@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 10, fontWeight: '700' },
   viewBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7,
+    alignSelf: 'flex-start', paddingHorizontal: 12, minHeight: 44,
     borderRadius: 8, borderWidth: 1,
   },
   viewBtnText: { fontSize: 13, fontWeight: '600' },

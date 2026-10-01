@@ -603,7 +603,7 @@ const styles = StyleSheet.create({
   refreshButtonText: { fontSize: 12, fontWeight: '600' },
 
   dateSelector: { flexDirection: 'row', alignItems: 'center', padding: 8, borderRadius: 10, borderWidth: 1, marginBottom: 10 },
-  dateButton: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
+  dateButton: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   dateDisplay: { flex: 1, alignItems: 'center' },
   dateDisplayRow: { flexDirection: 'row', alignItems: 'center' },
   dateText: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
@@ -686,7 +686,7 @@ export default function StaffAttendanceScreen() {
           <View style={styles.emptyContainer}>
             <Ionicons name="lock-closed" size={56} color="#9CA3AF" />
             <ThemedText type="subtitle" style={styles.emptyTitle}>Access Denied</ThemedText>
-            <ThemedText style={styles.emptyText}>You don't have permission to view staff attendance</ThemedText>
+            <ThemedText style={styles.emptyText}>You don&apos;t have permission to view staff attendance</ThemedText>
           </View>
         </ThemedView>
       }

@@ -89,7 +89,7 @@ export default function ResultsScreen() {
     enabled: !examId,
   });
 
-  const { data: resultsData, isLoading } = useQuery({
+  const { data: resultsData, isLoading, refetch: refetchResults, isRefetching: refetchingResults } = useQuery({
     queryKey: ['exam-results', selectedExamId],
     queryFn: () => examResultsApi.list(selectedExamId),
     enabled: !!selectedExamId,
@@ -158,7 +158,7 @@ export default function ResultsScreen() {
               autoCorrect={false}
             />
             {studentSearch.length > 0 && (
-              <TouchableOpacity onPress={() => setStudentSearch('')}>
+              <TouchableOpacity onPress={() => setStudentSearch('')} accessibilityLabel="Clear search">
                 <Ionicons name="close-circle" size={16} color={colors['muted-foreground']} />
               </TouchableOpacity>
             )}
@@ -207,9 +207,9 @@ export default function ResultsScreen() {
 
           <View style={[styles.summaryCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
             <Text style={[styles.detailStudentName, { color: colors.foreground }]}>
-              {studentResult.student_name ?? studentResult.student_id}
+              {studentResult.student_name ?? 'Student'}
             </Text>
-            {studentResult.admission_number && (
+            {!!studentResult.admission_number && (
               <Text style={[styles.admNo, { color: colors['muted-foreground'] }]}>{studentResult.admission_number}</Text>
             )}
 
@@ -243,7 +243,7 @@ export default function ResultsScreen() {
             renderItem={({ item }) => (
               <View style={[styles.subjectRow, { backgroundColor: cardBg, borderColor: borderCol }]}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.subjectName, { color: colors.foreground }]}>{item.subject_name ?? item.subject_config_id}</Text>
+                  <Text style={[styles.subjectName, { color: colors.foreground }]}>{item.subject_name ?? 'Subject'}</Text>
                   {item.is_absent ? (
                     <Text style={{ color: '#F59E0B', fontSize: 12, marginTop: 2 }}>Absent</Text>
                   ) : (
@@ -276,7 +276,7 @@ export default function ResultsScreen() {
       <View style={{ flex: 1 }}>
         <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</Text>
         <Text style={[styles.studentName, { color: colors.foreground }]}>
-          {item.student_name ?? item.student_id}
+          {item.student_name ?? 'Student'}
         </Text>
         <Text style={[styles.admNo, { color: colors['muted-foreground'] }]}>
           {item.admission_number ?? ''}
@@ -289,7 +289,7 @@ export default function ResultsScreen() {
         <Text style={[styles.percentage, { color: item.is_passed ? PASS_COLOR : FAIL_COLOR }]}>
           {Number(item.percentage ?? 0).toFixed(1)}%
         </Text>
-        {item.rank && <Text style={[styles.rank, { color: colors['muted-foreground'] }]}>#{item.rank}</Text>}
+        {!!item.rank && <Text style={[styles.rank, { color: colors['muted-foreground'] }]}>#{item.rank}</Text>}
       </View>
 
       <View style={[styles.passBadge, { backgroundColor: item.is_passed ? '#10B98118' : '#EF444418' }]}>
@@ -411,6 +411,8 @@ export default function ResultsScreen() {
             data={Array.isArray(resultsData) ? resultsData : []}
             keyExtractor={item => item.student_id}
             renderItem={renderResultRow}
+            onRefresh={refetchResults}
+            refreshing={refetchingResults}
             contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
           />
         )}
@@ -432,10 +434,10 @@ const styles = StyleSheet.create({
   },
   searchInputSP: { flex: 1, fontSize: 14, padding: 0 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
+  chip: { paddingHorizontal: 14, minHeight: 40, justifyContent: 'center', borderRadius: 20, borderWidth: 1 },
   chipText: { fontSize: 12, fontWeight: '500' },
   actionsBar: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 8 },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, minHeight: 44, borderRadius: 10 },
   actionBtnText: { color: 'white', fontWeight: '600', fontSize: 13 },
   summaryBar: { paddingHorizontal: 16, paddingBottom: 8 },
   summaryText: { fontSize: 13 },
@@ -453,7 +455,7 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { marginTop: 12, fontSize: 14 },
   // Detail view
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 16 },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 16, minHeight: 48 },
   backText: { fontWeight: '600' },
   summaryCard: {
     margin: 16, borderRadius: 14, borderWidth: 1, padding: 16,

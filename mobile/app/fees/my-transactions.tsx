@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
 import { useAuth, useTheme } from '@/contexts';
@@ -52,7 +52,7 @@ function MyTransactionsScreenContent() {
   // whichever child is active in the header switcher, same as My Receipts.
   const mine = useMyFeeTransactions(undefined, !isParent);
   const childrens = useMyChildrenFeeTransactions(undefined, isParent);
-  const { data: allTransactions = [], isLoading, error, refetch } = isParent ? childrens : mine;
+  const { data: allTransactions = [], isLoading, error, refetch, isRefetching } = isParent ? childrens : mine;
 
   const transactions = isParent
     ? allTransactions.filter((t) => t.student_admission_num === selectedStudent?.admission_number)
@@ -96,7 +96,7 @@ function MyTransactionsScreenContent() {
 
   return (
     <AppLayout title="My Transactions">
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 48 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={INDIGO} />}>
         <View style={styles.headerRow}>
           <Text style={[styles.pageTitle, { color: colors.foreground }]}>My Transactions</Text>
           <Text style={[styles.pageSub, { color: muted }]}>
@@ -127,7 +127,7 @@ function MyTransactionsScreenContent() {
                       {txn.student_admission_num}
                     </Text>
                   )}
-                  {txn.transaction_number && (
+                  {!!txn.transaction_number && (
                     <Text style={[styles.txnNumber, { color: colors.foreground }]} numberOfLines={1}>
                       {txn.transaction_number}
                     </Text>
@@ -141,7 +141,7 @@ function MyTransactionsScreenContent() {
                     </View>
                   </View>
                   <Text style={[styles.txnSub, { color: muted }]}>
-                    {PAYMENT_METHOD_LABEL[txn.payment_method] ?? txn.payment_method} · {fmtDate(txn.transaction_date)}
+                    {PAYMENT_METHOD_LABEL[txn.payment_method] ?? String(txn.payment_method ?? '').replace(/_/g, ' ')} · {fmtDate(txn.transaction_date)}
                   </Text>
                   <Text style={[styles.txnSub, { color: muted }]}>
                     Receipt: {txn.receipt_generated ? 'Generated' : '—'}

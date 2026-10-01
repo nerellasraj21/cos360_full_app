@@ -144,7 +144,7 @@ function MyCertificatesView({ studentId, title }: { studentId?: string; title?: 
 
   return (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-      {title && (
+      {!!title && (
         <ThemedText style={styles.viewTitle}>{title}</ThemedText>
       )}
 
@@ -203,7 +203,7 @@ function AdminCertificatesView() {
     queryKey: ['cert-selector-classes'],
     queryFn: studentCertificatesApi.getSelectorClasses,
   });
-  const classes = classesRaw.map((c) => ({ label: c.class_name, value: c.id }));
+  const classes = classesRaw.map((c) => ({ label: c.class_name || '', value: c.id }));
 
   const { data: sectionsRaw = [] } = useQuery({
     queryKey: ['cert-selector-sections', classId],
@@ -212,7 +212,7 @@ function AdminCertificatesView() {
   });
   const sections = [
     { label: 'All Sections', value: '' },
-    ...sectionsRaw.map((s) => ({ label: s.section_name, value: s.id })),
+    ...sectionsRaw.map((s) => ({ label: s.section_name || '', value: s.id })),
   ];
 
   const { data: studentsRaw = [] } = useQuery({
@@ -232,7 +232,7 @@ function AdminCertificatesView() {
     queryFn: () => certificateTypesApi.listCertificateTypes({ limit: 100 }),
   });
   const certTypes = (certTypesData?.items ?? []).map((t) => ({
-    label: t.name,
+    label: t.name || '',
     value: t.id,
   }));
 
@@ -705,8 +705,8 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   iconBtn: {
-    width: 30,
-    height: 30,
+    width: 40,
+    height: 40,
     borderRadius: 7,
     justifyContent: 'center',
     alignItems: 'center',

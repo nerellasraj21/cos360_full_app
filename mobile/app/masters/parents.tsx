@@ -13,6 +13,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 
 import { useToastContext } from '@/components/ToastProvider';
@@ -271,7 +273,7 @@ function ParentsScreenContent() {
 
       {/* Create / Edit Modal */}
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={closeModal}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalContent, { backgroundColor: cardBg }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
@@ -377,7 +379,7 @@ function ParentsScreenContent() {
               </TouchableOpacity>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
       <ConfirmModal {...modalProps} />
     </View>
@@ -388,11 +390,11 @@ const styles = StyleSheet.create({
   serialNo: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 12, overflow: 'hidden' },
   bannerDecor: { position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.12)' },
-  backBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginRight: 4 },
+  backBtn: { width: 40, height: 40, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginRight: 4 },
   bannerIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700' },
   bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 11 },
-  addBtn: { width: 34, height: 34, borderRadius: 9, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  addBtn: { width: 40, height: 40, borderRadius: 9, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, margin: 12, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   searchInput: { flex: 1, fontSize: 14 },
   listContent: { paddingHorizontal: 12, paddingBottom: 32 },
@@ -407,7 +409,7 @@ const styles = StyleSheet.create({
   statusDot: { width: 6, height: 6, borderRadius: 3, marginLeft: 4 },
   statusText: { fontSize: 11, fontWeight: '600' },
   actions: { alignItems: 'center' },
-  actionBtn: { width: 30, height: 30, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  actionBtn: { width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   emptyState: { alignItems: 'center', gap: 10, paddingTop: 60 },
   emptyText: { fontSize: 14, textAlign: 'center' },
   emptyAddBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, marginTop: 4 },

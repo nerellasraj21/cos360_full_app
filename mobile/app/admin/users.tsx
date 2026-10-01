@@ -5,7 +5,9 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -102,7 +104,7 @@ function EditUserModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.modal, { backgroundColor: colors.background }]}>
           {/* Header */}
           <View style={styles.modalHeader}>
@@ -189,7 +191,7 @@ function EditUserModal({
 
           {tab === 'details' && (
             <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+              <TouchableOpacity style={[styles.cancelBtn, { backgroundColor: inputBg }]} onPress={onClose}>
                 <Text style={{ color: colors.foreground }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -204,7 +206,7 @@ function EditUserModal({
             </View>
           )}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -240,7 +242,7 @@ function AdminUsersScreenContent() {
   });
 
   // ── System user list ─────────────────────────────────────────────────────
-  const { data: usersResp, isLoading: usersLoading } = useQuery({
+  const { data: usersResp, isLoading: usersLoading, refetch: refetchUsers, isRefetching: usersRefetching } = useQuery({
     queryKey: ['admin-system-users', search, roleFilter, page],
     queryFn: () => adminUsersApi.listUsers({
       page,
@@ -291,6 +293,8 @@ function AdminUsersScreenContent() {
       <FlatList
         data={systemUsers}
         keyExtractor={u => u.id}
+        refreshing={usersRefetching}
+        onRefresh={refetchUsers}
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <>
@@ -415,7 +419,7 @@ function AdminUsersScreenContent() {
               <Text style={[styles.userMeta, { color: colors['muted-foreground'] }]}>
                 @{item.username} · {item.role_name}
               </Text>
-              {item.entity_type && (
+              {!!item.entity_type && (
                 <Text style={[styles.userMeta, { color: colors['muted-foreground'] }]}>
                   {item.entity_type.charAt(0).toUpperCase() + item.entity_type.slice(1)}
                 </Text>
@@ -473,9 +477,9 @@ const styles = StyleSheet.create({
   userMeta: { fontSize: 11, lineHeight: 16 },
   userActions: { alignItems: 'center', gap: 6 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
-  editBtn: { width: 30, height: 30, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  editBtn: { width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, paddingVertical: 10 },
-  pageBtn: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: COLOR + '18' },
+  pageBtn: { width: 44, height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: COLOR + '18' },
   pageInfo: { fontSize: 13, fontWeight: '600' },
 
   // Edit modal

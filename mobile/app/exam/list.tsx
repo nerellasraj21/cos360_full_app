@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useState, useMemo } from 'react';
 import {
-  ActivityIndicator, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 
 import { AppLayout } from '@/components';
@@ -96,7 +96,7 @@ export default function ExamListScreen() {
 
   // Endpoint mapping: scope the list to the active academic year, same as
   // the web app's ExamList (`selectedAcademicYearId` param on GET /exams).
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['exams', activeAcademicYearId, statusFilter, natureFilter],
     queryFn: () => examsApi.list({
       academic_year_id: activeAcademicYearId ?? undefined,
@@ -377,7 +377,7 @@ export default function ExamListScreen() {
             keyExtractor={item => item.id}
             renderItem={renderItem}
             onRefresh={refetch}
-            refreshing={isLoading}
+            refreshing={isRefetching}
             contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
             ListHeaderComponent={
               <Text style={[styles.count, { color: colors['muted-foreground'] }]}>
@@ -390,8 +390,12 @@ export default function ExamListScreen() {
 
       {/* Edit Modal */}
       <Modal visible={!!editTarget} animationType="slide" transparent onRequestClose={() => setEditTarget(null)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView
+            style={[styles.modalCard, { backgroundColor: cardBg, borderColor: borderCol }]}
+            keyboardShouldPersistTaps="handled"
+            bounces={false}
+          >
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>Edit Exam</Text>
             <Text style={[styles.modalHint, { color: colors['muted-foreground'] }]}>
               Board, level, nature, and academic year cannot be changed after creation.
@@ -481,8 +485,8 @@ export default function ExamListScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
         <DatePickerModal
           visible={showEditDatePicker}
           initialDate={
@@ -544,7 +548,7 @@ const styles = StyleSheet.create({
   natureBadgeText: { fontSize: 11, fontWeight: '500', textTransform: 'capitalize' },
   yearLabel: { fontSize: 11, marginBottom: 6 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.15)', paddingTop: 8, marginTop: 2 },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 },
   actionBtnText: { fontSize: 12, fontWeight: '600' },
   studentFooter: { alignItems: 'flex-end' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -560,7 +564,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalCard: {
-    borderRadius: 20, borderWidth: 1, padding: 20,
+    borderRadius: 20, borderWidth: 1, padding: 20, maxHeight: '90%', flexGrow: 0,
     marginHorizontal: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0,
   },
   modalTitle: { fontSize: 17, fontWeight: '700', marginBottom: 4 },

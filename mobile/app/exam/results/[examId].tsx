@@ -94,7 +94,7 @@ export default function MyExamResultScreen() {
           <Text style={[styles.backText, { color: colors.primary as string }]}>Back to Results</Text>
         </TouchableOpacity>
 
-        {isParent && selectedStudent && (
+        {isParent && !!selectedStudent && (
           <Text style={[styles.studentLabel, { color: colors['muted-foreground'] }]}>{selectedStudent.name}</Text>
         )}
 
@@ -134,7 +134,7 @@ export default function MyExamResultScreen() {
                 <Text style={[styles.resultBannerText, { color: result.is_passed ? PASS_COLOR : FAIL_COLOR }]}>
                   {result.is_passed ? 'Pass' : 'Fail'}
                 </Text>
-                {result.grade_label && (
+                {!!result.grade_label && (
                   <Text style={[styles.gradeText, { color: colors['muted-foreground'] }]}>
                     Grade: {result.grade_label}
                   </Text>
@@ -189,7 +189,7 @@ export default function MyExamResultScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 16, paddingBottom: 4 },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 16, paddingBottom: 4, minHeight: 48 },
   backText: { fontWeight: '600' },
   studentLabel: { fontSize: 12, marginLeft: 16, marginBottom: 8 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },

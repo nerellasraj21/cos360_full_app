@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -40,7 +40,7 @@ function MyReceiptsScreenContent() {
   // whichever child is active in the header switcher, same as My Transactions.
   const mine = useMyFeeReceipts(undefined, !isParent);
   const childrens = useMyChildrenFeeReceipts(undefined, isParent);
-  const { data: allReceipts = [], isLoading, error, refetch } = isParent ? childrens : mine;
+  const { data: allReceipts = [], isLoading, error, refetch, isRefetching } = isParent ? childrens : mine;
 
   const receipts = isParent
     ? allReceipts.filter((r) => r.student_admission_num === selectedStudent?.admission_number)
@@ -117,7 +117,7 @@ function MyReceiptsScreenContent() {
 
   return (
     <AppLayout title="My Receipts">
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 48 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={INDIGO} />}>
         <View style={styles.headerRow}>
           <Text style={[styles.pageTitle, { color: colors.foreground }]}>My Receipts</Text>
           <Text style={[styles.pageSub, { color: muted }]}>
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   snoBox: { width: 30, height: 30, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   receiptNum: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
   receiptSub: { fontSize: 12, marginTop: 2 },
-  downloadBtn: { width: 36, height: 36, borderRadius: 8, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  downloadBtn: { width: 44, height: 44, borderRadius: 8, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
 });
 
 // Screen-level access control - see docs/USER_ROLES_WORKFLOW.md.

@@ -4,7 +4,10 @@ import { useRouter } from 'expo-router';
 import React, { useState, useEffect } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -93,7 +96,7 @@ export default function BoardPatternsScreen() {
   const canUpdate = hasPermission?.(RESOURCE, 'update');
   const canDelete = hasPermission?.(RESOURCE, 'delete');
 
-  const { data: patterns = [], isLoading } = useQuery({
+  const { data: patterns = [], isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['board-patterns'],
     queryFn: () => boardPatternsApi.list(),
   });
@@ -176,7 +179,12 @@ export default function BoardPatternsScreen() {
         </TouchableOpacity>
       )}
 
-      <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
+      >
         {isLoading ? (
           <View style={styles.emptyView}>
             <ActivityIndicator size="large" color="#556ee6" />
@@ -206,7 +214,7 @@ export default function BoardPatternsScreen() {
                       color={colors['muted-foreground']}
                     />
                     <Text style={[styles.cardTitle, { color: colors.foreground }]}>
-                      {item.board === 'Custom' ? item.custom_board_name : item.board}
+                      {(item.board === 'Custom' ? item.custom_board_name : item.board) || 'Custom'}
                     </Text>
                   </View>
                   <Text style={[styles.cardDesc, { color: colors['muted-foreground'] }]}>
@@ -238,7 +246,7 @@ export default function BoardPatternsScreen() {
                     <View key={et.id} style={[styles.typeRow, { borderColor: borderCol }]}>
                       <Text style={[styles.typeName, { color: colors.foreground }]}>{et.exam_type_name}</Text>
                       <Text style={[styles.typeMeta, { color: colors['muted-foreground'] }]}>
-                        {et.nature} · {et.weightage_percent ?? '—'}% · {et.count_per_year ?? '—'}/yr · Order {et.sort_order}
+                        {et.nature} · {et.weightage_percent ?? '—'}% · {et.count_per_year ?? '—'}/yr
                       </Text>
                     </View>
                   ))}
@@ -252,7 +260,7 @@ export default function BoardPatternsScreen() {
 
       {/* Create / Edit Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={closeModal}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalSheet, { backgroundColor: cardBg }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
@@ -263,7 +271,7 @@ export default function BoardPatternsScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={[styles.label, { color: colors.foreground }]}>Board</Text>
               <CustomDropdown
                 data={BOARD_OPTIONS}
@@ -308,7 +316,7 @@ export default function BoardPatternsScreen() {
                   <View style={styles.typeCardTop}>
                     <Text style={[styles.typeIdx, { color: colors['muted-foreground'] }]}>Type Name</Text>
                     {form.exam_types.length > 1 && (
-                      <TouchableOpacity onPress={() => removeType(idx)} accessibilityLabel="Delete">
+                      <TouchableOpacity onPress={() => removeType(idx)} accessibilityLabel="Delete" hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}>
                         <Ionicons name="trash-outline" size={16} color="#EF4444" />
                       </TouchableOpacity>
                     )}
@@ -378,7 +386,7 @@ export default function BoardPatternsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
       <ConfirmModal {...modalProps} />
     </AppLayout>
@@ -389,7 +397,7 @@ const styles = StyleSheet.create({
   addBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: '#556ee6', marginHorizontal: 16, marginTop: 12, marginBottom: 8,
-    borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10,
+    borderRadius: 10, paddingHorizontal: 16, minHeight: 44,
   },
   addBtnText: { color: 'white', fontWeight: '700', fontSize: 14 },
   list: { padding: 16 },
@@ -403,7 +411,7 @@ const styles = StyleSheet.create({
   cardDesc: { fontSize: 13, marginBottom: 6 },
   statusBadge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   actions: { flexDirection: 'row', gap: 4 },
-  iconBtn: { padding: 6 },
+  iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   typesTable: { marginTop: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
   typeRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
   typeName: { fontSize: 13, fontWeight: '600' },
@@ -416,7 +424,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 12 },
   input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
   typesHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 8 },
-  addTypeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  addTypeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 },
   addTypeBtnText: { color: '#556ee6', fontSize: 13, fontWeight: '600' },
   typeCard: { borderRadius: 10, borderWidth: 1, padding: 10, marginBottom: 8 },
   typeCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
@@ -424,7 +432,7 @@ const styles = StyleSheet.create({
   typeFields: { flexDirection: 'row', gap: 8, marginTop: 8 },
   fieldLabel: { fontSize: 11, marginBottom: 4 },
   smallInput: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 7, fontSize: 13 },
-  natureDropdown: { height: 34, paddingHorizontal: 8, paddingVertical: 0, borderRadius: 6 },
+  natureDropdown: { height: 44, paddingHorizontal: 8, paddingVertical: 0, borderRadius: 6 },
   natureDropdownText: { fontSize: 13 },
   modalFooter: {
     flexDirection: 'row', gap: 10, marginTop: 8, paddingTop: 16,

@@ -10,7 +10,10 @@ import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  RefreshControl,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -21,7 +24,8 @@ import { useToastContext } from '@/components/ToastProvider';
 export default function ExpenseApprovalsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-  const { data: pendingApprovals, isLoading, error } = useExpensePendingApprovalsProtected();
+  const { data: pendingApprovals, isLoading, error, refetch } = useExpensePendingApprovalsProtected();
+  const [refreshing, setRefreshing] = useState(false);
   const approveMutation = useApproveExpenseTransactionProtected();
 
   const [approvalModalVisible, setApprovalModalVisible] = useState(false);
@@ -47,7 +51,7 @@ export default function ExpenseApprovalsScreen() {
     );
   }, [transactions, searchQuery]);
 
-  const totalAmount = transactions.reduce((sum: number, t: any) => sum + (t.amount ?? 0), 0);
+  const totalAmount = transactions.reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
   const requiresAttentionCount = transactions.filter((t: any) => t.requires_approval).length;
 
   const handleApprove = (id: string) => {
@@ -99,11 +103,11 @@ export default function ExpenseApprovalsScreen() {
             {item.description}
           </ThemedText>
           <ThemedText style={[styles.transactionInfo, { color: colors['muted-foreground'] }]}>
-            {new Date(item.transaction_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+            {item.transaction_date ? new Date(item.transaction_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
           </ThemedText>
         </View>
 
-        <ApprovePermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_APPROVALS}>
+        <ApprovePermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_APPROVALS} fallback={null} loadingFallback={null}>
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={[styles.actionButton, styles.rejectButton]}
@@ -151,6 +155,25 @@ export default function ExpenseApprovalsScreen() {
     <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_APPROVALS}>
       <AppLayout title="Expense Approvals">
         <View style={styles.container}>
+        <FlatList
+          data={filteredTransactions}
+          keyExtractor={(item) => item.id}
+          renderItem={renderTransactionItem}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              tintColor={colors.primary}
+              onRefresh={async () => {
+                setRefreshing(true);
+                try { await refetch(); } finally { setRefreshing(false); }
+              }}
+            />
+          }
+          ListHeaderComponent={
+            <View>
           {/* Summary cards */}
           <View style={styles.statsRow}>
             <View style={[styles.statCard, { backgroundColor: colors.card }]}>
@@ -182,12 +205,8 @@ export default function ExpenseApprovalsScreen() {
             />
           </View>
 
-        <FlatList
-          data={filteredTransactions}
-          keyExtractor={(item) => item.id}
-          renderItem={renderTransactionItem}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
+            </View>
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="checkmark-circle-outline" size={48} color={colors['muted-foreground']} />
@@ -205,7 +224,7 @@ export default function ExpenseApprovalsScreen() {
           transparent={true}
           onRequestClose={() => setApprovalModalVisible(false)}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ThemedView style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <ThemedText type="subtitle">
@@ -259,7 +278,7 @@ export default function ExpenseApprovalsScreen() {
                 </TouchableOpacity>
               </View>
             </ThemedView>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
         </View>
       </AppLayout>
@@ -356,7 +375,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     borderRadius: 8,
     gap: 8,
   },
@@ -420,14 +440,14 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
   },
   submitButton: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     alignItems: 'center',
   },

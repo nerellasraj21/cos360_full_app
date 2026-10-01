@@ -287,7 +287,7 @@ export default function StudentAdmissionScreen() {
     queryKey: ['classes-list'],
     queryFn: async () => {
       const data = await classSectionsApi.getClassList();
-      return data.map((item: any) => ({ label: item.name, value: item.id }));
+      return data.map((item: any) => ({ label: item.name || '', value: item.id }));
     },
   });
 
@@ -308,21 +308,21 @@ export default function StudentAdmissionScreen() {
     queryKey: ['sections-for-admitted', formData.admitted_class_id],
     queryFn: () => classSectionsApi.getSectionsByClass(formData.admitted_class_id),
     enabled: !!formData.admitted_class_id,
-    select: (d) => d.map((s: any) => ({ label: s.name, value: s.id })),
+    select: (d) => d.map((s: any) => ({ label: s.name || '', value: s.id })),
   });
 
   const { data: currentSectionsData } = useQuery({
     queryKey: ['sections-for-current', formData.current_class_id],
     queryFn: () => classSectionsApi.getSectionsByClass(formData.current_class_id),
     enabled: !!formData.current_class_id,
-    select: (d) => d.map((s: any) => ({ label: s.name, value: s.id })),
+    select: (d) => d.map((s: any) => ({ label: s.name || '', value: s.id })),
   });
 
   const { data: academicYearsData } = useQuery({
     queryKey: ['academic-years-dropdown'],
     queryFn: async () => {
       const data = await academicYearsApi.getAcademicYearsDropdown();
-      return data.map((item: any) => ({ label: item.title, value: item.id }));
+      return data.map((item: any) => ({ label: item.title || '', value: item.id }));
     },
   });
 
@@ -395,7 +395,7 @@ export default function StudentAdmissionScreen() {
     queryKey: ['castes-dropdown'],
     queryFn: async () => {
       const data = await castesApi.getCastesDropdown();
-      return data.map((item: any) => ({ label: item.name, value: item.id }));
+      return data.map((item: any) => ({ label: item.name || '', value: item.id }));
     },
   });
 
@@ -403,7 +403,7 @@ export default function StudentAdmissionScreen() {
     queryKey: ['sub-castes-dropdown', formData.student.caste_id],
     queryFn: async () => {
       const data = await castesApi.getSubCastesDropdown(formData.student.caste_id!);
-      return data.map((item: any) => ({ label: item.name, value: item.id }));
+      return data.map((item: any) => ({ label: item.name || '', value: item.id }));
     },
     enabled: !!formData.student.caste_id,
   });
@@ -412,7 +412,7 @@ export default function StudentAdmissionScreen() {
     queryKey: ['salary-ranges-dropdown'],
     queryFn: async () => {
       const data = await parentsApi.getSalaryRangesDropdown();
-      return data.map((item) => ({ label: item.label, value: item.value }));
+      return data.map((item) => ({ label: item.label || '', value: item.value }));
     },
     staleTime: 30 * 60 * 1000,
   });
@@ -439,9 +439,9 @@ export default function StudentAdmissionScreen() {
   });
 
   // Pre-compute dropdown option lists for rendering and summary
-  const statesOptions = (statesData ?? []).map(s => ({ label: s.name, value: s.id }));
-  const districtsOptions = (districtsData ?? []).map(d => ({ label: d.name, value: d.id }));
-  const mandalsOptions = (mandalsData ?? []).map(m => ({ label: m.name, value: m.id }));
+  const statesOptions = (statesData ?? []).map(s => ({ label: s.name || '', value: s.id }));
+  const districtsOptions = (districtsData ?? []).map(d => ({ label: d.name || '', value: d.id }));
+  const mandalsOptions = (mandalsData ?? []).map(m => ({ label: m.name || '', value: m.id }));
 
   // Sub-castes for view modal (keyed on selected admission's caste_id, not form data)
   const viewCasteId = selectedViewAdmission?.student?.caste_id;
@@ -449,7 +449,7 @@ export default function StudentAdmissionScreen() {
     queryKey: ['sub-castes-dropdown', viewCasteId],
     queryFn: async () => {
       const data = await castesApi.getSubCastesDropdown(viewCasteId!);
-      return data.map((item: any) => ({ label: item.name, value: item.id }));
+      return data.map((item: any) => ({ label: item.name || '', value: item.id }));
     },
     enabled: !!viewCasteId,
   });
@@ -469,8 +469,8 @@ export default function StudentAdmissionScreen() {
     enabled: !!viewDistrictId,
     staleTime: 10 * 60 * 1000,
   });
-  const viewDistrictsOptions = (viewDistrictsData ?? []).map(d => ({ label: d.name, value: d.id }));
-  const viewMandalsOptions = (viewMandalsData ?? []).map(m => ({ label: m.name, value: m.id }));
+  const viewDistrictsOptions = (viewDistrictsData ?? []).map(d => ({ label: d.name || '', value: d.id }));
+  const viewMandalsOptions = (viewMandalsData ?? []).map(m => ({ label: m.name || '', value: m.id }));
 
   const { data: admissionsData, isLoading: isLoadingAdmissions } = useAdmissions({ skip: (currentPage - 1) * pageSize, limit: pageSize });
   const { data: searchResults } = useStudentsSearch(searchQuery);
@@ -1259,7 +1259,7 @@ export default function StudentAdmissionScreen() {
         activeOpacity={0.75}
       >
         <ThemedText type="subtitle" style={[fStyles.sectionTitle, { marginBottom: 0, flex: 1 }]}>{title}</ThemedText>
-        {badge && (
+        {!!badge && (
           <View style={[fStyles.optionalBadge, { backgroundColor: themeColors.accent, marginRight: 8 }]}>
             <ThemedText style={[fStyles.optionalBadgeText, { color: themeColors['muted-foreground'] }]}>{badge}</ThemedText>
           </View>
@@ -2090,7 +2090,7 @@ const lStyles = StyleSheet.create({
   cardAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   cardActionText: { fontSize: 12, fontWeight: '600' },
   emptyRow: { alignItems: 'center', paddingVertical: 48 },
-  pageBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  pageBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
 });
 
 const fStyles = StyleSheet.create({

@@ -155,14 +155,12 @@ function FeeReportsScreenContent() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const blob = await feeReportsApi.exportReport({
+      const text = await feeReportsApi.exportReport({
         report_type: activeTab,
         format: 'csv',
         filters: activeTab === 'collection' ? colParams :
                  activeTab === 'pending'    ? pendParams : strucParams,
       });
-      // On mobile, share via the OS share sheet
-      const text = await (blob as any).text?.() ?? '';
       await Share.share({ message: text, title: `fee_${activeTab}_report.csv` });
     } catch {
       showError('Export failed', 'Unable to export report. Please try again.');
@@ -199,7 +197,7 @@ function FeeReportsScreenContent() {
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
         {/* ── Collection tab ────────────────────────────────────────────── */}
         {activeTab === 'collection' && (
@@ -216,7 +214,7 @@ function FeeReportsScreenContent() {
                     onChangeText={setColDateFrom}
                     placeholder="YYYY-MM-DD"
                     placeholderTextColor={colors['muted-foreground']}
-                    keyboardType="numeric"
+                    keyboardType="numbers-and-punctuation"
                   />
                 </View>
                 <View style={styles.filterField}>
@@ -227,12 +225,12 @@ function FeeReportsScreenContent() {
                     onChangeText={setColDateTo}
                     placeholder="YYYY-MM-DD"
                     placeholderTextColor={colors['muted-foreground']}
-                    keyboardType="numeric"
+                    keyboardType="numbers-and-punctuation"
                   />
                 </View>
               </View>
               <Text style={[styles.filterLabel, { color: colors['muted-foreground'] }]}>Payment Method</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginBottom: 12 }}>
                 {PAYMENT_METHODS.map(m => (
                   <TouchableOpacity
                     key={m.value}
@@ -246,7 +244,7 @@ function FeeReportsScreenContent() {
                 ))}
               </ScrollView>
               <Text style={[styles.filterLabel, { color: colors['muted-foreground'] }]}>Status</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginBottom: 12 }}>
                 {FEE_STATUSES.map(s => (
                   <TouchableOpacity
                     key={s.value}
@@ -290,7 +288,7 @@ function FeeReportsScreenContent() {
                       </View>
                       <View style={[styles.statCard, { backgroundColor: '#10B98118', borderColor: '#10B98140' }]}>
                         <Text style={[styles.statValue, { color: '#10B981' }]}>
-                          {collectionStats.collection_percentage.toFixed(1)}%
+                          {(Number(collectionStats.collection_percentage) || 0).toFixed(1)}%
                         </Text>
                         <Text style={[styles.statLabel, { color: '#10B981' }]}>Collection %</Text>
                       </View>
@@ -324,7 +322,7 @@ function FeeReportsScreenContent() {
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.rowLabel, { color: colors.foreground }]}>{row.student_name}</Text>
                           <Text style={[styles.rowSub, { color: colors['muted-foreground'] }]}>
-                            {row.student_admission_no} • {row.fee_type} • {row.payment_method.replace(/_/g, ' ')}
+                            {row.student_admission_no} • {row.fee_type} • {String(row.payment_method ?? '').replace(/_/g, ' ')}
                           </Text>
                         </View>
                         <Text style={[styles.rowValue, { color: '#10B981' }]}>
@@ -551,7 +549,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    paddingVertical: 8,
+    paddingVertical: 12,
   },
   tabText: { fontSize: 11, fontWeight: '600' },
   content: { padding: 16 },
@@ -585,8 +583,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   methodChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
     borderRadius: 8,
     backgroundColor: '#f1f5f9',
     marginRight: 6,
@@ -597,17 +595,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     borderRadius: 10,
-    paddingVertical: 10,
+    paddingVertical: 13,
   },
   applyBtnText: { color: 'white', fontWeight: '700', fontSize: 13 },
 
   statsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 14,
   },
   statCard: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '30%',
+    minWidth: 100,
     borderRadius: 12,
     borderWidth: 1,
     padding: 10,

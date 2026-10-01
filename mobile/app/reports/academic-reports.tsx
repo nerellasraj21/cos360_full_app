@@ -104,11 +104,11 @@ function AcademicReportsScreenContent() {
                 <View style={styles.rowHeader}>
                   <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>{exam.exam_name}</Text>
                   <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
-                    <Text style={[styles.statusText, { color: sc.text }]}>{exam.status}</Text>
+                    <Text style={[styles.statusText, { color: sc.text }]}>{exam.status ?? ''}</Text>
                   </View>
                 </View>
                 <Text style={[styles.rowSub, { color: colors['muted-foreground'] }]}>
-                  {exam.exam_type} · {exam.board} · {exam.academic_year_title || ""}
+                  {[String(exam.exam_type ?? '').replace(/_/g, ' '), exam.board, exam.academic_year_title].filter(Boolean).join(' · ')}
                 </Text>
               </View>
             );
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   bannerDecor: { position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.12)' },
   bannerIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700', flex: 1 },
-  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 11, borderRadius: 8 },
   exportBtnText: { color: 'white', fontSize: 12, fontWeight: '700' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   loadingText: { fontSize: 14 },
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   rowTitle: { fontSize: 13, fontWeight: '600', flex: 1, marginRight: 8 },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   statusText: { fontSize: 11, fontWeight: '600', textTransform: 'capitalize' },
-  rowSub: { fontSize: 12 },
+  rowSub: { fontSize: 12, textTransform: 'capitalize' },
   emptyState: { alignItems: 'center', gap: 8, paddingTop: 40 },
   emptyText: { fontSize: 14 },
 });

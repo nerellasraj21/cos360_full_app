@@ -61,34 +61,22 @@ function CertificateUploadPageContent() {
   // Fetch students for dropdown
   const { data: studentOptions } = useQuery({
     queryKey: ['active-students-dropdown-simple'],
-    queryFn: async () => {
-      console.log('DEBUG: Fetching active students dropdown');
-      const result = await studentAdmissionsApi.getActiveStudentsDropdownSimple();
-      console.log('DEBUG: Students dropdown result:', result);
-      return result;
-    },
+    queryFn: () => studentAdmissionsApi.getActiveStudentsDropdownSimple(),
   });
 
   // Fetch certificate types
   const { data: certificateTypes, isLoading: isLoadingTypes, error: typesError } = useQuery({
     queryKey: ['certificate-types'],
-    queryFn: async () => {
-      console.log('DEBUG: Fetching certificate types');
-      const result = await certificateTypesApi.listCertificateTypes();
-      console.log('DEBUG: Certificate types result:', result);
-      return result;
-    },
+    queryFn: () => certificateTypesApi.listCertificateTypes(),
   });
 
   const pickDocument = async () => {
-    console.log('DEBUG: Starting document picker');
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'image/*'],
         multiple: false,
       });
 
-      console.log('DEBUG: Document picker result:', result);
       if (result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
         setSelectedFile({
@@ -97,10 +85,8 @@ function CertificateUploadPageContent() {
           name: asset.name,
           size: asset.size,
         });
-        console.log('DEBUG: Selected file:', asset);
       }
     } catch (err) {
-      console.log('DEBUG: Document picker error:', err);
       showError('Error', 'Failed to pick document');
     }
   };
@@ -111,19 +97,13 @@ function CertificateUploadPageContent() {
   };
 
   const handleSubmit = async () => {
-    console.log('DEBUG: Starting certificate upload');
-    console.log('DEBUG: Selected file:', selectedFile);
-    console.log('DEBUG: Form data:', formData);
-    console.log('DEBUG: Selected student:', selectedStudent);
 
     if (!selectedFile) {
-      console.log('DEBUG: No file selected');
       showError('Error', 'Please select a certificate file');
       return;
     }
 
     if (!formData.certificateName || !formData.certificateTypeId || !selectedStudent) {
-      console.log('DEBUG: Missing required fields');
       showError('Error', 'Please fill in all required fields');
       return;
     }
@@ -143,11 +123,8 @@ function CertificateUploadPageContent() {
         } as any,
       };
 
-      console.log('DEBUG: Upload data:', uploadData);
-      console.log('DEBUG: Calling studentCertificatesApi.createCertificate');
 
       const result = await studentCertificatesApi.createCertificate(uploadData);
-      console.log('DEBUG: Upload successful, result:', result);
 
       showSuccess('Certificate Uploaded', 'Certificate uploaded successfully!');
       // Reset form
@@ -161,9 +138,6 @@ function CertificateUploadPageContent() {
         description: '',
       });
     } catch (error: any) {
-      console.error('DEBUG: Upload error:', error);
-      console.error('DEBUG: Error response:', error.response);
-      console.error('DEBUG: Error data:', error.response?.data);
       const errorMessage = error.response?.data?.detail || error.message || 'Failed to upload certificate';
       showError('Upload Failed', errorMessage);
     } finally {
@@ -196,7 +170,7 @@ function CertificateUploadPageContent() {
             </ThemedText>
           </TouchableOpacity>
 
-          {selectedFile && (
+          {!!selectedFile && (
             <View style={styles.fileInfo}>
               <Ionicons name="document" size={20} color={colors.primary} />
               <View style={styles.fileDetails}>

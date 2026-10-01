@@ -13,7 +13,9 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -188,7 +190,7 @@ export default function StudentTripsScreen() {
       : 'Unknown Student';
 
     const tripDisplay = trip ? `Trip ${trip.trip_number}` : 'Unknown Trip';
-    const stopDisplay = stop?.name || item.stop_id || 'Unknown Stop';
+    const stopDisplay = stop?.name || 'Unknown Stop';
 
     return (
       <View style={[styles.assignmentCard, { backgroundColor: colors.card }]}>
@@ -243,14 +245,14 @@ export default function StudentTripsScreen() {
           <View style={styles.detailRow}>
             <Ionicons name="cash" size={16} color={colors['muted-foreground']} />
             <ThemedText style={styles.detailText}>
-              Fee per Term: ₹{item.fee_per_term.toLocaleString()}
+              Fee per Term: ₹{Number(item.fee_per_term).toLocaleString('en-IN')}
             </ThemedText>
           </View>
-          {item.created_at && (
+          {!!item.created_at && (
             <View style={styles.detailRow}>
               <Ionicons name="calendar" size={16} color={colors['muted-foreground']} />
               <ThemedText style={styles.detailText}>
-                Created: {new Date(item.created_at).toLocaleDateString()}
+                Created: {new Date(item.created_at).toLocaleDateString('en-IN')}
               </ThemedText>
             </View>
           )}
@@ -288,7 +290,7 @@ export default function StudentTripsScreen() {
               Access Denied
             </ThemedText>
             <ThemedText style={styles.emptyText}>
-              You don't have permission to view transport assignments
+              You don&apos;t have permission to view transport assignments
             </ThemedText>
           </View>
         }
@@ -351,6 +353,7 @@ export default function StudentTripsScreen() {
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContainer}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             refreshControl={
               <RefreshControl
                 refreshing={isLoading}
@@ -380,7 +383,7 @@ export default function StudentTripsScreen() {
             transparent={true}
             onRequestClose={() => setIsModalVisible(false)}
           >
-            <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
               <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
                 <View style={styles.modalHeader}>
                   <ThemedText type="title" style={styles.modalTitle}>
@@ -473,7 +476,7 @@ export default function StudentTripsScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
+            </KeyboardAvoidingView>
           </Modal>
           <ConfirmModal {...confirmModalProps} />
         </View>
@@ -502,7 +505,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: 8,
   },
   addButtonText: {
@@ -570,9 +573,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -656,7 +659,7 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     alignItems: 'center',
   },

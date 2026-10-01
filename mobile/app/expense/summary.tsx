@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -43,6 +44,8 @@ type TypeRow = {
 function ExpenseSummaryScreenContent() {
   const router = useRouter();
   const { colors, theme } = useTheme();
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedYear, setSelectedYear] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
@@ -136,8 +139,8 @@ function ExpenseSummaryScreenContent() {
           id: t.id,
           name: t.name,
           description: t.description,
-          total_amount: typeReportMap[t.id]?.total_amount ?? 0,
-          entry_count: typeReportMap[t.id]?.transaction_count ?? 0,
+          total_amount: Number(typeReportMap[t.id]?.total_amount) || 0,
+          entry_count: Number(typeReportMap[t.id]?.transaction_count) || 0,
         }));
 
       const rep = catReportMap[cat.id];
@@ -145,8 +148,8 @@ function ExpenseSummaryScreenContent() {
         id: cat.id,
         name: cat.name,
         description: cat.description,
-        total_amount: rep?.total_amount ?? 0,
-        entry_count: rep?.transaction_count ?? 0,
+        total_amount: Number(rep?.total_amount) || 0,
+        entry_count: Number(rep?.transaction_count) || 0,
         types: catTypes,
       };
     });
@@ -169,7 +172,30 @@ function ExpenseSummaryScreenContent() {
 
   return (
     <AppLayout title="Expense Summary">
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={ORANGE}
+            onRefresh={async () => {
+              setRefreshing(true);
+              try {
+                await Promise.all([
+                  queryClient.invalidateQueries({ queryKey: ['summary-categories'] }),
+                  queryClient.invalidateQueries({ queryKey: ['summary-types'] }),
+                  queryClient.invalidateQueries({ queryKey: ['summary-cat-report'] }),
+                  queryClient.invalidateQueries({ queryKey: ['summary-type-report'] }),
+                ]);
+              } finally {
+                setRefreshing(false);
+              }
+            }}
+          />
+        }
+      >
 
         {/* Header: title + year picker */}
         <View style={styles.header}>
@@ -198,7 +224,7 @@ function ExpenseSummaryScreenContent() {
               <Ionicons name="logo-usd" size={20} color="#556ee6" />
             </View>
             <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>Grand Total</Text>
-            <Text style={[styles.statValue, { color: colors.foreground }]}>{fmt(grandTotal)}</Text>
+            <Text style={[styles.statValue, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit>{fmt(grandTotal)}</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
             <View style={[styles.statIcon, { backgroundColor: ORANGE + '20' }]}>
@@ -371,7 +397,7 @@ const styles = StyleSheet.create({
   },
   catHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    padding: 14,
+    padding: 14, minHeight: 56,
   },
   catIconBox: { width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   catName: { fontSize: 15, fontWeight: '700' },
@@ -380,8 +406,8 @@ const styles = StyleSheet.create({
   catAmount: { fontSize: 15, fontWeight: '700' },
   typesList: { borderTopWidth: 1, paddingHorizontal: 12, paddingBottom: 12, paddingTop: 8, gap: 6 },
   typeRow: {
-    flexDirection: 'row', alignItems: 'center',
-    borderRadius: 8, borderWidth: 1, padding: 10,
+    flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap',
+    borderRadius: 8, borderWidth: 1, padding: 12, minHeight: 44,
   },
   typeName: { fontSize: 13, fontWeight: '600' },
   typeSep: { fontSize: 12 },

@@ -186,14 +186,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700', flex: 1 },
-  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 11, borderRadius: 8 },
   exportBtnText: { color: 'white', fontSize: 12, fontWeight: '700' },
   filterBar: {
     flexDirection: 'row', gap: 8, padding: 12,
     borderBottomWidth: 1,
   },
   filterChip: {
-    paddingHorizontal: 12, paddingVertical: 6,
+    paddingHorizontal: 14, paddingVertical: 10,
     borderRadius: 20, borderWidth: 1,
   },
   filterChipText: { fontSize: 12, fontWeight: '600' },

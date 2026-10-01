@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -104,7 +106,8 @@ export default function ExamSettingsScreen() {
 
   return (
     <AppLayout title="Exam Settings">
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
         {/* Board Configuration */}
         <View style={[styles.section, { backgroundColor: cardBg, borderColor: borderCol }]}>
@@ -195,7 +198,7 @@ export default function ExamSettingsScreen() {
         </View>
 
         {/* Updated at */}
-        {settings?.updated_at && (
+        {!!settings?.updated_at && (
           <Text style={[styles.updatedAt, { color: colors['muted-foreground'] }]}>
             Last updated: {new Date(settings.updated_at).toLocaleString()}
           </Text>
@@ -214,6 +217,7 @@ export default function ExamSettingsScreen() {
 
         <View style={{ height: 48 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
     </AppLayout>
   );
 }
@@ -237,7 +241,7 @@ const styles = StyleSheet.create({
   updatedAt: { fontSize: 12, textAlign: 'center', marginBottom: 16 },
   saveBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#556ee6', borderRadius: 10, paddingVertical: 14, marginBottom: 8,
+    backgroundColor: '#556ee6', borderRadius: 10, minHeight: 48, marginBottom: 8,
   },
   saveBtnText: { color: 'white', fontWeight: '700', fontSize: 15 },
 });

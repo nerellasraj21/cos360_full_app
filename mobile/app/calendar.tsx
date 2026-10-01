@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,6 +21,10 @@ const MONTH_NAMES = [
 ];
 
 const TODAY = new Date();
+
+function toLocalDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 function formatDateRange(start: string, end: string): string {
   const s = new Date(start);
@@ -89,7 +94,7 @@ export default function CalendarScreen() {
   const cardBg   = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
-  const { data: holidays = [], isLoading, error, refetch } = useQuery<HolidayRead[]>({
+  const { data: holidays = [], isLoading, isRefetching, error, refetch } = useQuery<HolidayRead[]>({
     queryKey: ['holidays', activeAcademicYearId],
     queryFn: () => holidaysApi.getHolidays({
       academic_year_id: activeAcademicYearId ?? undefined,
@@ -126,7 +131,11 @@ export default function CalendarScreen() {
 
   return (
     <AppLayout title="School Calendar">
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+      >
 
         {/* Banner */}
         <View style={[styles.banner, { backgroundColor: '#556ee6' }]}>
@@ -239,9 +248,9 @@ export default function CalendarScreen() {
               <View key={wi} style={styles.gridWeek}>
                 {week.map((date, di) => {
                   if (!date) return <View key={di} style={styles.gridCell} />;
-                  const ds = date.toISOString().slice(0, 10);
+                  const ds = toLocalDateStr(date);
                   const dayHols = getHolidaysForDate(ds, holidays);
-                  const isToday = ds === TODAY.toISOString().slice(0, 10);
+                  const isToday = ds === toLocalDateStr(TODAY);
                   const isSel   = ds === selectedDay;
                   return (
                     <TouchableOpacity
@@ -269,7 +278,7 @@ export default function CalendarScreen() {
             ))}
 
             {/* Tooltip for selected day */}
-            {selectedDay && (() => {
+            {!!selectedDay && (() => {
               const dayHols = getHolidaysForDate(selectedDay, holidays);
               if (!dayHols.length) return null;
               return (
@@ -406,7 +415,7 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   filterChip: {
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 11,
     borderRadius: 10,
     backgroundColor: '#f1f5f9',
   },
@@ -484,7 +493,7 @@ const styles = StyleSheet.create({
   // View toggle
   viewToggle: { flexDirection: 'row', gap: 4, alignSelf: 'flex-start' },
   viewBtn: {
-    width: 32, height: 32, borderRadius: 8,
+    width: 44, height: 44, borderRadius: 10,
     justifyContent: 'center', alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.05)',
   },
@@ -498,7 +507,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   gridNavBtn: {
-    width: 32, height: 32, borderRadius: 8,
+    width: 44, height: 44, borderRadius: 10,
     backgroundColor: '#556ee618', justifyContent: 'center', alignItems: 'center',
   },
   gridMonthLabel: { fontSize: 15, fontWeight: '700' },

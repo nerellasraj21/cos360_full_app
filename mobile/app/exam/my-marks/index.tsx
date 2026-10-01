@@ -48,7 +48,7 @@ export default function MyMarksIndexScreen() {
   // Web parity: fetch every exam for the selected academic year (no status
   // filter server-side) then narrow to entry-allowed statuses client-side —
   // matching MarkEntryExamList.tsx exactly instead of only 'published' exams.
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['exams', activeAcademicYearId],
     queryFn: () => examsApi.list({ academic_year_id: activeAcademicYearId || undefined, size: 100 }),
     enabled: isStudentOrParent,
@@ -118,7 +118,7 @@ export default function MyMarksIndexScreen() {
           autoCorrect={false}
         />
         {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
+          <TouchableOpacity onPress={() => setSearch('')} accessibilityLabel="Clear search" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <Ionicons name="close-circle" size={16} color={colors['muted-foreground']} />
           </TouchableOpacity>
         )}
@@ -147,6 +147,9 @@ export default function MyMarksIndexScreen() {
           data={filteredExams}
           keyExtractor={e => e.id}
           renderItem={renderItem}
+          onRefresh={refetch}
+          refreshing={isRefetching}
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ padding: 16, paddingTop: 4, paddingBottom: 32 }}
           ListHeaderComponent={
             <Text style={[styles.hint, { color: colors['muted-foreground'] }]}>
@@ -168,7 +171,7 @@ const styles = StyleSheet.create({
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     borderRadius: 10, borderWidth: 1, marginHorizontal: 16,
-    paddingHorizontal: 10, height: 40,
+    paddingHorizontal: 10, height: 44,
   },
   searchInput: { flex: 1, fontSize: 14, padding: 0 },
   card: {

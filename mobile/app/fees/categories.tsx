@@ -26,7 +26,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -90,7 +93,7 @@ function CategoryCard({
 
         {/* Action buttons */}
         <View style={styles.actionButtons}>
-          <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TYPES}>
+          <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_TYPES} fallback={null} loadingFallback={null}>
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: colors.primary + '18' }]}
               onPress={(e) => { e.stopPropagation?.(); onAddType(item); }}
@@ -100,7 +103,7 @@ function CategoryCard({
               <Ionicons name="add" size={16} color={colors.primary} />
             </TouchableOpacity>
           </CreatePermissionGuard>
-          <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_CATEGORIES}>
+          <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_CATEGORIES} fallback={null} loadingFallback={null}>
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: colors.primary + '18' }]}
               onPress={(e) => { e.stopPropagation?.(); onEdit(item); }}
@@ -110,7 +113,7 @@ function CategoryCard({
               <Ionicons name="create-outline" size={16} color={colors.primary} />
             </TouchableOpacity>
           </UpdatePermissionGuard>
-          <DeletePermissionGuard resource={PERMISSION_RESOURCES.FEE_CATEGORIES}>
+          <DeletePermissionGuard resource={PERMISSION_RESOURCES.FEE_CATEGORIES} fallback={null} loadingFallback={null}>
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: '#EF444422' }]}
               onPress={(e) => { e.stopPropagation?.(); onDelete(item); }}
@@ -183,7 +186,7 @@ function ManageFeeTypesModal({
       transparent
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ThemedView style={[styles.manageModalContent, { backgroundColor: colors.card }]}>
           {/* Header */}
           <View style={[styles.manageHeader, { borderBottomColor: colors.border }]}>
@@ -216,7 +219,7 @@ function ManageFeeTypesModal({
               </ThemedText>
             ) : feeTypes.length === 0 ? (
               <ThemedText style={{ color: colors['muted-foreground'], textAlign: 'center', paddingVertical: 24 }}>
-                No fee types yet. Tap "+ Add Fee Type" to create one.
+                No fee types yet. Tap &quot;+ Add Fee Type&quot; to create one.
               </ThemedText>
             ) : (
               feeTypes.map((ft: FeeTypeResponse) => {
@@ -236,7 +239,7 @@ function ManageFeeTypesModal({
                             {ftActive ? 'Active' : 'Inactive'}
                           </ThemedText>
                         </View>
-                        {termLabel && (
+                        {!!termLabel && (
                           <ThemedText style={[styles.termLabel, { color: colors['muted-foreground'] }]}>{termLabel}</ThemedText>
                         )}
                       </View>
@@ -265,7 +268,7 @@ function ManageFeeTypesModal({
             </TouchableOpacity>
           </View>
         </ThemedView>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -302,6 +305,7 @@ function FeeCategoriesScreenContent() {
   const [showAddTypeForm, setShowAddTypeForm] = useState(false);
   const [typeFormData, setTypeFormData] = useState({ type_name: '', fee_status: 'active', fee_term_id: '' });
 
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
@@ -535,7 +539,7 @@ function FeeCategoriesScreenContent() {
             <ThemedText style={[styles.countText, { color: colors['muted-foreground'] }]}>
               Showing {filtered.length} of {totalCount} {totalCount === 1 ? 'category' : 'categories'}
             </ThemedText>
-            <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_CATEGORIES}>
+            <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_CATEGORIES} fallback={null} loadingFallback={null}>
               <TouchableOpacity
                 style={[styles.addButton, { backgroundColor: colors.primary }]}
                 onPress={handleCreate}
@@ -547,7 +551,22 @@ function FeeCategoriesScreenContent() {
           </View>
 
           {/* List */}
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContainer}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContainer}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                tintColor={colors.primary}
+                onRefresh={async () => {
+                  setRefreshing(true);
+                  await queryClient.invalidateQueries({ queryKey: ['feeCategories'] });
+                  setRefreshing(false);
+                }}
+              />
+            }
+          >
             {filtered.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons name="folder-outline" size={48} color={colors['muted-foreground']} />
@@ -581,7 +600,7 @@ function FeeCategoriesScreenContent() {
             transparent
             onRequestClose={() => setIsModalVisible(false)}
           >
-            <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
               <ThemedView style={[styles.modalContent, { backgroundColor: colors.card }]}>
                 <View style={styles.modalHeader}>
                   <ThemedText type="subtitle">
@@ -593,7 +612,7 @@ function FeeCategoriesScreenContent() {
                   </TouchableOpacity>
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false}>
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <ThemedText style={styles.label}>Category Name *</ThemedText>
                   <TextInput
                     style={[styles.input, {
@@ -649,7 +668,7 @@ function FeeCategoriesScreenContent() {
                   </TouchableOpacity>
                 </View>
               </ThemedView>
-            </View>
+            </KeyboardAvoidingView>
           </Modal>
 
           {/* Manage Fee Types modal */}
@@ -679,7 +698,7 @@ function FeeCategoriesScreenContent() {
             transparent
             onRequestClose={() => setShowAddTypeForm(false)}
           >
-            <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
               <ThemedView style={[styles.modalContent, { backgroundColor: colors.card }]}>
                 <View style={styles.modalHeader}>
                   <View style={{ flex: 1, marginRight: 8 }}>
@@ -696,7 +715,7 @@ function FeeCategoriesScreenContent() {
                   </TouchableOpacity>
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false}>
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <ThemedText style={styles.label}>Fee Type Name *</ThemedText>
                   <TextInput
                     style={[styles.input, {
@@ -752,7 +771,7 @@ function FeeCategoriesScreenContent() {
                   </TouchableOpacity>
                 </View>
               </ThemedView>
-            </View>
+            </KeyboardAvoidingView>
           </Modal>
 
           <ConfirmModal {...confirmModalProps} />
@@ -792,8 +811,8 @@ const styles = StyleSheet.create({
   statusPickerWrap: { width: 120 },
   statusPickerContainer: { marginBottom: 0 },
   statusPickerBox: {
-    height: 32,
-    minHeight: 32,
+    height: 44,
+    minHeight: 44,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 8,
@@ -815,7 +834,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: 8,
     gap: 5,
   },
@@ -858,6 +877,8 @@ const styles = StyleSheet.create({
   typeCount: { fontSize: 11 },
   actionButtons: { flexDirection: 'row', gap: 6, marginLeft: 8 },
   actionBtn: {
+    minWidth: 40,
+    minHeight: 40,
     padding: 7,
     borderRadius: 6,
     alignItems: 'center',
@@ -922,12 +943,12 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 20 },
   cancelButton: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
   },
-  submitButton: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
+  submitButton: { flex: 1, padding: 14, borderRadius: 8, alignItems: 'center' },
   submitButtonText: { color: 'white', fontWeight: '600' },
   retryBtn: { marginTop: 16, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 8 },
 
@@ -960,7 +981,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 11,
     borderRadius: 8,
     gap: 4,
   },
@@ -975,7 +996,7 @@ const styles = StyleSheet.create({
   },
   manageFeeTypeName: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
   manageTypeMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  deleteTypeBtn: { padding: 4 },
+  deleteTypeBtn: { padding: 12 },
   manageFooter: {
     padding: 12,
     borderTopWidth: StyleSheet.hairlineWidth,

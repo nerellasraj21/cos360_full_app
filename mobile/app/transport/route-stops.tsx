@@ -15,7 +15,9 @@ import { useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -271,7 +273,7 @@ export default function RouteStopsScreen() {
           <View style={styles.detailRow}>
             <Ionicons name="cash" size={16} color={colors['muted-foreground']} />
             <ThemedText style={styles.detailText}>
-              Amount (₹/yr): ₹{(item.fees ?? 0).toLocaleString('en-IN')}
+              Amount (₹/yr): ₹{Number(item.fees ?? 0).toLocaleString('en-IN')}
             </ThemedText>
           </View>
           <View style={styles.detailRow}>
@@ -385,6 +387,7 @@ export default function RouteStopsScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={isLoading}
@@ -414,7 +417,7 @@ export default function RouteStopsScreen() {
           transparent={true}
           onRequestClose={() => setIsModalVisible(false)}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
               <View style={styles.modalHeader}>
                 <ThemedText type="title" style={styles.modalTitle}>
@@ -426,7 +429,7 @@ export default function RouteStopsScreen() {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.modalBody}>
+              <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
                 {/* Stop Number is only asked for when creating a stop, matching the
                     web page — its inline row edit never lets you change the number,
                     only the Add Stop dialog does. */}
@@ -561,7 +564,7 @@ export default function RouteStopsScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Custom Time Picker — separate Modal, layers above form Modal on both platforms */}
@@ -602,7 +605,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: 8,
   },
   addButtonText: {
@@ -681,9 +684,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -800,7 +803,7 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     alignItems: 'center',
   },

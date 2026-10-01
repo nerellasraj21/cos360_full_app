@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,6 +22,7 @@ const ORANGE = '#F97316';
 export default function ExpenseReportsScreen() {
   const { colors, theme } = useTheme();
 
+  const [refreshing, setRefreshing] = useState(false);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [appliedFrom, setAppliedFrom] = useState('');
@@ -66,7 +68,21 @@ export default function ExpenseReportsScreen() {
   return (
     <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS}>
       <AppLayout title="Expense Reports">
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={{ flex: 1 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              tintColor={ORANGE}
+              onRefresh={async () => {
+                setRefreshing(true);
+                try { await refetch(); } finally { setRefreshing(false); }
+              }}
+            />
+          }
+        >
 
           {/* Date filter */}
           <View style={[styles.filterCard, { backgroundColor: filterBg, borderColor: borderCol }]}>
@@ -80,6 +96,7 @@ export default function ExpenseReportsScreen() {
                   placeholderTextColor={colors['muted-foreground']}
                   value={fromDate}
                   onChangeText={setFromDate}
+                  keyboardType="numbers-and-punctuation"
                 />
               </View>
               <View style={[styles.dateInput, { borderColor: borderCol, backgroundColor: inputBg }]}>
@@ -90,6 +107,7 @@ export default function ExpenseReportsScreen() {
                   placeholderTextColor={colors['muted-foreground']}
                   value={toDate}
                   onChangeText={setToDate}
+                  keyboardType="numbers-and-punctuation"
                 />
               </View>
             </View>
@@ -100,7 +118,7 @@ export default function ExpenseReportsScreen() {
               >
                 <Text style={styles.applyBtnText}>Apply</Text>
               </TouchableOpacity>
-              {(appliedFrom || appliedTo) && (
+              {!!(appliedFrom || appliedTo) && (
                 <TouchableOpacity
                   style={[styles.clearBtn, { borderColor: borderCol }]}
                   onPress={handleClear}
@@ -140,7 +158,7 @@ export default function ExpenseReportsScreen() {
                     <View style={[styles.statIcon, { backgroundColor: card.color + '15' }]}>
                       <Ionicons name={card.icon as any} size={20} color={card.color} />
                     </View>
-                    <Text style={[styles.statValue, { color: colors.foreground }]}>{card.value}</Text>
+                    <Text style={[styles.statValue, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit>{card.value}</Text>
                     <Text style={[styles.statLabel, { color: colors['muted-foreground'] }]}>{card.label}</Text>
                   </View>
                 ))}
@@ -220,13 +238,13 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: 'row', gap: 10 },
   dateInput: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, height: 40,
+    borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, height: 44,
   },
   dateText: { flex: 1, fontSize: 12, padding: 0 },
   filterBtnRow: { flexDirection: 'row', gap: 10 },
-  applyBtn: { flex: 1, borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
+  applyBtn: { flex: 1, borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
   applyBtnText: { color: 'white', fontWeight: '700', fontSize: 13 },
-  clearBtn: { flex: 1, borderRadius: 8, paddingVertical: 10, alignItems: 'center', borderWidth: 1 },
+  clearBtn: { flex: 1, borderRadius: 8, paddingVertical: 14, alignItems: 'center', borderWidth: 1 },
   clearBtnText: { fontWeight: '600', fontSize: 13 },
   filterActive: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
   centered: { alignItems: 'center', justifyContent: 'center', paddingVertical: 64 },

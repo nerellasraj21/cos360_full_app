@@ -1,12 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,23 +13,13 @@ import {
 } from 'react-native';
 
 import { AppLayout } from '@/components';
-import { useAcademicYear, useAuth, useTheme } from '@/contexts';
-// Fix #3: Authenticated PDF receipt download via FileSystem (Blob responseType doesn't work in RN)
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import { apiClient } from '@/src/api';
-import { getValidAccessToken } from '../../services/authUtils';
+import { useAuth, useTheme } from '@/contexts';
 import {
   feeCollectionApi,
-  feeConcessionsApi,
-  feeOldFeesApi,
   FeeCollectionSummary,
-  FeeConcessionCreate,
-  FeeSearchStudentResult,
 } from '@/src/api/fees';
 import { classSectionsApi } from '@/src/api/masters';
 import CustomDropdown from '@/components/ui/dropdown';
-import { useToastContext } from '@/components/ToastProvider';
 import { ScreenAccessGate } from '@/components/ScreenAccessGate';
 
 // M-1: INR currency formatter
@@ -41,7 +28,6 @@ const formatINR = (amount: number | string | null | undefined) =>
 function FeeCollectionScreenContent() {
   const { role, selectedStudent } = useAuth();
   const { colors, theme } = useTheme();
-  const { activeAcademicYearId } = useAcademicYear();
   const router = useRouter();
 
   const roleName = role?.name?.toLowerCase() ?? '';
@@ -55,38 +41,6 @@ function FeeCollectionScreenContent() {
   const [selectedStudentId, setSelectedStudentId] = useState('');
 
   const [selectedStudentInfo, setSelectedStudentInfo] = useState(null as any);
-
-  type AdminTab = 'summary' | 'payment' | 'concessions' | 'old-fees';
-  const [adminTab, setAdminTab] = useState<AdminTab>('summary');
-  const [paymentForm, setPaymentForm] = useState({
-    amount: '',
-    payment_method: 'cash' as 'cash' | 'cheque' | 'bank_transfer' | 'upi' | 'dd' | 'card',
-    remarks: '',
-    upi_reference: '',
-    bank_reference: '',
-    cheque_number: '',
-    cheque_bank: '',
-    // Fix #4: cheque_date required by backend for cheque/dd methods
-    cheque_date: '',
-  });
-  // C-6: max-amount guard error state
-  const [amountError, setAmountError] = useState(null as any);
-  const [paymentSuccess, setPaymentSuccess] = useState<{
-    receipt_number?: string;
-    receipt_id?: string;
-    transaction_number?: string;
-    amount_paid: number;
-  } | null>(null);
-  const [concessionForm, setConcessionForm] = useState({
-    fee_type_id: '',
-    amount: '',
-    approver_role: 'admin' as FeeConcessionCreate['approver_role'],
-    remarks: '',
-  });
-
-  const qc = useQueryClient();
-  const { showSuccess, showError } = useToastContext();
-
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
@@ -126,84 +80,9 @@ function FeeCollectionScreenContent() {
     enabled: !isStudent && !isParent && searchTriggered,
   });
 
-  const { data: adminFeeSummary, isLoading: adminLoading } = useQuery({
-    queryKey: ['fee-summary', selectedStudentId],
-    queryFn: () => feeCollectionApi.getSummary(selectedStudentId),
-    enabled: !isStudent && !isParent && !!selectedStudentId,
-  });
-
-  const { data: oldFees, isLoading: oldFeesLoading } = useQuery({
-    queryKey: ['old-fees', selectedStudentId],
-    queryFn: () => feeOldFeesApi.getOldFeesByStudent(selectedStudentId),
-    enabled: !isStudent && !isParent && !!selectedStudentId && adminTab === 'old-fees',
-  });
-
-  // C-7: fetch existing concessions for the selected student
-  const { data: existingConcessions } = useQuery({
-    queryKey: ['fee-concessions', selectedStudentId, activeAcademicYearId],
-    queryFn: () =>
-      feeConcessionsApi.getByStudent(selectedStudentId, {
-        academic_year_id: activeAcademicYearId ?? undefined,
-      }),
-    enabled: !isStudent && !isParent && !!selectedStudentId && adminTab === 'concessions',
-  });
-
-  const payMutation = useMutation({
-    mutationFn: (capturedStudentId: string) => feeCollectionApi.pay({
-      student_id: capturedStudentId,
-      academic_year_id: activeAcademicYearId ?? '',
-      amount_to_pay: parseFloat(paymentForm.amount) || 0,
-      payment_method: paymentForm.payment_method,
-      remarks: paymentForm.remarks || null,
-      upi_reference: paymentForm.upi_reference || undefined,
-      bank_reference: paymentForm.bank_reference || undefined,
-      cheque_number: paymentForm.cheque_number || undefined,
-      cheque_bank: paymentForm.cheque_bank || undefined,
-      // Fix #4: pass cheque_date — backend requires it for cheque/dd
-      cheque_date: paymentForm.cheque_date || undefined,
-    } as any),
-    onSuccess: (data: any, capturedStudentId: string) => {
-      qc.invalidateQueries({ queryKey: ['fee-summary', capturedStudentId] });
-      qc.invalidateQueries({ queryKey: ['fee-my-summary'] });
-      qc.invalidateQueries({ queryKey: ['fee-child-summary'] });
-      setAdminTab('summary');
-      setAmountError(null);
-      const paid = parseFloat(paymentForm.amount) || 0;
-      setPaymentForm({ amount: '', payment_method: 'cash', remarks: '', upi_reference: '', bank_reference: '', cheque_number: '', cheque_bank: '', cheque_date: '' });
-      setPaymentSuccess({
-        receipt_number: data?.receipt_number,
-        receipt_id: data?.receipt_id,
-        transaction_number: data?.transaction_number,
-        amount_paid: data?.amount_paid ?? paid,
-      });
-    },
-    onError: () => showError('Error', 'Failed to record payment'),
-  });
-
-  const concessionMutation = useMutation({
-    mutationFn: (capturedStudentId: string) => feeConcessionsApi.bulkCreate([{
-      student_id: capturedStudentId,
-      fee_type_id: concessionForm.fee_type_id,
-      academic_year_id: activeAcademicYearId ?? '',
-      amount: parseFloat(concessionForm.amount) || 0,
-      approver_role: concessionForm.approver_role,
-      remarks: concessionForm.remarks || undefined,
-    } as FeeConcessionCreate]),
-    onSuccess: (_: any, capturedStudentId: string) => {
-      qc.invalidateQueries({ queryKey: ['fee-summary', capturedStudentId] });
-      qc.invalidateQueries({ queryKey: ['fee-my-summary'] });
-      qc.invalidateQueries({ queryKey: ['TEMP_MARKER'] });
-      qc.invalidateQueries({ queryKey: ['fee-concessions', capturedStudentId] });
-      setAdminTab('summary');
-      setConcessionForm({ fee_type_id: '', amount: '', approver_role: 'admin', remarks: '' });
-      showSuccess('Concession Applied', 'Concession applied successfully');
-    },
-    onError: () => showError('Error', 'Failed to apply concession'),
-  });
-
   // ── Shared summary renderer ───────────────────────────────────────────────
   const SummaryView = ({ data }: { data: FeeCollectionSummary }) => (
-    <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+    <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
       {/* Student header */}
       <View style={[styles.summaryHeader,{backgroundColor:colors.primary}]}>
         <Text style={styles.summaryName}>{data.student_name}</Text>
@@ -280,7 +159,7 @@ function FeeCollectionScreenContent() {
                   Due: {formatINR(item.due_amount)}
                 </Text>
               </View>
-              {item.last_paid_date && (
+              {!!item.last_paid_date && (
                 <Text style={[styles.feeSub, { color: colors['muted-foreground'] }]}>
                   Last paid: {item.last_paid_date}
                   {item.last_receipt_number ? ` • Receipt: ${item.last_receipt_number}` : ''}
@@ -339,264 +218,6 @@ function FeeCollectionScreenContent() {
       </AppLayout>
     );
   }
-
-  // ── ADMIN / STAFF / TEACHER view ──────────────────────────────────────────
-  const ADMIN_TABS: { key: AdminTab; label: string }[] = [
-    { key: 'summary', label: 'Fee Summary' },
-    { key: 'payment', label: 'Fee Payment' },
-    { key: 'concessions', label: 'Concessions' },
-    { key: 'old-fees', label: 'Old Fees' },
-  ];
-
-  const PaymentTabContent = () => (
-    <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false}>
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Record Payment</Text>
-
-      <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Amount (₹) *</Text>
-      <TextInput
-        style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol }]}
-        placeholder="Enter amount"
-        placeholderTextColor={colors['muted-foreground']}
-        value={paymentForm.amount}
-        onChangeText={(t) => { setPaymentForm(pr => ({ ...pr, amount: t })); const v=parseFloat(t); if(v===v && Number(adminFeeSummary?.grand_total_due??0)>0 && v>Number(adminFeeSummary?.grand_total_due??0)){setAmountError(String.fromCharCode(65,109,111,117,110,116,32,99,97,110,110,111,116,32,101,120,99,101,101,100,32,111,117,116,115,116,97,110,100,105,110,103,32,98,97,108,97,110,99,101));}else{setAmountError(null);} }}
-        keyboardType="numeric"
-      />
-      {amountError ? <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '500' }}>{amountError}</Text> : null}
-
-      <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Payment Method</Text>
-      <View style={styles.chipRow}>
-        {(['cash', 'cheque', 'bank_transfer', 'upi', 'dd'] as const).map(method => (
-          <TouchableOpacity
-            key={method}
-            style={[styles.methodChip, paymentForm.payment_method === method && { backgroundColor: colors.primary }]}
-            onPress={() => setPaymentForm(p => ({ ...p, payment_method: method }))}
-          >
-            <Text style={{ color: paymentForm.payment_method === method ? 'white' : colors['muted-foreground'], fontSize: 12, fontWeight: '600' }}>
-              {method.replace('_', ' ').toUpperCase()}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {paymentForm.payment_method === 'upi' && (
-        <>
-          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>UPI Reference / Transaction ID</Text>
-          <TextInput
-            style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol }]}
-            placeholder="Enter UPI reference number"
-            placeholderTextColor={colors['muted-foreground']}
-            value={paymentForm.upi_reference}
-            onChangeText={(t) => setPaymentForm(p => ({ ...p, upi_reference: t }))}
-          />
-        </>
-      )}
-      {paymentForm.payment_method === 'bank_transfer' && (
-        <>
-          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Bank Reference / UTR Number</Text>
-          <TextInput
-            style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol }]}
-            placeholder="Enter bank reference / UTR"
-            placeholderTextColor={colors['muted-foreground']}
-            value={paymentForm.bank_reference}
-            onChangeText={(t) => setPaymentForm(p => ({ ...p, bank_reference: t }))}
-          />
-        </>
-      )}
-      {/* Fix #4: Show cheque fields for both 'cheque' AND 'dd' — backend requires all 3 for both */}
-      {(['cheque', 'dd'] as const).includes(paymentForm.payment_method as 'cheque' | 'dd') && (
-        <>
-          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Cheque / DD Number *</Text>
-          <TextInput
-            style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol }]}
-            placeholder="Enter cheque or DD number"
-            placeholderTextColor={colors['muted-foreground']}
-            value={paymentForm.cheque_number}
-            onChangeText={(t) => setPaymentForm(p => ({ ...p, cheque_number: t }))}
-          />
-          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Bank Name *</Text>
-          <TextInput
-            style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol }]}
-            placeholder="Enter bank name"
-            placeholderTextColor={colors['muted-foreground']}
-            value={paymentForm.cheque_bank}
-            onChangeText={(t) => setPaymentForm(p => ({ ...p, cheque_bank: t }))}
-          />
-          <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Cheque / DD Date * (YYYY-MM-DD)</Text>
-          <TextInput
-            style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol }]}
-            placeholder="e.g. 2026-03-28"
-            placeholderTextColor={colors['muted-foreground']}
-            value={paymentForm.cheque_date}
-            onChangeText={(t) => setPaymentForm(p => ({ ...p, cheque_date: t }))}
-            keyboardType="numeric"
-          />
-        </>
-      )}
-
-      <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Remarks (optional)</Text>
-      <TextInput
-        style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol, minHeight: 72 }]}
-        placeholder="Enter remarks"
-        placeholderTextColor={colors['muted-foreground']}
-        value={paymentForm.remarks}
-        onChangeText={(t) => setPaymentForm(p => ({ ...p, remarks: t }))}
-        multiline
-        textAlignVertical="top"
-      />
-
-      <TouchableOpacity
-        style={[styles.submitBtn, { backgroundColor: '#10B981', opacity: payMutation.isPending ? 0.5 : 1 }]}
-        onPress={() => payMutation.mutate(selectedStudentId)}
-        disabled={
-          payMutation.isPending || !paymentForm.amount || !!amountError
-          // Fix #4: enforce conditional required fields before submit to avoid 422 from backend
-          || (paymentForm.payment_method === 'upi' && !paymentForm.upi_reference)
-          || (paymentForm.payment_method === 'bank_transfer' && !paymentForm.bank_reference)
-          || ((['cheque', 'dd'] as const).includes(paymentForm.payment_method as 'cheque' | 'dd')
-              && (!paymentForm.cheque_number || !paymentForm.cheque_bank || !paymentForm.cheque_date))
-        }
-      >
-        <Text style={styles.submitBtnText}>{payMutation.isPending ? 'Processing...' : 'Record Payment'}</Text>
-      </TouchableOpacity>
-      <View style={{ height: 48 }} />
-    </ScrollView>
-  );
-
-  const ConcessionTabContent = () => (
-    <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false}>
-      {/* C-7: Existing concessions */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Applied Concessions</Text>
-      {existingConcessions && existingConcessions.length > 0 ? existingConcessions.map((con) => (
-        <View key={con.id} style={[styles.feeCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.feeTypeName, { color: colors.foreground }]}>{con.fee_type_id}</Text>
-              <Text style={[styles.feeSub, { color: colors['muted-foreground'] }]}>Approved by: {con.approver_role}</Text>
-            </View>
-            <Text style={[styles.feeTypeName, { color: '#8B5CF6' }]}>{formatINR(con.amount)}</Text>
-          </View>
-        </View>)) : <Text style={[styles.feeSub, { color: colors['muted-foreground'] }]}>No concessions applied</Text>}
-      <View style={styles.divider} />
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Apply Concession</Text>
-
-      <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Fee Type *</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-        {(adminFeeSummary?.items ?? []).map(item => (
-          <TouchableOpacity
-            key={item.fee_type_id}
-            style={[styles.methodChip, concessionForm.fee_type_id === item.fee_type_id && { backgroundColor: colors.primary }]}
-            onPress={() => setConcessionForm(p => ({ ...p, fee_type_id: item.fee_type_id }))}
-          >
-            <Text style={{ color: concessionForm.fee_type_id === item.fee_type_id ? 'white' : colors['muted-foreground'], fontSize: 12, fontWeight: '600' }}>
-              {item.fee_type_name}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Amount (₹) *</Text>
-      <TextInput
-        style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol }]}
-        placeholder="Enter concession amount"
-        placeholderTextColor={colors['muted-foreground']}
-        value={concessionForm.amount}
-        onChangeText={(t) => setConcessionForm(p => ({ ...p, amount: t }))}
-        keyboardType="numeric"
-      />
-
-      <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Approved By</Text>
-      <View style={styles.chipRow}>
-        {(['principal', 'management', 'accountant', 'admin'] as FeeConcessionCreate['approver_role'][]).map(role => (
-          <TouchableOpacity
-            key={role}
-            style={[styles.methodChip, concessionForm.approver_role === role && { backgroundColor: colors.primary }]}
-            onPress={() => setConcessionForm(p => ({ ...p, approver_role: role }))}
-          >
-            <Text style={{ color: concessionForm.approver_role === role ? 'white' : colors['muted-foreground'], fontSize: 12, fontWeight: '600' }}>
-              {role.charAt(0).toUpperCase() + role.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Reason (optional)</Text>
-      <TextInput
-        style={[styles.fieldInput, { color: colors.foreground, backgroundColor: cardBg, borderColor: borderCol, minHeight: 72 }]}
-        placeholder="Enter reason for concession"
-        placeholderTextColor={colors['muted-foreground']}
-        value={concessionForm.remarks}
-        onChangeText={(t) => setConcessionForm(p => ({ ...p, remarks: t }))}
-        multiline
-        textAlignVertical="top"
-      />
-
-      <TouchableOpacity
-        style={[styles.submitBtn, { backgroundColor: '#8B5CF6', opacity: concessionMutation.isPending ? 0.5 : 1 }]}
-        onPress={() => concessionMutation.mutate(selectedStudentId)}
-        disabled={concessionMutation.isPending || !concessionForm.fee_type_id || !concessionForm.amount}
-      >
-        <Text style={styles.submitBtnText}>{concessionMutation.isPending ? 'Applying...' : 'Apply Concession'}</Text>
-      </TouchableOpacity>
-      <View style={{ height: 48 }} />
-    </ScrollView>
-  );
-
-  const OldFeesTabContent = () => (
-    <View style={{ flex: 1 }}>
-      {adminFeeSummary && Number(adminFeeSummary.old_fee_pending_amount) > 0 && (
-        <View style={[styles.oldFeeAlert, { margin: 16, marginBottom: 0 }]}>
-          <Ionicons name="warning" size={14} color="#D97706" />
-          <Text style={styles.oldFeeText}>
-            Total carry-forward pending: {formatINR(adminFeeSummary.old_fee_pending_amount)}
-          </Text>
-        </View>
-      )}
-      {oldFeesLoading ? (
-        <View style={styles.centered}><ActivityIndicator size="large" color={colors.primary} /></View>
-      ) : (
-        <FlatList
-          data={oldFees ?? []}
-          keyExtractor={(_, idx) => String(idx)}
-          contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
-          ListEmptyComponent={
-            <View style={styles.centered}>
-              <Ionicons name="checkmark-circle-outline" size={48} color="#10B981" />
-              <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>No pending old fees</Text>
-            </View>
-          }
-          renderItem={({ item }: { item: any }) => (
-            <View style={[styles.feeCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
-              <Text style={[styles.feeTypeName, { color: colors.foreground }]}>
-                {item.academic_year ?? item.year ?? 'Previous Year'}
-              </Text>
-              <View style={styles.feeAmounts}>
-                {item.fee_type_name && (
-                  <Text style={[styles.feeAmountChip, { color: colors['muted-foreground'] }]}>
-                    {item.fee_type_name}
-                  </Text>
-                )}
-                {item.original_amount != null && (
-                  <Text style={[styles.feeAmountChip, { color: colors['muted-foreground'] }]}>
-                    Total: {formatINR(item.original_amount)}
-                  </Text>
-                )}
-                {item.paid_amount != null && (
-                  <Text style={[styles.feeAmountChip, { color: '#10B981' }]}>
-                    Paid: {formatINR(item.paid_amount)}
-                  </Text>
-                )}
-                {item.balance != null && (
-                  <Text style={[styles.feeAmountChip, { color: '#EF4444' }]}>
-                    Due: {formatINR(item.balance)}
-                  </Text>
-                )}
-              </View>
-            </View>
-          )}
-        />
-      )}
-    </View>
-  );
 
   return (
     <AppLayout title="Fee Collection">
@@ -689,7 +310,7 @@ function FeeCollectionScreenContent() {
                 <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>No students found</Text>
               </View>
             ) : (
-              <ScrollView showsVerticalScrollIndicator={true} persistentScrollbar={true} contentContainerStyle={styles.studentGrid}>
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.studentGrid}>
                 {(searchResults ?? []).map((s: any) => {
                   // Backend may use different field names — check all variants
                   const name = s.student_name || s.name || s.full_name || s.studentName || '—';
@@ -887,11 +508,11 @@ const styles = StyleSheet.create({
   filterActions: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   searchBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 10, borderRadius: 8, gap: 6,
+    paddingVertical: 13, borderRadius: 8, gap: 6,
   },
   searchBtnText: { color: 'white', fontWeight: '600', fontSize: 14 },
   clearBtn: {
-    paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, borderWidth: 1,
+    paddingHorizontal: 20, paddingVertical: 13, borderRadius: 8, borderWidth: 1,
     alignItems: 'center', justifyContent: 'center',
   },
   clearBtnText: { fontWeight: '600', fontSize: 14 },

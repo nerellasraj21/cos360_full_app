@@ -233,7 +233,7 @@ function FeeReceiptsScreenContent() {
 
   return (
     <AppLayout title="Fee Receipts">
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 48 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Header */}
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
@@ -382,7 +382,7 @@ function FeeReceiptsScreenContent() {
               )}
 
               {/* Content */}
-              {content && (
+              {!!content && (
                 <View style={[styles.contentBox, { borderColor: borderCol }]}>
                   <Text style={[styles.contentTitle, { color: colors.foreground }]}>Receipt Content</Text>
                   {content.transaction_number ? <DetailRow label="Transaction" value={content.transaction_number} colors={colors} /> : null}
@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
   statusLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   statusPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
   countPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, borderWidth: 1 },
-  eyeBtn: { width: 36, height: 36, borderRadius: 8, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  eyeBtn: { width: 44, height: 44, borderRadius: 8, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
   rowActions: { flexDirection: 'row', gap: 8 },
   emptySub: { fontSize: 13, textAlign: 'center' },
 

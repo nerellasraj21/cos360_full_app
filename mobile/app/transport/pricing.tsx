@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -271,7 +272,7 @@ export default function TransportPricingScreen() {
             ₹{Number(item.amount).toLocaleString('en-IN')}
           </Text>
           <Text style={[styles.cardSub, { color: colors['muted-foreground'] }]}>
-            {item.start_date} → {item.end_date}
+            {item.start_date ? parseDate(item.start_date).toLocaleDateString('en-IN') : ''} - {item.end_date ? parseDate(item.end_date).toLocaleDateString('en-IN') : ''}
           </Text>
         </View>
         <View style={styles.actions}>
@@ -308,7 +309,7 @@ export default function TransportPricingScreen() {
           <View style={styles.centered}>
             <Ionicons name="lock-closed" size={48} color={colors['muted-foreground']} />
             <Text style={{ color: colors['muted-foreground'], marginTop: 12 }}>
-              You don't have permission to view transport pricing
+              You don&apos;t have permission to view transport pricing
             </Text>
           </View>
         }
@@ -355,7 +356,7 @@ export default function TransportPricingScreen() {
             transparent
             onRequestClose={() => setShowModal(false)}
           >
-            <View style={styles.overlay}>
+            <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
               <View style={[styles.modal, { backgroundColor: colors.background }]}>
                 <View style={styles.modalHeader}>
                   <Text style={[styles.modalTitle, { color: colors.foreground }]}>
@@ -367,7 +368,7 @@ export default function TransportPricingScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false}>
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   {/* Vehicle (required) */}
                   <Text style={[styles.label, { color: colors.foreground }]}>Vehicle *</Text>
                   <CustomDropdown
@@ -473,7 +474,7 @@ export default function TransportPricingScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
+            </KeyboardAvoidingView>
           </Modal>
         </View>
       </ReadOrListPermissionGuard>
@@ -518,7 +519,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 10,
     alignSelf: 'flex-end',
     marginBottom: 12,
@@ -538,9 +539,9 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   actions: { flexDirection: 'row', gap: 6 },
   iconBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -549,6 +550,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
+    paddingBottom: 32,
     maxHeight: '90%',
   },
   modalHeader: {
@@ -563,7 +565,7 @@ const styles = StyleSheet.create({
   dateInput: {
     borderWidth: 1,
     borderRadius: 10,
-    padding: 12,
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -578,11 +580,11 @@ const styles = StyleSheet.create({
   modalFooter: { flexDirection: 'row', gap: 10, marginTop: 16 },
   cancelBtn: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderRadius: 10,
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     borderWidth: 1,
   },
-  submitBtn: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
+  submitBtn: { flex: 1, padding: 14, borderRadius: 10, alignItems: 'center' },
 });

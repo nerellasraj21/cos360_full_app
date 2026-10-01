@@ -24,7 +24,7 @@ function actionColor(action: string) {
 // or the enriched web-parity fields (actor_name/actor_role/description/created_at).
 // Prefer the enriched fields, falling back to the raw ones so nothing renders blank.
 function entryName(e: AuditLog) {
-  return e.actor_name || e.performed_by || 'System';
+  return e.actor_name || 'System';
 }
 function entryRole(e: AuditLog) {
   return e.actor_role;
@@ -149,6 +149,8 @@ export default function ExamAuditLogScreen() {
             data={filtered}
             keyExtractor={item => item.id}
             renderItem={renderItem}
+            onRefresh={refetch}
+            refreshing={isFetching && !isLoading}
             contentContainerStyle={{ padding: 16, paddingBottom: 8, gap: 8 }}
           />
         )}
@@ -187,7 +189,7 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 14, padding: 0 },
   refreshBtn: {
-    width: 40, height: 40, borderRadius: 10, borderWidth: 1,
+    width: 44, height: 44, borderRadius: 10, borderWidth: 1,
     justifyContent: 'center', alignItems: 'center',
   },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
@@ -209,7 +211,7 @@ const styles = StyleSheet.create({
   pageLabel: { fontSize: 13 },
   paginationBtns: { flexDirection: 'row', gap: 8 },
   pageBtn: {
-    width: 36, height: 36, borderRadius: 8, borderWidth: 1,
+    width: 44, height: 44, borderRadius: 8, borderWidth: 1,
     justifyContent: 'center', alignItems: 'center',
   },
 });

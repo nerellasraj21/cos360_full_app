@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Linking } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Linking,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -176,7 +186,7 @@ export default function MyDocumentsPage() {
           <View style={styles.accessDeniedContainer}>
             <Ionicons name="lock-closed" size={48} color={colors['muted-foreground']} />
             <ThemedText style={styles.accessDeniedText}>
-              You don't have permission to access documents
+              You don&apos;t have permission to access documents
             </ThemedText>
           </View>
         </AppLayout>
@@ -198,7 +208,7 @@ export default function MyDocumentsPage() {
           )}
 
         <View style={[styles.card, { backgroundColor: colors.card }]}>
-          {studentHeaderTitle && (
+          {!!studentHeaderTitle && (
             <ThemedText type="subtitle" style={styles.cardTitle}>{studentHeaderTitle}</ThemedText>
           )}
           <FlatList
@@ -229,7 +239,7 @@ export default function MyDocumentsPage() {
 
       {/* Upload Document Modal */}
       <Modal visible={showUploadModal} transparent animationType="slide" onRequestClose={() => setShowUploadModal(false)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
               <ThemedText style={styles.modalTitle}>Upload Document</ThemedText>
@@ -269,7 +279,7 @@ export default function MyDocumentsPage() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ReadOrListPermissionGuard>
   );
@@ -387,8 +397,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     borderRadius: 6,
     justifyContent: 'center',
     alignItems: 'center',

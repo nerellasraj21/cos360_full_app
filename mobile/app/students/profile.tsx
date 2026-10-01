@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { PrimaryButton, SecondaryButton, IconButton } from '@/components/buttons';
@@ -99,7 +108,7 @@ export default function StudentProfile() {
           <View style={styles.accessDeniedContainer}>
             <Ionicons name="lock-closed" size={48} color={colors['muted-foreground']} />
             <ThemedText style={styles.accessDeniedText}>
-              You don't have permission to view student profile
+              You don&apos;t have permission to view student profile
             </ThemedText>
           </View>
         </AppLayout>
@@ -154,13 +163,13 @@ export default function StudentProfile() {
                 DOB: {profile.date_of_birth ? new Date(profile.date_of_birth).toLocaleDateString() : 'Not provided'}
               </ThemedText>
             </View>
-            {profile.blood_group && (
+            {!!profile.blood_group && (
               <View style={styles.detailRow}>
                 <Ionicons name="water" size={20} color={colors['muted-foreground']} />
                 <ThemedText style={styles.detailText}>Blood Group: {profile.blood_group}</ThemedText>
               </View>
             )}
-            {profile.emergency_contact && (
+            {!!profile.emergency_contact && (
               <View style={styles.detailRow}>
                 <Ionicons name="call" size={20} color={colors['muted-foreground']} />
                 <ThemedText style={styles.detailText}>Emergency Contact: {profile.emergency_contact}</ThemedText>
@@ -180,7 +189,7 @@ export default function StudentProfile() {
               <Ionicons name="time" size={20} color={colors['muted-foreground']} />
               <ThemedText style={styles.detailText}>Academic Year: {profile.academic_year || 'N/A'}</ThemedText>
             </View>
-            {profile.roll_number && (
+            {!!profile.roll_number && (
               <View style={styles.detailRow}>
                 <Ionicons name="id-card" size={20} color={colors['muted-foreground']} />
                 <ThemedText style={styles.detailText}>Roll Number: {profile.roll_number}</ThemedText>
@@ -188,7 +197,7 @@ export default function StudentProfile() {
             )}
           </View>
 
-          {profile.address && (
+          {!!profile.address && (
             <View style={styles.detailsSection}>
               <ThemedText type="subtitle" style={styles.sectionTitle}>Address</ThemedText>
               <View style={styles.detailRow}>
@@ -207,7 +216,7 @@ export default function StudentProfile() {
         animationType="slide"
         onRequestClose={() => setEditModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
               <ThemedText type="subtitle" style={styles.modalTitle}>Edit Profile</ThemedText>
@@ -274,7 +283,7 @@ export default function StudentProfile() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
         </Modal>
       </AppLayout>
     </ReadPermissionGuard>

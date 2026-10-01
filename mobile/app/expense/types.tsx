@@ -2,7 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Switch,
@@ -26,18 +29,24 @@ import {
 } from '@/hooks/use-expense-protected';
 import type { ExpenseType } from '@/src/types/expense';
 import { ScreenAccessGate } from '@/components/ScreenAccessGate';
+import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 
 const ORANGE = '#F97316';
 
 function ExpenseTypesScreenContent() {
   const { colors, theme } = useTheme();
   const { showSuccess, showError } = useToastContext();
+  const { hasPermission } = useMobilePermission();
+  const canCreate = hasPermission('expense_types', 'create');
+  const canUpdate = hasPermission('expense_types', 'update');
+  const canDelete = hasPermission('expense_types', 'delete');
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<ExpenseType | null>(null);
   const [form, setForm] = useState({ name: '', category_id: '', description: '', is_active: true });
   const { confirm, modalProps } = useConfirmModal();
+  const [refreshing, setRefreshing] = useState(false);
 
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
@@ -45,7 +54,7 @@ function ExpenseTypesScreenContent() {
   const filterBg = theme === 'dark' ? '#13132b' : '#f8fafc';
 
   // Filter by category server-side (matches the web app), so it refetches per category
-  const { data: raw, isLoading } = useExpenseTypesProtected({ category_id: categoryFilter || undefined });
+  const { data: raw, isLoading, refetch } = useExpenseTypesProtected({ category_id: categoryFilter || undefined });
   const { data: categoriesDropdown = [] } = useExpenseCategoryDropdownProtected();
   const createMutation = useCreateExpenseTypeProtected();
   const updateMutation = useUpdateExpenseTypeProtected();
@@ -133,7 +142,7 @@ function ExpenseTypesScreenContent() {
           placeholder="All Categories"
           containerStyle={{ marginBottom: 0 }}
           style={{
-            height: 38,
+            height: 44,
             paddingHorizontal: 10,
             paddingVertical: 0,
             borderRadius: 10,
@@ -147,18 +156,33 @@ function ExpenseTypesScreenContent() {
       </View>
 
       {/* New Type button, right-aligned in its own row */}
-      <View style={styles.newBtnRow}>
-        <TouchableOpacity
-          style={[styles.newBtn, { backgroundColor: '#556ee6' }]}
-          onPress={() => { resetForm(); setShowModal(true); }}
-        >
-          <Ionicons name="add" size={15} color="white" />
-          <Text style={styles.newBtnText}>New Type</Text>
-        </TouchableOpacity>
-      </View>
+      {canCreate && (
+        <View style={styles.newBtnRow}>
+          <TouchableOpacity
+            style={[styles.newBtn, { backgroundColor: '#556ee6' }]}
+            onPress={() => { resetForm(); setShowModal(true); }}
+          >
+            <Ionicons name="add" size={15} color="white" />
+            <Text style={styles.newBtnText}>New Type</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Cards */}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={ORANGE}
+            onRefresh={async () => {
+              setRefreshing(true);
+              try { await refetch(); } finally { setRefreshing(false); }
+            }}
+          />
+        }
+      >
         {isLoading ? (
           <View style={styles.centered}><ActivityIndicator color={ORANGE} /></View>
         ) : types.length === 0 ? (
@@ -188,16 +212,22 @@ function ExpenseTypesScreenContent() {
               <Text style={[styles.cardDate, { color: colors['muted-foreground'] }]}>
                 Created {new Date(item.created_at).toLocaleDateString('en-US')}
               </Text>
-              <View style={[styles.cardFooter, { borderTopColor: borderCol }]}>
-                <TouchableOpacity style={styles.cardAction} onPress={() => openEdit(item)}>
-                  <Ionicons name="create-outline" size={15} color={colors['muted-foreground']} />
-                  <Text style={[styles.cardActionText, { color: colors['muted-foreground'] }]}>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.cardAction} onPress={() => handleDelete(item)}>
-                  <Ionicons name="trash-outline" size={15} color="#EF4444" />
-                  <Text style={[styles.cardActionText, { color: '#EF4444' }]}>Delete</Text>
-                </TouchableOpacity>
-              </View>
+              {(canUpdate || canDelete) && (
+                <View style={[styles.cardFooter, { borderTopColor: borderCol }]}>
+                  {canUpdate && (
+                    <TouchableOpacity style={styles.cardAction} onPress={() => openEdit(item)}>
+                      <Ionicons name="create-outline" size={15} color={colors['muted-foreground']} />
+                      <Text style={[styles.cardActionText, { color: colors['muted-foreground'] }]}>Edit</Text>
+                    </TouchableOpacity>
+                  )}
+                  {canDelete && (
+                    <TouchableOpacity style={styles.cardAction} onPress={() => handleDelete(item)}>
+                      <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                      <Text style={[styles.cardActionText, { color: '#EF4444' }]}>Delete</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
             </View>
           </View>
         ))}
@@ -206,7 +236,7 @@ function ExpenseTypesScreenContent() {
 
       {/* Create / Edit Modal */}
       <Modal visible={showModal} animationType="slide" transparent onRequestClose={() => setShowModal(false)}>
-        <View style={styles.overlay}>
+        <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modal, { backgroundColor: colors.background }]}>
             <View style={styles.modalTop}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
@@ -220,7 +250,7 @@ function ExpenseTypesScreenContent() {
             <Text style={[styles.modalSubtitle, { color: colors['muted-foreground'] }]}>
               Expense types must be linked to categories for proper classification
             </Text>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={[styles.label, { color: colors.foreground }]}>Name *</Text>
               <TextInput
                 style={[styles.input, { color: colors.foreground, borderColor: borderCol, backgroundColor: inputBg }]}
@@ -277,7 +307,7 @@ function ExpenseTypesScreenContent() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
       <ConfirmModal {...modalProps} />
     </AppLayout>
@@ -291,13 +321,13 @@ const styles = StyleSheet.create({
   },
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, height: 38,
+    borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, height: 44,
   },
   searchInput: { flex: 1, fontSize: 13, padding: 0 },
   newBtnRow: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, alignItems: 'flex-end' },
   newBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12,
   },
   newBtnText: { color: 'white', fontSize: 13, fontWeight: '600' },
   listContent: { padding: 12 },
@@ -310,13 +340,13 @@ const styles = StyleSheet.create({
   cardDesc: { fontSize: 13, marginBottom: 4 },
   cardDate: { fontSize: 11, marginBottom: 6 },
   cardFooter: { flexDirection: 'row', gap: 4, paddingTop: 8, borderTopWidth: 1, marginTop: 4 },
-  cardAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  cardAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 8 },
   cardActionText: { fontSize: 13, fontWeight: '600' },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, alignSelf: 'flex-start' },
   badgeText: { fontSize: 11, fontWeight: '600' },
   centered: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modal: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
+  modal: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32, maxHeight: '90%' },
   modalTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   modalTitle: { fontSize: 17, fontWeight: '700' },
   modalSubtitle: { fontSize: 13, lineHeight: 18, marginBottom: 10 },
@@ -325,8 +355,8 @@ const styles = StyleSheet.create({
   textarea: { height: 80, textAlignVertical: 'top' },
   switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 8 },
   modalFooter: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  cancelBtn: { flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
-  submitBtn: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
+  cancelBtn: { flex: 1, padding: 14, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
+  submitBtn: { flex: 1, padding: 14, borderRadius: 10, alignItems: 'center' },
 });
 
 

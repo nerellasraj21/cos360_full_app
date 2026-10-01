@@ -13,6 +13,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  KeyboardAvoidingView,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -264,7 +265,7 @@ function ClassSubjectMappingsScreenContent() {
 
   function toggleAllVisibleFields() {
     const next = !allFieldsVisible;
-    setVisibleFields({ section: next, excludeMarks: next, order: next, active: next });
+    setVisibleFields({ class: next, section: next, excludeMarks: next, order: next, active: next });
   }
 
   function handleBulkAdd() {
@@ -629,7 +630,7 @@ function ClassSubjectMappingsScreenContent() {
         animationType="slide"
         onRequestClose={() => setEditMapping(null)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.editSheet, { backgroundColor: cardBg }]}>
             <View style={styles.editHeader}>
               <View>
@@ -667,7 +668,7 @@ function ClassSubjectMappingsScreenContent() {
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.toggleLabel, { color: colors.foreground }]}>Exclude from Marks</Text>
                   <Text style={[styles.toggleHint, { color: colors['muted-foreground'] }]}>
-                    Subject marks won't count toward totals
+                    Subject marks won&apos;t count toward totals
                   </Text>
                 </View>
                 <Ionicons
@@ -717,7 +718,7 @@ function ClassSubjectMappingsScreenContent() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Add Subjects Modal */}
@@ -727,7 +728,7 @@ function ClassSubjectMappingsScreenContent() {
         animationType="slide"
         onRequestClose={() => { setIsAddModalVisible(false); resetAddModal(); }}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.addSheet, { backgroundColor: cardBg }]}>
             {/* Header */}
             <View style={styles.addSheetHeader}>
@@ -878,7 +879,7 @@ function ClassSubjectMappingsScreenContent() {
               </View>
             )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Section picker inside add modal */}

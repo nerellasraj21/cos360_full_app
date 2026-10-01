@@ -4,7 +4,10 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  RefreshControl,
   StyleSheet,
   Switch,
   Text,
@@ -24,7 +27,7 @@ const COLOR = '#6366F1';
 
 function AdminMenuScreenContent() {
   const { colors, theme } = useTheme();
-  const { showError } = useToastContext();
+  const { showSuccess, showError } = useToastContext();
   const { confirm, modalProps } = useConfirmModal();
   const queryClient = useQueryClient();
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
@@ -34,7 +37,7 @@ function AdminMenuScreenContent() {
   const [editingMenu, setEditingMenu] = useState<AuthMenu | null>(null);
   const [form, setForm] = useState<AuthMenuCreate>({ name: '', path: '', icon: '', order: 0, is_active: true });
 
-  const { data: menus = [], isLoading } = useQuery({
+  const { data: menus = [], isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['admin-menus'],
     queryFn: () => authApi.getMenus(),
   });
@@ -43,6 +46,7 @@ function AdminMenuScreenContent() {
     mutationFn: (data: AuthMenuCreate) => authApi.createMenu(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-menus'] });
+      showSuccess('Created', 'Menu item created.');
       closeModal();
     },
     onError: () => showError('Error', 'Failed to create menu item'),
@@ -52,6 +56,7 @@ function AdminMenuScreenContent() {
     mutationFn: ({ id, data }: { id: string; data: AuthMenuUpdate }) => authApi.updateMenu(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-menus'] });
+      showSuccess('Updated', 'Menu item updated.');
       closeModal();
     },
     onError: () => showError('Error', 'Failed to update menu item'),
@@ -61,6 +66,7 @@ function AdminMenuScreenContent() {
     mutationFn: (id: string) => authApi.deleteMenu(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-menus'] });
+      showSuccess('Deleted', 'Menu item deleted.');
     },
     onError: () => showError('Error', 'Failed to delete menu item'),
   });
@@ -151,6 +157,7 @@ function AdminMenuScreenContent() {
           data={menus}
           keyExtractor={(item: any) => item.id}
           contentContainerStyle={styles.listContent}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Ionicons name="menu-outline" size={40} color={colors['muted-foreground']} />
@@ -211,7 +218,7 @@ function AdminMenuScreenContent() {
 
       {/* Create / Edit Modal */}
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={closeModal}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalContent, { backgroundColor: cardBg }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
@@ -290,7 +297,7 @@ function AdminMenuScreenContent() {
               )}
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
       <ConfirmModal {...modalProps} />
     </ScreenLayout>
@@ -303,7 +310,7 @@ const styles = StyleSheet.create({
   bannerIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700' },
   bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 11 },
-  addBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  addBtn: { width: 44, height: 44, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   loadingText: { fontSize: 14 },
   listContent: { padding: 16, paddingBottom: 32 },
@@ -312,7 +319,7 @@ const styles = StyleSheet.create({
   rowTitle: { fontSize: 13, fontWeight: '600' },
   rowSub: { fontSize: 11, marginTop: 1 },
   rowOrder: { fontSize: 10, marginTop: 1 },
-  actionBtn: { width: 30, height: 30, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  actionBtn: { width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   emptyState: { alignItems: 'center', gap: 10, paddingTop: 40 },
   emptyText: { fontSize: 14, marginBottom: 4 },
   emptyAddBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },

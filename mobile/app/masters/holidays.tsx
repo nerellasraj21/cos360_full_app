@@ -3,13 +3,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -21,6 +24,7 @@ import { useAuth, useAcademicYear, useTheme } from '@/contexts';
 import { ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
+import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { QuickSendButton } from '@/components/communication/QuickSendButton';
 
 // ─── View types ─────────────────────────────────────────────────────────────
@@ -284,6 +288,7 @@ export default function HolidaysScreen() {
   const { theme } = useTheme();
   const themeColors = Colors[theme];
   const { showSuccess, showError } = useToastContext();
+  const { confirm, modalProps } = useConfirmModal();
   const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
   const { activeAcademicYearId } = useAcademicYear();
@@ -440,9 +445,19 @@ export default function HolidaysScreen() {
     });
   };
 
+  const confirmDeleteEvent = (ev: HolidayRead) => {
+    confirm({
+      title: 'Delete Event',
+      message: `Are you sure you want to delete "${ev.name}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(ev.id),
+    });
+  };
+
   const handleDeleteEvent = () => {
     if (!selectedEvent) return;
-    deleteMutation.mutate(selectedEvent.id);
+    confirmDeleteEvent(selectedEvent);
   };
 
   const handleSort = (key: 'name' | 'start_date' | 'end_date') => {
@@ -599,86 +614,85 @@ export default function HolidaysScreen() {
           ) : null}
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={{ minWidth: 720 }}>
-            <View style={[styles.tableRow, styles.tableHeaderRow, { borderColor: themeColors.border, backgroundColor: themeColors.muted }]}>
-              <ThemedText style={[styles.th, { width: 44 }]}>S.No.</ThemedText>
-              <TouchableOpacity style={[styles.thTouchable, { width: 140 }]} onPress={() => handleSort('name')}>
-                <ThemedText style={styles.th}>Title</ThemedText>
-                <SortIcon colKey="name" />
-              </TouchableOpacity>
-              <ThemedText style={[styles.th, { width: 160 }]}>Description</ThemedText>
-              <TouchableOpacity style={[styles.thTouchable, { width: 104 }]} onPress={() => handleSort('start_date')}>
-                <ThemedText style={styles.th}>Start Date</ThemedText>
-                <SortIcon colKey="start_date" />
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.thTouchable, { width: 104 }]} onPress={() => handleSort('end_date')}>
-                <ThemedText style={styles.th}>End Date</ThemedText>
-                <SortIcon colKey="end_date" />
-              </TouchableOpacity>
-              <ThemedText style={[styles.th, { width: 60 }]}>Color</ThemedText>
-              <ThemedText style={[styles.th, { width: 128 }]}>Actions</ThemedText>
-            </View>
+        <View style={styles.sortRow}>
+          {([['name', 'Title'], ['start_date', 'Start'], ['end_date', 'End']] as const).map(([key, label]) => (
+            <TouchableOpacity
+              key={key}
+              style={[
+                styles.sortChip,
+                { borderColor: allEventsSortKey === key ? themeColors.primary : themeColors.border },
+              ]}
+              onPress={() => handleSort(key)}
+              accessibilityLabel={`Sort by ${label}`}
+            >
+              <ThemedText style={styles.th}>{label}</ThemedText>
+              <SortIcon colKey={key} />
+            </TouchableOpacity>
+          ))}
+        </View>
 
-            {filteredAndSortedEvents.length === 0 ? (
-              <View style={styles.centerPad}>
-                <ThemedText style={{ color: themeColors['muted-foreground'] }}>
-                  {allEventsSearch ? 'No events match your search' : 'No events'}
-                </ThemedText>
-              </View>
-            ) : (
-              filteredAndSortedEvents.map((ev, idx) => (
-                <View key={ev.id} style={[styles.tableRow, { borderColor: themeColors.border }]}>
-                  <ThemedText style={{ width: 44, fontSize: 13, color: themeColors['muted-foreground'] }}>
-                    {idx + 1 + page * pageSize}
-                  </ThemedText>
-                  <TouchableOpacity style={{ width: 140 }} onPress={() => openEditDialog(ev)}>
-                    <ThemedText style={{ fontSize: 13 }} numberOfLines={1}>{ev.name}</ThemedText>
-                  </TouchableOpacity>
-                  <ThemedText style={{ width: 160, fontSize: 12, color: themeColors['muted-foreground'] }} numberOfLines={1}>
-                    {ev.description ? (ev.description.length > 60 ? `${ev.description.slice(0, 60)}...` : ev.description) : '-'}
-                  </ThemedText>
-                  <ThemedText style={{ width: 104, fontSize: 13 }}>{ev.start_date}</ThemedText>
-                  <ThemedText style={{ width: 104, fontSize: 13 }}>{ev.end_date}</ThemedText>
-                  <View style={{ width: 60 }}>
-                    <View style={[styles.colorSwatch, { backgroundColor: ev.color || '#2563eb' }]} />
-                  </View>
-                  <View style={{ width: 128, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <QuickSendButton
-                      templateName="Holiday"
-                      targetType="all_parents"
-                      targetRef={{}}
-                      recipientLabel="All parents"
-                      variables={{
-                        date: ev.start_date === ev.end_date ? ev.start_date : `${ev.start_date} to ${ev.end_date}`,
-                        reason: ev.name ? ` (${ev.name})` : '',
-                      }}
-                      title="Send Holiday Message to all parents"
-                    />
-                    {hasUpdatePermission && (
-                      <TouchableOpacity
-                        style={[styles.rowActionBtn, { backgroundColor: themeColors.primary }]}
-                        onPress={() => openEditDialog(ev)}
-                        accessibilityLabel="Edit Event"
-                      >
-                        <Ionicons name="create" size={14} color="white" />
-                      </TouchableOpacity>
-                    )}
-                    {hasDeletePermission && (
-                      <TouchableOpacity
-                        style={[styles.rowActionBtn, { backgroundColor: themeColors.destructive }]}
-                        onPress={() => deleteMutation.mutate(ev.id)}
-                        accessibilityLabel="Delete Event"
-                      >
-                        <Ionicons name="trash" size={14} color="white" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              ))
-            )}
+        {filteredAndSortedEvents.length === 0 ? (
+          <View style={styles.centerPad}>
+            <ThemedText style={{ color: themeColors['muted-foreground'] }}>
+              {allEventsSearch ? 'No events match your search' : 'No events'}
+            </ThemedText>
           </View>
-        </ScrollView>
+        ) : (
+          filteredAndSortedEvents.map((ev) => (
+            <TouchableOpacity
+              key={ev.id}
+              activeOpacity={0.8}
+              onPress={() => openEditDialog(ev)}
+              style={[styles.eventCard, { backgroundColor: themeColors.card, borderColor: themeColors.border, borderLeftColor: ev.color || '#2563eb' }]}
+            >
+              <View style={styles.eventCardBody}>
+                <ThemedText style={styles.eventCardTitle} numberOfLines={2}>{ev.name}</ThemedText>
+                <View style={styles.eventCardMeta}>
+                  <Ionicons name="calendar-outline" size={14} color={themeColors['muted-foreground']} />
+                  <ThemedText style={{ fontSize: 13, color: themeColors['muted-foreground'] }}>
+                    {ev.start_date === ev.end_date ? ev.start_date : `${ev.start_date} to ${ev.end_date}`}
+                  </ThemedText>
+                </View>
+                {!!ev.description && (
+                  <ThemedText style={{ fontSize: 12, color: themeColors['muted-foreground'] }} numberOfLines={2}>
+                    {ev.description}
+                  </ThemedText>
+                )}
+              </View>
+              <View style={styles.eventCardActions}>
+                <QuickSendButton
+                  templateName="Holiday"
+                  targetType="all_parents"
+                  targetRef={{}}
+                  recipientLabel="All parents"
+                  variables={{
+                    date: ev.start_date === ev.end_date ? ev.start_date : `${ev.start_date} to ${ev.end_date}`,
+                    reason: ev.name ? ` (${ev.name})` : '',
+                  }}
+                  title="Send Holiday Message to all parents"
+                />
+                {hasUpdatePermission && (
+                  <TouchableOpacity
+                    style={[styles.rowActionBtn, { backgroundColor: themeColors.primary }]}
+                    onPress={() => openEditDialog(ev)}
+                    accessibilityLabel="Edit Event"
+                  >
+                    <Ionicons name="create" size={18} color="white" />
+                  </TouchableOpacity>
+                )}
+                {hasDeletePermission && (
+                  <TouchableOpacity
+                    style={[styles.rowActionBtn, { backgroundColor: themeColors.destructive }]}
+                    onPress={() => confirmDeleteEvent(ev)}
+                    accessibilityLabel="Delete Event"
+                  >
+                    <Ionicons name="trash" size={18} color="white" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
 
         <View style={styles.paginationRow}>
           <TouchableOpacity
@@ -779,7 +793,12 @@ export default function HolidaysScreen() {
           themeColors={themeColors}
         />
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 24 }}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={themeColors.primary} />}
+        >
           {view === 'month' ? (
             isLoading ? (
               <View style={styles.centerPad}><ActivityIndicator color={themeColors.primary} /></View>
@@ -789,7 +808,7 @@ export default function HolidaysScreen() {
 
         {/* Add Event Modal */}
         <Modal visible={showAddDialog} animationType="slide" transparent onRequestClose={() => setShowAddDialog(false)}>
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
               <View style={[styles.modalHeader, { borderBottomColor: themeColors.border }]}>
                 <ThemedText type="title" style={styles.modalTitle}>Add Event</ThemedText>
@@ -797,7 +816,7 @@ export default function HolidaysScreen() {
                   <Ionicons name="close" size={24} color={themeColors['card-foreground']} />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={styles.modalBody}>
+              <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
                 <View style={styles.formGroup}>
                   <ThemedText style={styles.label}>Title *</ThemedText>
                   <TextInput
@@ -897,12 +916,12 @@ export default function HolidaysScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Edit Event Modal */}
         <Modal visible={showEditDialog} animationType="slide" transparent onRequestClose={() => setShowEditDialog(false)}>
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
               <View style={[styles.modalHeader, { borderBottomColor: themeColors.border }]}>
                 <ThemedText type="title" style={styles.modalTitle}>Edit Event</ThemedText>
@@ -912,7 +931,7 @@ export default function HolidaysScreen() {
               </View>
               {selectedEvent && (
                 <>
-                  <ScrollView style={styles.modalBody}>
+                  <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
                     <View style={styles.formGroup}>
                       <ThemedText style={styles.label}>Title *</ThemedText>
                       <TextInput
@@ -1029,7 +1048,7 @@ export default function HolidaysScreen() {
                 </>
               )}
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Date pickers */}
@@ -1065,6 +1084,7 @@ export default function HolidaysScreen() {
           title="Select End Date"
           themeColors={themeColors}
         />
+        <ConfirmModal {...modalProps} />
       </ThemedView>
     </ReadOrListPermissionGuard>
   );
@@ -1216,10 +1236,17 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 4,
   },
+  sortRow: { flexDirection: 'row', gap: 8 },
+  sortChip: { flexDirection: 'row', alignItems: 'center', minHeight: 44, paddingHorizontal: 14, borderWidth: 1, borderRadius: 22 },
+  eventCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderLeftWidth: 4, borderRadius: 12, padding: 12, gap: 10 },
+  eventCardBody: { flex: 1, gap: 4 },
+  eventCardTitle: { fontSize: 15, fontWeight: '600' },
+  eventCardMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  eventCardActions: { gap: 8, alignItems: 'center' },
   rowActionBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },

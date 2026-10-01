@@ -1460,7 +1460,7 @@ export default function StaffEnrollmentScreen() {
           <View style={ss.centeredBox}>
             <Ionicons name="lock-closed-outline" size={56} color="#9CA3AF" />
             <ThemedText type="subtitle" style={{ marginTop: 16 }}>Access Denied</ThemedText>
-            <ThemedText style={{ textAlign: 'center', opacity: 0.6, marginTop: 8 }}>You don't have permission to view staff enrollment data</ThemedText>
+            <ThemedText style={{ textAlign: 'center', opacity: 0.6, marginTop: 8 }}>You don&apos;t have permission to view staff enrollment data</ThemedText>
           </View>
         </ScreenLayout>
       }

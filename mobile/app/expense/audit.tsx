@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -46,7 +47,7 @@ function AuditLogItem({ item, colors, theme }: { item: ExpenseAuditLog; colors: 
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
   const color = getActionColor(item.action);
   const timestamp = item.created_at || item.timestamp;
-  const username = item.actor_username || item.user_id || '—';
+  const username = item.actor_username || '—';
   const role = item.actor_role || item.user_role || '—';
   const notes = item.action_notes || item.notes;
 
@@ -56,9 +57,9 @@ function AuditLogItem({ item, colors, theme }: { item: ExpenseAuditLog; colors: 
         <View style={[styles.actionBadge, { backgroundColor: color + '20' }]}>
           <Text style={[styles.actionText, { color }]}>{item.action?.toUpperCase()}</Text>
         </View>
-        {item.action_category && (
+        {!!item.action_category && (
           <View style={[styles.catBadge, { backgroundColor: borderCol }]}>
-            <Text style={[styles.catText, { color: colors['muted-foreground'] }]}>{item.action_category}</Text>
+            <Text style={[styles.catText, { color: colors['muted-foreground'] }]}>{String(item.action_category).charAt(0).toUpperCase() + String(item.action_category).slice(1)}</Text>
           </View>
         )}
         <Text style={[styles.timestamp, { color: colors['muted-foreground'] }]}>{formatDate(timestamp)}</Text>
@@ -72,7 +73,7 @@ function AuditLogItem({ item, colors, theme }: { item: ExpenseAuditLog; colors: 
         <Text style={[styles.notes, { color: colors['muted-foreground'] }]} numberOfLines={2}>{notes}</Text>
       ) : null}
       <Text style={[styles.txnId, { color: colors['muted-foreground'] }]} numberOfLines={1}>
-        Txn: {item.transaction_id}
+        Transaction ref: {String(item.transaction_id ?? '').slice(-8).toUpperCase() || '—'}
       </Text>
     </View>
   );
@@ -91,7 +92,8 @@ function ExpenseAuditScreenContent() {
   const chipBg = theme === 'dark' ? '#1a1a2e' : '#f1f5f9';
 
   const categoryParam = actionFilter === 'All' ? undefined : actionFilter;
-  const { data: raw, isLoading } = useExpenseGlobalAuditLogsProtected({
+  const [refreshing, setRefreshing] = useState(false);
+  const { data: raw, isLoading, refetch } = useExpenseGlobalAuditLogsProtected({
     limit: 100,
     action_category: categoryParam,
   });
@@ -171,7 +173,7 @@ function ExpenseAuditScreenContent() {
                 placeholderTextColor={colors['muted-foreground']}
                 value={dateFrom}
                 onChangeText={setDateFrom}
-                keyboardType="numeric"
+                keyboardType="numbers-and-punctuation"
               />
             </View>
             <View style={styles.dateField}>
@@ -182,7 +184,7 @@ function ExpenseAuditScreenContent() {
                 placeholderTextColor={colors['muted-foreground']}
                 value={dateTo}
                 onChangeText={setDateTo}
-                keyboardType="numeric"
+                keyboardType="numbers-and-punctuation"
               />
             </View>
             {hasDateFilter && (
@@ -207,6 +209,8 @@ function ExpenseAuditScreenContent() {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chipsRow}
+        keyboardShouldPersistTaps="handled"
+        style={{ flexGrow: 0 }}
       >
         {ACTION_CATEGORIES.map(cat => {
           const active = actionFilter === cat;
@@ -225,7 +229,22 @@ function ExpenseAuditScreenContent() {
       </ScrollView>
 
       {/* List */}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={ORANGE}
+            onRefresh={async () => {
+              setRefreshing(true);
+              try { await refetch(); } finally { setRefreshing(false); }
+            }}
+          />
+        }
+      >
         {isLoading ? (
           <View style={styles.centered}>
             <ActivityIndicator color={ORANGE} />
@@ -249,11 +268,11 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: 'row', gap: 8 },
   searchBox: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, height: 38,
+    borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, height: 44,
   },
   searchInput: { flex: 1, fontSize: 13, padding: 0 },
   dateToggleBtn: {
-    width: 38, height: 38, borderRadius: 10, borderWidth: 1,
+    width: 44, height: 44, borderRadius: 10, borderWidth: 1,
     justifyContent: 'center', alignItems: 'center',
   },
   datePanel: {
@@ -265,16 +284,16 @@ const styles = StyleSheet.create({
   dateLabel: { fontSize: 11, fontWeight: '600', marginBottom: 4 },
   dateInput: {
     borderWidth: 1, borderRadius: 8, paddingHorizontal: 10,
-    paddingVertical: 8, fontSize: 13,
+    paddingVertical: 12, fontSize: 13,
   },
   clearDateBtn: {
-    height: 36, paddingHorizontal: 12, borderWidth: 1,
+    height: 44, paddingHorizontal: 12, borderWidth: 1,
     borderRadius: 8, justifyContent: 'center', alignItems: 'center',
   },
   filterSummary: { fontSize: 11, fontWeight: '600', marginTop: 6 },
   chipsRow: { paddingHorizontal: 16, gap: 8, paddingBottom: 10 },
   chip: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1,
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderWidth: 1,
   },
   chipText: { fontSize: 12, fontWeight: '600' },
   listContent: { padding: 16, paddingTop: 4, paddingBottom: 32, gap: 10 },

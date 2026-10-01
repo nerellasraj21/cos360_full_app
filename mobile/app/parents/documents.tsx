@@ -17,7 +17,7 @@ function ParentDocumentsScreenContent() {
   const cardBg = theme === 'dark' ? '#1a1a2e' : '#ffffff';
   const borderCol = theme === 'dark' ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
 
-  const { data: certs, isLoading } = useQuery({
+  const { data: certs, isLoading, isRefetching, refetch } = useQuery({
     queryKey: ['parentCertificates', selectedStudent?.id],
     queryFn: () => studentCertificatesApi.myChildCertificates(selectedStudent!.id),
     enabled: !!selectedStudent?.id,
@@ -65,6 +65,8 @@ function ParentDocumentsScreenContent() {
       <FlatList
         data={certs ?? []}
         keyExtractor={(item) => item.id}
+        refreshing={isRefetching}
+        onRefresh={refetch}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -83,18 +85,18 @@ function ParentDocumentsScreenContent() {
               <Text style={[styles.docName, { color: colors.foreground }]} numberOfLines={1}>
                 {item.type_name}
               </Text>
-              {item.issue_date && (
+              {!!item.issue_date && (
                 <Text style={[styles.docMeta, { color: colors['muted-foreground'] }]}>
                   Issued: {item.issue_date}
                 </Text>
               )}
-              {item.remarks && (
+              {!!item.remarks && (
                 <Text style={[styles.docMeta, { color: colors['muted-foreground'] }]} numberOfLines={1}>
                   {item.remarks}
                 </Text>
               )}
             </View>
-            {item.file_path && (
+            {!!item.file_path && (
               <TouchableOpacity
                 style={styles.dlBtn}
                 onPress={() => handleDownload(item.id)}
@@ -129,7 +131,7 @@ const styles = StyleSheet.create({
   docName: { fontSize: 14, fontWeight: '600', marginBottom: 3 },
   docMeta: { fontSize: 12, lineHeight: 17 },
   dlBtn: {
-    width: 36, height: 36, borderRadius: 10,
+    width: 44, height: 44, borderRadius: 12,
     backgroundColor: '#556ee618', justifyContent: 'center', alignItems: 'center',
   },
 });

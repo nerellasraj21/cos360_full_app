@@ -83,6 +83,7 @@ export default function FeeMappingsScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.tabBar}
+          keyboardShouldPersistTaps="handled"
           style={styles.tabBarWrapper}
         >
           {tabs.map(t => {
@@ -179,8 +180,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 12,
+    borderRadius: 22,
     borderWidth: 1,
   },
   tabText: { fontSize: 12, fontWeight: '600' },

@@ -69,7 +69,7 @@ Model: `docs/permissions.md`. Single source: `useAuth().hasPermission(resource, 
 
 - The backend menu uses **web paths**. `components/navigation/menuMap.ts` `WEB_TO_MOBILE` / `mapPath()` translate them for the drawer and hubs, so a new screen reachable from the menu needs an entry there.
 - The Masters hub (and the student/parent sections of the Fees hub) render from the backend menu, with a permission-filtered fallback list for cold start. The Transport hub and admin Fee sections are hardcoded lists. Only show sections that the backend menu (and web dashboard) actually has.
-- Tab screens and most sub-screens use `AppLayout title="..."` (header + bottom nav, `showFooter`). `ScreenLayout` (no bottom nav, `headerRight` slot for actions like "+ Add") is used by a few admin screens. `AppHeader` has no back button; sub-screens rely on the stack or system back.
+- Every module folder under `app/` has a `_layout.tsx` with `headerShown: false` (the root Stack would otherwise draw a native header above each screen's own `AppHeader`); new module folders need one too. Tab screens and most sub-screens use `AppLayout title="..."` (header + bottom nav, `showFooter`). `ScreenLayout` (no bottom nav, `headerRight` slot for actions like "+ Add") is used by a few admin screens. `AppHeader` has no back button; sub-screens rely on the stack or system back.
 - Typed routes: navigate with `router.push('/transport/routes')`. Hub-to-tab links use `'/(tabs)/masters'`.
 
 ## UI conventions
@@ -107,7 +107,7 @@ Android auto-commits and dismisses. iOS (`components/ui/ios-date-picker-modal.ts
 
 **Taps swallowed in ScrollViews:** a `ScrollView` holding forms or action buttons (especially nested vertical + horizontal ones) needs `keyboardShouldPersistTaps="handled"`, or taps on Edit/Delete/Save do nothing.
 
-**Authenticated downloads:** use `FileSystem.downloadAsync(url, localUri, { headers })` from `expo-file-system/legacy` with the `Authorization` header only (see `downloadAuthenticatedFile` in `app/exam/hall-tickets/[examId].tsx`). `Linking.openURL` can't send headers and returns 401 on protected endpoints. `app/exam/hall-ticket-download.tsx` still uses `Linking.openURL`, which is a known bug.
+**Authenticated downloads:** use `FileSystem.downloadAsync(url, localUri, { headers })` from `expo-file-system/legacy` with the `Authorization` header only (see `downloadAuthenticatedFile` in `app/exam/hall-tickets/[examId].tsx`). `Linking.openURL` can't send headers and returns 401 on protected endpoints.
 
 **Query keys:** use stable primitives (`['subjects', p?.academic_year_id, p?.active_only]`), not a whole params object built each render. Every mutation invalidates the affected list keys.
 

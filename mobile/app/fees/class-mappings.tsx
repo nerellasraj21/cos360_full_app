@@ -3,8 +3,6 @@ import { ThemedView } from '@/components/themed-view';
 import { AppLayout } from '@/components';
 import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import CustomDropdown from '@/components/ui/dropdown';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { FeeClassMappingResponse, FeeClassMappingRequest, feeClassMappingsApi, feeClassMappingTermAmountsApi, feeStudentMappingsApi, feeTypesApi, feeTermsApi } from '@/src/api/fees';
 import { classSectionsApi } from '@/src/api/masters';
 import { studentAdmissionsApi } from '@/src/api/students';
@@ -20,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useState, useMemo, useEffect } from 'react';
-import { useAuth } from '@/contexts';
+import { useAuth, useTheme } from '@/contexts';
 import { roleBlocksFees } from '@/src/lib/menuUtils';
 import { useAcademicYear } from '@/contexts/AcademicYearContext';
 import {
@@ -29,6 +27,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Switch,
@@ -184,7 +183,7 @@ function TermAmountsModal({
               <ThemedText style={{ color: colors['muted-foreground'] }}>Loading term amounts...</ThemedText>
             </View>
           ) : (
-            <ScrollView style={taStyles.body} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, gap: 12 }}>
+            <ScrollView style={taStyles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, gap: 12 }}>
 
               {/* Info card — Fee Type / Total Amount / Number of Terms / Term Structure */}
               <View style={[taStyles.infoCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
@@ -328,7 +327,7 @@ const taStyles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'flex-start', padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, gap: 10 },
   title: { fontSize: 17, fontWeight: '700' },
   subtitle: { fontSize: 12, marginTop: 2 },
-  closeBtn: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  closeBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   loadingBox: { padding: 32, alignItems: 'center', justifyContent: 'center', minHeight: 120 },
   // Info card
   infoCard: { borderRadius: 10, padding: 14, borderWidth: StyleSheet.hairlineWidth },
@@ -341,7 +340,7 @@ const taStyles = StyleSheet.create({
   sectionLabel: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 },
   // Distribution buttons
   distributionBtns: { flexDirection: 'row', gap: 10 },
-  distBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, gap: 6 },
+  distBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 13, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, gap: 6 },
   distBtnText: { fontSize: 13, fontWeight: '600' },
   // Term rows
   termRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth },
@@ -358,8 +357,8 @@ const taStyles = StyleSheet.create({
   validText: { fontSize: 13, fontWeight: '700' },
   // Footer
   footer: { flexDirection: 'row', gap: 12, padding: 16, borderTopWidth: StyleSheet.hairlineWidth },
-  cancelBtn: { flex: 1, padding: 12, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
-  saveBtn: { flex: 2, padding: 12, borderRadius: 8, alignItems: 'center' },
+  cancelBtn: { flex: 1, padding: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+  saveBtn: { flex: 2, padding: 14, borderRadius: 8, alignItems: 'center' },
 });
 
 // ─── Mapping card with expandable term amounts ──────────────────────────────
@@ -462,7 +461,7 @@ function MappingCard({
           >
             <Ionicons name="grid-outline" size={16} color="#6366F1" />
           </TouchableOpacity>
-          <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS}>
+          <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS} fallback={null} loadingFallback={null}>
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: colors.primary + '18' }]}
               onPress={onEdit}
@@ -471,7 +470,7 @@ function MappingCard({
               <Ionicons name="create-outline" size={16} color={colors.primary} />
             </TouchableOpacity>
           </UpdatePermissionGuard>
-          <DeletePermissionGuard resource={PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS}>
+          <DeletePermissionGuard resource={PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS} fallback={null} loadingFallback={null}>
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: '#EF444422' }]}
               onPress={onDelete}
@@ -484,7 +483,7 @@ function MappingCard({
       </View>
 
       {/* Mandatory toggle — web parity: PATCH toggle-mandatory + bulk apply to class */}
-      <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS}>
+      <UpdatePermissionGuard resource={PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS} fallback={null} loadingFallback={null}>
         <View style={[styles.mandatoryRow, { borderTopColor: colors.border }]}>
           <View style={{ flex: 1 }}>
             <ThemedText style={[styles.mandatoryLabel, { color: colors.foreground }]}>
@@ -563,9 +562,7 @@ export function ClassMappingsContent() {
   const [searchQuery, setSearchQuery] = useState('');
 
 
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? 'dark' : 'light';
-  const colors = Colors[theme];
+  const { colors } = useTheme();
   const queryClient = useQueryClient();
   const { activeAcademicYearId } = useAcademicYear();
   const { showSuccess, showError } = useToastContext();
@@ -576,7 +573,7 @@ export function ClassMappingsContent() {
     queryFn: () => classSectionsApi.getClassSections({ active_only: true }),
   });
 
-  const { data: mappingsRaw = [], isLoading, error } = useQuery({
+  const { data: mappingsRaw = [], isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['feeClassMappings', activeAcademicYearId],
     queryFn: () => feeClassMappingsApi.getFeeClassMappings(activeAcademicYearId ?? undefined),
   });
@@ -903,7 +900,7 @@ export function ClassMappingsContent() {
     <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS}>
       <ThemedView style={styles.container}>
         <View style={styles.header}>
-          <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS}>
+          <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_CLASS_MAPPINGS} fallback={null} loadingFallback={null}>
             <TouchableOpacity
               style={[styles.addButton, { backgroundColor: colors.primary }]}
               onPress={handleCreate}
@@ -950,6 +947,8 @@ export function ClassMappingsContent() {
         renderItem={renderMappingItem}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={colors.primary} />}
         ListEmptyComponent={
           <ThemedView style={styles.emptyContainer}>
             <Ionicons name="school-outline" size={48} color={colors['muted-foreground']} />
@@ -967,7 +966,7 @@ export function ClassMappingsContent() {
         transparent={true}
         onRequestClose={() => setIsModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ThemedView style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
               <ThemedText type="subtitle">
@@ -979,7 +978,7 @@ export function ClassMappingsContent() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.formScroll}>
+            <ScrollView style={styles.formScroll} keyboardShouldPersistTaps="handled">
               <View style={styles.form}>
                 <ThemedText style={styles.label}>Class *</ThemedText>
                 <CustomDropdown
@@ -988,7 +987,7 @@ export function ClassMappingsContent() {
                   onChange={(value) => setFormData(prev => ({ ...prev, class_id: value as string }))}
                   placeholder="Select class"
                 />
-                {errors.class_id && <ThemedText style={[styles.errorText, { color: colors.destructive }]}>{errors.class_id}</ThemedText>}
+                {!!errors.class_id && <ThemedText style={[styles.errorText, { color: colors.destructive }]}>{errors.class_id}</ThemedText>}
 
                 <ThemedText style={styles.label}>Fee Type *</ThemedText>
                 <CustomDropdown
@@ -997,7 +996,7 @@ export function ClassMappingsContent() {
                   onChange={(value) => setFormData(prev => ({ ...prev, fee_type_id: value as string }))}
                   placeholder="Select fee type"
                 />
-                {errors.fee_type_id && <ThemedText style={[styles.errorText, { color: colors.destructive }]}>{errors.fee_type_id}</ThemedText>}
+                {!!errors.fee_type_id && <ThemedText style={[styles.errorText, { color: colors.destructive }]}>{errors.fee_type_id}</ThemedText>}
 
                 <ThemedText style={styles.label}>Total Fee *</ThemedText>
                 <TextInput
@@ -1015,7 +1014,7 @@ export function ClassMappingsContent() {
                   placeholderTextColor={colors['muted-foreground']}
                   keyboardType="numeric"
                 />
-                {errors.total_fee && <ThemedText style={[styles.errorText, { color: colors.destructive }]}>{errors.total_fee}</ThemedText>}
+                {!!errors.total_fee && <ThemedText style={[styles.errorText, { color: colors.destructive }]}>{errors.total_fee}</ThemedText>}
 
                 <ThemedText style={[styles.hintText, { color: colors['muted-foreground'] }]}>
                   After saving, use the grid icon on the mapping card to split this total into term-wise amounts.
@@ -1054,7 +1053,7 @@ export function ClassMappingsContent() {
               </TouchableOpacity>
             </View>
           </ThemedView>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Term Amounts Modal — single top-level instance shared by every row
@@ -1147,8 +1146,8 @@ const styles = StyleSheet.create({
   },
   addButton: {
     flexDirection: 'row',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1211,6 +1210,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
+    minWidth: 40,
+    minHeight: 40,
     padding: 8,
     borderRadius: 6,
     alignItems: 'center',
@@ -1289,14 +1290,14 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
   },
   submitButton: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     alignItems: 'center',
   },

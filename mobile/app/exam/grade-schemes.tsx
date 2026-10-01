@@ -4,7 +4,10 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -73,7 +76,6 @@ export default function GradeSchemesScreen() {
   const cardBg = isDark ? '#1a1a2e' : '#ffffff';
   const borderCol = isDark ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
   const inputBg = isDark ? '#0f0f23' : '#f8fafc';
-  const altRowBg = isDark ? 'rgba(255,255,255,0.03)' : '#f9fafb';
 
   const canCreate = hasPermission?.('exams', 'create');
   const canUpdate = hasPermission?.('exams', 'update');
@@ -81,7 +83,7 @@ export default function GradeSchemesScreen() {
 
   // ── Query ────────────────────────────────────────────────────────────────
 
-  const { data: schemes = [], isLoading } = useQuery({
+  const { data: schemes = [], isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['grade-schemes', 'exam'],
     queryFn: () => gradeSchemeApi.listExamSchemes(),
   });
@@ -212,7 +214,12 @@ export default function GradeSchemesScreen() {
           ) : null}
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
+        >
           {isLoading ? (
             <View style={styles.emptyView}>
               <ActivityIndicator size="large" color="#556ee6" />
@@ -289,42 +296,30 @@ export default function GradeSchemesScreen() {
                       {item.bands.length === 0 ? (
                         <Text style={[styles.noBandsText, { color: colors['muted-foreground'] }]}>No grade bands defined.</Text>
                       ) : (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                          <View>
-                            <View style={[styles.bandTableHeader, { borderBottomColor: borderCol }]}>
-                              <Text style={[styles.bandHeaderCell, styles.bandColPercent]}>From %</Text>
-                              <Text style={[styles.bandHeaderCell, styles.bandColPercent]}>To %</Text>
-                              <Text style={[styles.bandHeaderCell, styles.bandColGrade]}>Grade</Text>
-                              <Text style={[styles.bandHeaderCell, styles.bandColGpa]}>GPA</Text>
-                              <Text style={[styles.bandHeaderCell, styles.bandColRemarks]}>Remarks</Text>
-                              <Text style={[styles.bandHeaderCell, styles.bandColPass]}>Pass?</Text>
-                            </View>
-                            {item.bands.map((b, i) => (
-                              <View key={i} style={[styles.bandTableRow, { borderTopColor: borderCol }]}>
-                                <Text style={[styles.bandCell, styles.bandColPercent, { color: colors.foreground }]}>{b.from_percent}</Text>
-                                <Text style={[styles.bandCell, styles.bandColPercent, { color: colors.foreground }]}>{b.to_percent}</Text>
-                                <View style={styles.bandColGrade}>
-                                  <View style={styles.gradeBadge}>
-                                    <Text style={styles.gradeBadgeText}>{b.grade_label}</Text>
-                                  </View>
-                                </View>
-                                <Text style={[styles.bandCell, styles.bandColGpa, { color: colors.foreground }]}>
-                                  {b.gpa != null ? Number(b.gpa).toFixed(1) : '—'}
-                                </Text>
-                                <Text style={[styles.bandCell, styles.bandColRemarks, { color: colors['muted-foreground'] }]} numberOfLines={1}>
-                                  {b.remarks || '—'}
-                                </Text>
-                                <View style={styles.bandColPass}>
-                                  <View style={[styles.passBadge, { backgroundColor: b.is_pass ? '#10B98120' : '#EF444420' }]}>
-                                    <Text style={{ color: b.is_pass ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: '700' }}>
-                                      {b.is_pass ? 'Pass' : 'Fail'}
-                                    </Text>
-                                  </View>
-                                </View>
+                        <View>
+                          {item.bands.map((b, i) => (
+                            <View key={i} style={[styles.bandCardRow, { borderTopColor: borderCol }]}>
+                              <View style={styles.gradeBadge}>
+                                <Text style={styles.gradeBadgeText}>{b.grade_label}</Text>
                               </View>
-                            ))}
-                          </View>
-                        </ScrollView>
+                              <View style={{ flex: 1 }}>
+                                <Text style={[styles.bandCell, { color: colors.foreground }]}>
+                                  {b.from_percent}% to {b.to_percent}%{b.gpa != null ? `  |  GPA ${Number(b.gpa).toFixed(1)}` : ''}
+                                </Text>
+                                {!!b.remarks && (
+                                  <Text style={[styles.bandCell, { color: colors['muted-foreground'], fontSize: 12 }]} numberOfLines={2}>
+                                    {b.remarks}
+                                  </Text>
+                                )}
+                              </View>
+                              <View style={[styles.passBadge, { backgroundColor: b.is_pass ? '#10B98120' : '#EF444420' }]}>
+                                <Text style={{ color: b.is_pass ? '#10B981' : '#EF4444', fontSize: 11, fontWeight: '700' }}>
+                                  {b.is_pass ? 'Pass' : 'Fail'}
+                                </Text>
+                              </View>
+                            </View>
+                          ))}
+                        </View>
                       )}
                     </View>
                   )}
@@ -337,7 +332,7 @@ export default function GradeSchemesScreen() {
 
       {/* Create / Edit Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={closeModal}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalSheet, { backgroundColor: cardBg }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
@@ -349,7 +344,7 @@ export default function GradeSchemesScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={[styles.label, { color: colors.foreground }]}>Name *</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: inputBg, color: colors.foreground, borderColor: borderCol }]}
@@ -392,8 +387,7 @@ export default function GradeSchemesScreen() {
                 <View key={idx} style={[styles.bandRow, { backgroundColor: inputBg, borderColor: borderCol }]}>
                   <View style={styles.bandRowTop}>
                     <Text style={[styles.bandIdx, { color: colors['muted-foreground'] }]}>Band {idx + 1}</Text>
-                    <TouchableOpacity onPress={() => removeBand(idx)}
-              accessibilityLabel="Delete">
+                    <TouchableOpacity onPress={() => removeBand(idx)} accessibilityLabel="Delete" hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}>
                       <Ionicons name="trash-outline" size={16} color="#EF4444" />
                     </TouchableOpacity>
                   </View>
@@ -474,7 +468,7 @@ export default function GradeSchemesScreen() {
               </TouchableOpacity>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
       <ConfirmModal {...modalProps} />
     </AppLayout>
@@ -494,7 +488,7 @@ const styles = StyleSheet.create({
   addButton: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: '#556ee6', borderRadius: 8,
-    paddingHorizontal: 12, height: 36,
+    paddingHorizontal: 12, height: 44,
   },
   addButtonText: { color: 'white', fontWeight: '600', fontSize: 13 },
 
@@ -502,7 +496,7 @@ const styles = StyleSheet.create({
   filtersLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   filtersLabelText: { fontSize: 13, fontWeight: '500' },
   searchBar: {
-    flexDirection: 'row', alignItems: 'center', height: 36,
+    flexDirection: 'row', alignItems: 'center', height: 44,
     paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, marginBottom: 14, gap: 8,
   },
   searchInput: { flex: 1, fontSize: 14, padding: 0 },
@@ -522,20 +516,13 @@ const styles = StyleSheet.create({
   bandsBadge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, marginTop: 6 },
   bandsBadgeText: { fontSize: 11, fontWeight: '600' },
   cardActions: { flexDirection: 'row', gap: 4, marginLeft: 8 },
-  iconBtn: { padding: 6 },
+  iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 
   // Expanded band table
   expandedPanel: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 12 },
   noBandsText: { fontSize: 13, textAlign: 'center', paddingVertical: 8 },
-  bandTableHeader: { flexDirection: 'row', borderBottomWidth: 1, paddingBottom: 8, marginBottom: 4 },
-  bandHeaderCell: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, opacity: 0.6, color: '#94a3b8' },
-  bandTableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
+  bandCardRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
   bandCell: { fontSize: 13 },
-  bandColPercent: { width: 64 },
-  bandColGrade: { width: 72 },
-  bandColGpa: { width: 56 },
-  bandColRemarks: { width: 130 },
-  bandColPass: { width: 70 },
   gradeBadge: { alignSelf: 'flex-start', borderWidth: 1, borderColor: '#556ee650', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   gradeBadgeText: { fontSize: 12, fontWeight: '700', color: '#556ee6' },
   passBadge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
@@ -554,7 +541,7 @@ const styles = StyleSheet.create({
   toggleBox: { width: 24, height: 24, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   toggleLabel: { fontSize: 14 },
   bandsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 8 },
-  addBandBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  addBandBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 },
   addBandBtnText: { color: '#556ee6', fontSize: 13, fontWeight: '600' },
   bandRow: { borderRadius: 10, borderWidth: 1, padding: 10, marginBottom: 8 },
   bandRowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
@@ -566,7 +553,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   passToggle: {
-    alignSelf: 'flex-end', paddingHorizontal: 10, paddingVertical: 8,
+    alignSelf: 'flex-end', paddingHorizontal: 10, minHeight: 36,
     borderRadius: 6, marginBottom: 0, justifyContent: 'center',
   },
   saveBtn: {

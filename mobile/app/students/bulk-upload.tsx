@@ -190,7 +190,7 @@ function StudentBulkUploadScreenContent() {
         </View>
 
         {/* Results */}
-        {result && (
+        {!!result && (
           <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
             <Text style={[styles.stepTitle, { color: colors.foreground, marginBottom: 10 }]}>Results</Text>
             <View style={styles.resultRow}>

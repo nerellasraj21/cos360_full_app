@@ -308,7 +308,7 @@ function FeeReportsScreenContent() {
                     {row.class_section} · {row.fee_category} · {row.fee_type}
                   </Text>
                   <Text style={[styles.rowSub, { color: colors['muted-foreground'] }]}>
-                    {row.payment_method} · {row.transaction_date}
+                    {String(row.payment_method ?? '').replace(/_/g, ' ')} · {row.transaction_date}
                   </Text>
                   <Text style={[styles.rowSub, { color: colors['muted-foreground'] }]}>
                     #{row.transaction_number}
@@ -370,13 +370,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700', flex: 1 },
-  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 11, borderRadius: 8 },
   exportBtnText: { color: 'white', fontSize: 12, fontWeight: '700' },
   tabBar: { flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: 8 },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 12 },
   tabText: { fontSize: 13, fontWeight: '600' },
   filterBar: { flexDirection: 'row', gap: 8, padding: 10, borderBottomWidth: 1 },
-  filterChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
+  filterChip: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 20, borderWidth: 1 },
   filterChipText: { fontSize: 11, fontWeight: '600' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   loadingText: { fontSize: 14 },
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
   rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   rowTitle: { fontSize: 13, fontWeight: '600', flex: 1, marginRight: 8 },
   rowAmount: { fontSize: 14, fontWeight: '700' },
-  rowSub: { fontSize: 12, lineHeight: 18 },
+  rowSub: { fontSize: 12, lineHeight: 18, textTransform: 'capitalize' },
   overdueBadge: {
     alignSelf: 'flex-start', fontSize: 11, fontWeight: '600',
     paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginTop: 4,

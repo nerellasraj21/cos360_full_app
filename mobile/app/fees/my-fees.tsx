@@ -30,15 +30,15 @@ function MyFeesScreenContent() {
   // types drop off the list entirely), so "total fee" here is what was ever
   // due across those items, not the full fee structure total.
   const items      = summary?.outstanding_items ?? [];
-  const totalFee   = items.reduce((sum, i) => sum + (i.amount_due ?? 0), 0);
-  const totalPaid  = items.reduce((sum, i) => sum + (i.amount_paid ?? 0), 0);
-  const totalDue   = summary?.total_outstanding ?? 0;
+  const totalFee   = items.reduce((sum, i) => sum + Number(i.amount_due ?? 0), 0);
+  const totalPaid  = items.reduce((sum, i) => sum + Number(i.amount_paid ?? 0), 0);
+  const totalDue   = Number(summary?.total_outstanding ?? 0);
   const paidPct    = totalFee > 0 ? Math.round((totalPaid / totalFee) * 100) : 0;
   const progressW  = `${paidPct}%`;
 
   return (
     <AppLayout title="My Fees">
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
         {/* Overview card */}
         <View style={[styles.overviewCard, { backgroundColor: '#556ee6' }]}>
@@ -74,14 +74,14 @@ function MyFeesScreenContent() {
           <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>Fee Breakdown</Text>
             {items.map((item, i) => {
-              const due = item.outstanding_amount ?? 0;
+              const due = Number(item.outstanding_amount ?? 0);
               return (
                 <View key={`${item.fee_type_id}-${item.fee_term_id}-${i}`} style={[styles.feeRow, { borderBottomColor: borderCol }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.feeType, { color: colors.foreground }]} numberOfLines={1}>
                       {item.fee_type_name}
                     </Text>
-                    {item.fee_term_name && (
+                    {!!item.fee_term_name && (
                       <Text style={[styles.feeMeta, { color: colors['muted-foreground'] }]}>
                         {item.fee_term_name}
                       </Text>
@@ -89,7 +89,7 @@ function MyFeesScreenContent() {
                   </View>
                   <View style={styles.feeAmts}>
                     <Text style={{ fontSize: 13, fontWeight: '600', color: '#10B981' }}>
-                      ₹{(item.amount_paid ?? 0).toLocaleString('en-IN')}
+                      ₹{Number(item.amount_paid ?? 0).toLocaleString('en-IN')}
                     </Text>
                     {due > 0 && (
                       <Text style={{ fontSize: 11, color: '#EF4444' }}>
@@ -115,7 +115,7 @@ function MyFeesScreenContent() {
                     #{r.receipt_number}
                   </Text>
                   <Text style={[styles.receiptDate, { color: colors['muted-foreground'] }]}>
-                    {r.issued_date}
+                    {r.issued_date ? new Date(r.issued_date).toLocaleDateString('en-IN') : ''}
                   </Text>
                 </View>
               </View>

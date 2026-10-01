@@ -308,21 +308,21 @@ function AdminCertificates() {
   }, [allStudentsData, searchInput]);
 
   const classOptions = useMemo(() =>
-    (classesData as any[]).map((c: any) => ({ label: c.name, value: c.id })), [classesData]);
+    (classesData as any[]).map((c: any) => ({ label: c.name || '', value: c.id })), [classesData]);
   const sectionOptions = useMemo(() =>
-    (sectionsData as any[]).map((s: any) => ({ label: s.name, value: s.id })), [sectionsData]);
+    (sectionsData as any[]).map((s: any) => ({ label: s.name || '', value: s.id })), [sectionsData]);
   const cascadeStudentOptions = useMemo(() =>
     (cascadeStudents as any[]).map((s: any) => ({
-      label: s.admission_no ? `${s.full_name} (${s.admission_no})` : s.full_name,
+      label: s.admission_no ? `${s.full_name} (${s.admission_no})` : s.full_name || '',
       value: s.student_id,
     })), [cascadeStudents]);
   const typeOptions = useMemo(() =>
-    (typesData as any[]).map((t: any) => ({ label: t.name, value: t.id })), [typesData]);
+    (typesData as any[]).map((t: any) => ({ label: t.name || '', value: t.id })), [typesData]);
 
   const templateOptions = useMemo(() =>
     (templatesData as any[])
       .filter((t: any) => t.is_active === true || t.is_active === 'True')
-      .map((t: any) => ({ label: t.name, value: t.id })),
+      .map((t: any) => ({ label: t.name || '', value: t.id })),
   [templatesData]);
 
   // ── Selection handlers ──────────────────────────────────────────

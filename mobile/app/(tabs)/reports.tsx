@@ -146,14 +146,6 @@ export default function ReportsScreen() {
           </View>
         </View>
 
-        {/* Coming soon notice */}
-        <View style={[styles.noticeCard, { backgroundColor: PRIMARY + '12', borderColor: PRIMARY + '30' }]}>
-          <Ionicons name="time-outline" size={18} color={PRIMARY} />
-          <Text style={[styles.noticeText, { color: PRIMARY }]}>
-            Unified reporting dashboard coming soon. Module-specific reports available below.
-          </Text>
-        </View>
-
         {/* Section label */}
         <Text style={[styles.sectionLabel, { color: colors['muted-foreground'] }]}>REPORT SECTIONS</Text>
 
@@ -221,11 +213,6 @@ const styles = StyleSheet.create({
   },
   bannerTitle: { color: 'white', fontSize: 18, fontWeight: '700', marginBottom: 2 },
   bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 11, lineHeight: 16 },
-  noticeCard: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-    borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 20,
-  },
-  noticeText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '500' },
   sectionLabel: {
     fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 12,
   },

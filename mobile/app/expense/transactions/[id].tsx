@@ -21,7 +21,9 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { getValidAccessToken } from '../../../services/authUtils';
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -69,7 +71,7 @@ export default function ExpenseTransactionDetailScreen() {
 
   const getTypeName = (typeId: string) => {
     const found = (typeDropdown as ExpenseTypeDropdown[]).find((t) => t.id === typeId);
-    return found?.name ?? typeId;
+    return found?.name ?? '—';
   };
 
   const getStatusColor = (status: string) => STATUS_COLORS[status] ?? colors['muted-foreground'];
@@ -153,7 +155,7 @@ export default function ExpenseTransactionDetailScreen() {
       const headers: Record<string, string> = {};
       if (token) headers.Authorization = `Bearer ${token}`;
       const url = `${API_BASE_URL}/expense/attachments/${attachmentId}/download`;
-      const localUri = FileSystem.documentDirectory + filename;
+      const localUri = FileSystem.documentDirectory + filename.replace(/[^\w.\-]/g, '_');
       const result = await FileSystem.downloadAsync(url, localUri, { headers });
       await Sharing.shareAsync(result.uri);
     } catch {
@@ -194,13 +196,13 @@ export default function ExpenseTransactionDetailScreen() {
   return (
     <ReadPermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS}>
       <AppLayout title="Transaction Details">
-        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
           {/* Header card */}
           <ThemedView style={[styles.headerCard, { backgroundColor: colors.card }]}>
             <View style={styles.headerTop}>
               <ThemedText type="subtitle" style={{ flex: 1 }}>
-                {transaction.vendor_name ?? 'N/A'}
+                {transaction.vendor_name || 'N/A'}
               </ThemedText>
               <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
                 <ThemedText style={[styles.statusText, { color: statusColor }]}>
@@ -212,7 +214,7 @@ export default function ExpenseTransactionDetailScreen() {
               ₹{Number(transaction.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </ThemedText>
             <ThemedText style={[styles.date, { color: colors['muted-foreground'] }]}>
-              {new Date(transaction.transaction_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+              {transaction.transaction_date ? new Date(transaction.transaction_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
             </ThemedText>
           </ThemedView>
 
@@ -324,7 +326,7 @@ export default function ExpenseTransactionDetailScreen() {
           </View>
 
           {transaction.status === 'pending' && (
-            <ApprovePermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_APPROVALS}>
+            <ApprovePermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_APPROVALS} fallback={null} loadingFallback={null}>
               <View style={styles.approvalActions}>
                 <TouchableOpacity
                   style={[styles.actionButton, styles.rejectButton]}
@@ -356,7 +358,7 @@ export default function ExpenseTransactionDetailScreen() {
           transparent
           onRequestClose={() => setUploadModalVisible(false)}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ThemedView style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <ThemedText type="subtitle">Add Attachment</ThemedText>
@@ -422,7 +424,7 @@ export default function ExpenseTransactionDetailScreen() {
                 </TouchableOpacity>
               </View>
             </ThemedView>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Approval Modal */}
@@ -432,7 +434,7 @@ export default function ExpenseTransactionDetailScreen() {
           transparent={true}
           onRequestClose={() => setApprovalModalVisible(false)}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ThemedView style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <ThemedText type="subtitle">
@@ -483,7 +485,7 @@ export default function ExpenseTransactionDetailScreen() {
                 </TouchableOpacity>
               </View>
             </ThemedView>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       </AppLayout>
     </ReadPermissionGuard>
@@ -518,11 +520,11 @@ const styles = StyleSheet.create({
   attachmentInfo: { flex: 1, marginLeft: 12 },
   attachmentName: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
   attachmentMeta: { fontSize: 12 },
-  downloadButton: { padding: 8 },
+  downloadButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   attachmentsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   addAttachmentBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1,
+    paddingHorizontal: 12, paddingVertical: 12, borderRadius: 8, borderWidth: 1,
   },
   addAttachmentText: { fontSize: 13, fontWeight: '600' },
   noAttachmentsText: { fontSize: 13, fontStyle: 'italic', paddingVertical: 8 },
@@ -557,7 +559,7 @@ const styles = StyleSheet.create({
   modalLabel: { marginBottom: 8, fontWeight: '600', fontSize: 16 },
   commentInput: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 16, minHeight: 80 },
   modalActions: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  cancelButton: { flex: 1, padding: 12, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
-  submitButton: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
+  cancelButton: { flex: 1, padding: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+  submitButton: { flex: 1, padding: 14, borderRadius: 8, alignItems: 'center' },
   submitButtonText: { color: 'white', fontWeight: '600' },
 });

@@ -464,7 +464,7 @@ export default function StaffProfileScreen() {
                 Access Denied
               </ThemedText>
               <ThemedText style={styles.designationText}>
-                You don't have permission to view staff profile data
+                You don&apos;t have permission to view staff profile data
               </ThemedText>
             </View>
           </View>

@@ -148,7 +148,7 @@ export default function ProfileTabScreen() {
                   Failed to load profile information
                 </ThemedText>
                 <ThemedText style={[styles.errorSubtext, { color: colors['muted-foreground'] }]}>
-                  {profileQuery.error.message || 'Please try again later'}
+                  {profileQuery.error?.message || 'Please try again later'}
                 </ThemedText>
                 <View style={styles.buttonRow}>
                   <PrimaryButton
@@ -175,7 +175,7 @@ export default function ProfileTabScreen() {
                 Profile not available for your role
               </ThemedText>
               <ThemedText style={[styles.errorSubtext, { color: colors['muted-foreground'] }]}>
-                Role: {role?.name || 'Unknown'}
+                Please contact your administrator.
               </ThemedText>
             </View>
           ) : (

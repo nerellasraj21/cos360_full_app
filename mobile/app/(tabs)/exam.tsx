@@ -103,7 +103,7 @@ export default function ExamScreen() {
 
   const filteredExams = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return q === '' ? exams : exams.filter(e => e.exam_name.toLowerCase().includes(q));
+    return q === '' ? exams : exams.filter(e => (e.exam_name ?? '').toLowerCase().includes(q));
   }, [exams, search]);
 
   const byStatus = (status: ExamStatus) => filteredExams.filter(e => e.status === status);
@@ -240,7 +240,7 @@ export default function ExamScreen() {
 
         {isLoading ? (
           <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
-            <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>Loading exams…</Text>
+            <Text style={[styles.emptyText, { color: colors['muted-foreground'] }]}>Loading exams...</Text>
           </View>
         ) : (<>
           {SECTION_ORDER.map(({ status, label }) => {
@@ -267,11 +267,11 @@ export default function ExamScreen() {
                             <View style={[styles.boardPill, { backgroundColor: colors['muted-foreground'] + '18' }]}>
                               <Text style={[styles.boardText, { color: colors['muted-foreground'] }]}>{exam.board}</Text>
                             </View>
-                            <Text style={[styles.examMeta, { color: colors['muted-foreground'] }]}>{exam.nature}</Text>
+                            <Text style={[styles.examMeta, { color: colors['muted-foreground'] }]}>{(exam.nature ?? '').replace(/_/g, ' ')}</Text>
                           </View>
                         </View>
                         <View style={[styles.statusPill, { backgroundColor: sc.bg }]}>
-                          <Text style={[styles.statusText, { color: sc.text }]}>{exam.status.toUpperCase()}</Text>
+                          <Text style={[styles.statusText, { color: sc.text }]}>{(exam.status ?? '').toUpperCase()}</Text>
                         </View>
                       </View>
                       <View style={styles.examDateRow}>

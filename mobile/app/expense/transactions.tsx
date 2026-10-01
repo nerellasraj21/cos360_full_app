@@ -1,11 +1,10 @@
 ﻿import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
-  Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -27,6 +26,7 @@ import {
 } from '@/hooks/use-expense-protected';
 import type { ExpenseTransaction } from '@/src/types/expense';
 import { ScreenAccessGate } from '@/components/ScreenAccessGate';
+import { useMobilePermission } from '@/src/hooks/useMobilePermission';
 
 const ORANGE = '#F97316';
 
@@ -51,11 +51,17 @@ function ExpenseTransactionsScreenContent() {
   const router = useRouter();
   const { colors, theme } = useTheme();
   const { showSuccess, showError } = useToastContext();
+  const { typeId } = useLocalSearchParams<{ typeId?: string }>();
+  const { hasPermission } = useMobilePermission();
+  const canCreate = hasPermission('expense_transactions', 'create');
+  const canUpdate = hasPermission('expense_transactions', 'update');
+  const canDelete = hasPermission('expense_transactions', 'delete');
+  const [refreshing, setRefreshing] = useState(false);
 
   const [activeTab, setActiveTab] = useState<StatusTab>('all');
   const { confirm, modalProps } = useConfirmModal();
   const [statusFilter, setStatusFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState(typeId ?? '');
   const [vendorFilter, setVendorFilter] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -66,7 +72,7 @@ function ExpenseTransactionsScreenContent() {
   const inputBg = theme === 'dark' ? '#0f0f23' : '#f8fafc';
   const filterBg = theme === 'dark' ? '#13132b' : '#f8fafc';
 
-  const { data: raw, isLoading } = useExpenseTransactionsProtected({
+  const { data: raw, isLoading, refetch } = useExpenseTransactionsProtected({
     status_filter: statusFilter || undefined,
     expense_type_id: typeFilter || undefined,
   });
@@ -104,7 +110,7 @@ function ExpenseTransactionsScreenContent() {
   const handleDelete = (item: ExpenseTransaction) => {
     confirm({
       title: 'Delete Transaction',
-      message: `Delete this transaction of ₹${item.amount}?`,
+      message: `Delete this transaction of ₹${Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}?`,
       confirmLabel: 'Delete',
       destructive: true,
       onConfirm: () =>
@@ -156,28 +162,32 @@ function ExpenseTransactionsScreenContent() {
         </View>
         <View style={styles.txBottom}>
           <Text style={[styles.txDate, { color: colors['muted-foreground'] }]}>
-            {new Date(item.transaction_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+            {item.transaction_date ? new Date(item.transaction_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
           </Text>
           {item.reference_number ? (
             <Text style={[styles.txRef, { color: colors['muted-foreground'] }]}>
               Ref: {item.reference_number}
             </Text>
           ) : null}
-          <View style={{ marginLeft: 'auto', flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-            <TouchableOpacity
-              onPress={() => router.push(`/expense/transactions/edit/${item.id}` as any)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel="Edit"
-            >
-              <Ionicons name="create-outline" size={15} color="#556ee6" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => handleDelete(item)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel="Delete"
-            >
-              <Ionicons name="trash-outline" size={15} color="#EF4444" />
-            </TouchableOpacity>
+          <View style={{ marginLeft: 'auto', flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+            {canUpdate && (
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={() => router.push(`/expense/transactions/edit/${item.id}` as any)}
+                accessibilityLabel="Edit"
+              >
+                <Ionicons name="create-outline" size={18} color="#556ee6" />
+              </TouchableOpacity>
+            )}
+            {canDelete && (
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={() => handleDelete(item)}
+                accessibilityLabel="Delete"
+              >
+                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </TouchableOpacity>
@@ -186,7 +196,21 @@ function ExpenseTransactionsScreenContent() {
 
   return (
     <AppLayout title="Expense Transactions">
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={ORANGE}
+            onRefresh={async () => {
+              setRefreshing(true);
+              try { await refetch(); } finally { setRefreshing(false); }
+            }}
+          />
+        }
+      >
 
         {/* Filters section */}
         <View style={[styles.filtersSection, { backgroundColor: filterBg, borderColor: borderCol }]}>
@@ -275,18 +299,20 @@ function ExpenseTransactionsScreenContent() {
         </View>
 
         {/* New Transaction button */}
-        <View style={styles.newBtnRow}>
-          <TouchableOpacity
-            style={[styles.newBtn, { backgroundColor: '#556ee6' }]}
-            onPress={() => router.push('/expense/transactions/create' as any)}
-          >
-            <Ionicons name="add" size={16} color="white" />
-            <Text style={styles.newBtnText}>New Transaction</Text>
-          </TouchableOpacity>
-        </View>
+        {canCreate && (
+          <View style={styles.newBtnRow}>
+            <TouchableOpacity
+              style={[styles.newBtn, { backgroundColor: '#556ee6' }]}
+              onPress={() => router.push('/expense/transactions/create' as any)}
+            >
+              <Ionicons name="add" size={16} color="white" />
+              <Text style={styles.newBtnText}>New Transaction</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Status tabs */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabsContent}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={styles.tabsScroll} contentContainerStyle={styles.tabsContent}>
           {TABS.map(tab => {
             const active = activeTab === tab.key;
             return (
@@ -353,23 +379,24 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: 'row', gap: 10 },
   filterHalf: { flex: 1 },
   filterDropdownContainer: { marginBottom: 0 },
-  filterDropdown: { height: 40, paddingHorizontal: 12, paddingVertical: 0 },
+  filterDropdown: { height: 44, paddingHorizontal: 12, paddingVertical: 0 },
   filterDropdownText: { fontSize: 12 },
   dateInput: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, height: 40,
+    borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, height: 44,
   },
   vendorInput: {
-    borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, height: 40,
+    borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, height: 44,
     justifyContent: 'center',
   },
   dateInputText: { flex: 1, fontSize: 12, padding: 0 },
   newBtnRow: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, alignItems: 'flex-end' },
-  newBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 9 },
+  newBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12 },
   newBtnText: { color: 'white', fontSize: 13, fontWeight: '600' },
   tabsScroll: { marginTop: 10 },
   tabsContent: { paddingHorizontal: 16, gap: 8, paddingBottom: 4 },
-  tab: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
+  tab: { paddingHorizontal: 14, paddingVertical: 11, borderRadius: 8 },
+  iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   tabText: { fontSize: 13, fontWeight: '600' },
   list: { padding: 16, gap: 10 },
   txCard: { borderRadius: 12, borderWidth: 1, padding: 14, gap: 8 },

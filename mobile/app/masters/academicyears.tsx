@@ -2,15 +2,16 @@ import { Ionicons } from '@expo/vector-icons';
 
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-    FlatList,
-    Modal,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+  KeyboardAvoidingView,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -274,7 +275,7 @@ export default function AcademicYearsScreen() {
         <AppLayout title="Academic Years">
           <View style={styles.centerContainer}>
             <ThemedText type="title">Access Denied</ThemedText>
-            <ThemedText>You don't have permission to view academic years</ThemedText>
+            <ThemedText>You don&apos;t have permission to view academic years</ThemedText>
           </View>
         </AppLayout>
       }
@@ -424,7 +425,7 @@ export default function AcademicYearsScreen() {
           transparent={true}
           onRequestClose={() => setIsModalVisible(false)}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
               <View style={[styles.modalHeader, { borderBottomColor: borderColor }]}>
                 <ThemedText style={styles.modalTitle}>
@@ -504,7 +505,7 @@ export default function AcademicYearsScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
         <ConfirmModal {...modalProps} />
       </AppLayout>

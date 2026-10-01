@@ -68,11 +68,11 @@ export default function MyMarksScreen() {
     if (!marks?.subjects) return [];
     return marks.subjects.map((s: { subject_config_id: string; subject_name?: string; components: ComponentMarkView[] }) => {
       const components = s.components ?? [];
-      const totalMax = components.reduce((sum, c) => sum + (c.max_marks ?? 0), 0);
-      const hasAnyMarks = components.some(c => c.marks_obtained !== null);
+      const totalMax = components.reduce((sum, c) => sum + Number(c.max_marks ?? 0), 0);
+      const hasAnyMarks = components.some(c => c.marks_obtained != null);
       const isAbsent = components.length > 0 && components.every(c => c.is_absent);
       const totalObtained = hasAnyMarks
-        ? components.reduce((sum, c) => sum + (c.marks_obtained ?? 0), 0)
+        ? components.reduce((sum, c) => sum + Number(c.marks_obtained ?? 0), 0)
         : null;
       return {
         subject_config_id: s.subject_config_id,
@@ -84,6 +84,8 @@ export default function MyMarksScreen() {
       };
     });
   }, [marks]);
+
+  const fmtNum = (v: number | string | null | undefined) => (v == null ? '—' : String(Number(v)));
 
   const getMarksColor = (obtained: number | null, max: number) => {
     if (obtained === null || !max) return colors['muted-foreground'];
@@ -129,9 +131,9 @@ export default function MyMarksScreen() {
             ) : subject.total_obtained !== null ? (
               <>
                 <Text style={[styles.subjectTotal, { color: marksColor }]}>
-                  {subject.total_obtained}/{subject.total_max_marks}
+                  {fmtNum(subject.total_obtained)}/{fmtNum(subject.total_max_marks)}
                 </Text>
-                {pct && (
+                {!!pct && (
                   <Text style={[styles.subjectPct, { color: marksColor }]}>{pct}%</Text>
                 )}
               </>
@@ -156,16 +158,16 @@ export default function MyMarksScreen() {
                     {
                       color: comp.is_absent
                         ? '#EF4444'
-                        : comp.marks_obtained !== null
-                        ? getMarksColor(comp.marks_obtained, comp.max_marks ?? 0)
+                        : comp.marks_obtained != null
+                        ? getMarksColor(Number(comp.marks_obtained), Number(comp.max_marks ?? 0))
                         : colors['muted-foreground'],
                     },
                   ]}
                 >
                   {comp.is_absent
                     ? 'Absent'
-                    : comp.marks_obtained !== null
-                    ? `${comp.marks_obtained}/${comp.max_marks ?? '—'}`
+                    : comp.marks_obtained != null
+                    ? `${fmtNum(comp.marks_obtained)}/${fmtNum(comp.max_marks)}`
                     : '—'}
                 </Text>
               </View>
@@ -218,7 +220,7 @@ export default function MyMarksScreen() {
         <View style={styles.headerCard}>
           <Text style={styles.headerExamName}>{exam?.exam_name ?? ''}</Text>
           <Text style={styles.headerStudentName}>{marks.student_name ?? selectedStudent?.name ?? ''}</Text>
-          {overallPct && (
+          {!!overallPct && (
             <View style={styles.overallRow}>
               <Text style={styles.overallLabel}>Overall</Text>
               <Text style={styles.overallPct}>{overallPct}%</Text>

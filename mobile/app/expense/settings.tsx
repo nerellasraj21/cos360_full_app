@@ -3,7 +3,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -46,12 +49,14 @@ function ExpenseSettingsScreenContent() {
 
   const canUpdate = hasPermission?.('expense_settings', 'update');
 
-  const { data: settings = [], isLoading } = useQuery({
+  const [refreshing, setRefreshing] = useState(false);
+
+  const { data: settings = [], isLoading, refetch } = useQuery({
     queryKey: ['expense-settings'],
     queryFn: () => expenseSettingsApi.getSettings(),
   });
 
-  const { data: common } = useQuery({
+  const { data: common, refetch: refetchCommon } = useQuery({
     queryKey: ['expense-settings-common'],
     queryFn: () => expenseSettingsApi.getCommonSettings(),
   });
@@ -101,7 +106,21 @@ function ExpenseSettingsScreenContent() {
 
   return (
     <AppLayout title="Expense Settings">
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor="#556ee6"
+            onRefresh={async () => {
+              setRefreshing(true);
+              try { await Promise.all([refetch(), refetchCommon()]); } finally { setRefreshing(false); }
+            }}
+          />
+        }
+      >
 
         {/* Common settings summary card */}
         {common && (
@@ -167,7 +186,7 @@ function ExpenseSettingsScreenContent() {
 
       {/* Edit Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={closeModal}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalSheet, { backgroundColor: cardBg }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
@@ -205,7 +224,7 @@ function ExpenseSettingsScreenContent() {
               <Text style={styles.saveBtnText}>{updateMutation.isPending ? 'Saving…' : 'Save'}</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </AppLayout>
   );
@@ -245,16 +264,16 @@ const styles = StyleSheet.create({
   settingValue: { fontSize: 13, fontWeight: '700', marginTop: 4 },
   rowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   activeDot: { width: 8, height: 8, borderRadius: 4 },
-  editBtn: { padding: 4 },
+  editBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   emptyView: { alignItems: 'center', paddingVertical: 48, gap: 12 },
   emptyText: { fontSize: 14 },
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
+  modalSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 16, fontWeight: '700', flex: 1, marginRight: 8 },
   label: { fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 10 },
-  input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, marginBottom: 4 },
+  input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12, fontSize: 14, marginBottom: 4 },
   saveBtn: {
     backgroundColor: '#556ee6', borderRadius: 10, paddingVertical: 14,
     alignItems: 'center', marginTop: 20, marginBottom: 8,

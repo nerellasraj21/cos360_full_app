@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
-  ActivityIndicator, FlatList, Modal, ScrollView, StyleSheet,
+  ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 
@@ -134,7 +134,7 @@ export default function ExamDatesScreen() {
   const subjectNameMap = useMemo(() => Object.fromEntries(subjectList.map((s: any) => [s.id, s.name])), [subjectList]);
   const classLabel = (d: ExamDate) => {
     const sectionLabel = d.section_id ? sectionNameMap[d.section_id] : null;
-    return [classNameMap[d.class_id] ?? d.class_id, sectionLabel].filter(Boolean).join(' – ');
+    return [classNameMap[d.class_id] ?? 'Class', sectionLabel].filter(Boolean).join(' – ');
   };
 
   const filteredDates = useMemo(() => {
@@ -151,7 +151,7 @@ export default function ExamDatesScreen() {
   const selectedCsKey = form.class_id ? csKey(form.class_id, form.section_id) : null;
   const subjectOptions = subjectConfigs
     .filter(sc => csKey(sc.class_id, sc.section_id) === selectedCsKey)
-    .map(sc => ({ label: sc.subject_name ?? sc.subject_id, value: sc.subject_id }));
+    .map(sc => ({ label: sc.subject_name || 'Subject', value: sc.subject_id }));
 
   const createMutation = useMutation({
     mutationFn: (data: ExamDateCreateRequest) => examDatesApi.create(selectedExamId, data),
@@ -227,7 +227,7 @@ export default function ExamDatesScreen() {
   const handleDelete = (d: ExamDate) => {
     confirm({
       title: 'Delete Date',
-      message: `Delete schedule for ${d.subject_name ?? d.subject_id}?`,
+      message: `Delete schedule for ${d.subject_name ?? subjectNameMap[d.subject_id] ?? 'this subject'}?`,
       confirmLabel: 'Delete',
       destructive: true,
       onConfirm: () => deleteMutation.mutate(d.id),
@@ -244,7 +244,7 @@ export default function ExamDatesScreen() {
       <View style={{ flex: 1 }}>
         <Text style={[styles.serialNo, { color: colors['muted-foreground'] }]}>{index + 1}</Text>
         <Text style={[styles.subjectText, { color: colors.foreground }]}>
-          {item.subject_name ?? subjectNameMap[item.subject_id] ?? item.subject_id}
+          {item.subject_name ?? subjectNameMap[item.subject_id] ?? 'Subject'}
         </Text>
         {!!classLabel(item) && (
           <Text style={[styles.metaText, { color: colors['muted-foreground'] }]}>
@@ -256,9 +256,9 @@ export default function ExamDatesScreen() {
           {item.start_time ? ` · ${formatTime12h(item.start_time)}` : ''}
           {item.end_time ? ` – ${formatTime12h(item.end_time)}` : ''}
         </Text>
-        {item.venue && (
+        {!!item.venue && (
           <Text style={[styles.metaText, { color: colors['muted-foreground'] }]}>
-            📍 {item.venue}
+            Venue: {item.venue}
           </Text>
         )}
       </View>
@@ -368,7 +368,7 @@ export default function ExamDatesScreen() {
 
       {/* Add / Edit Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalSheet, { backgroundColor: cardBg }]}>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <View style={styles.modalHeader}>
@@ -384,7 +384,7 @@ export default function ExamDatesScreen() {
               <Text style={[styles.fieldLabel, { color: colors['muted-foreground'] }]}>Class-Section *</Text>
               <CustomDropdown
                 data={classSections.map(cs => ({
-                  label: cs.section_name ? `${cs.class_name ?? cs.class_id} – ${cs.section_name}` : (cs.class_name ?? cs.class_id),
+                  label: cs.section_name ? `${cs.class_name ?? 'Class'} – ${cs.section_name}` : (cs.class_name || 'Class'),
                   value: `${cs.class_id}|${cs.section_id ?? ''}`,
                 }))}
                 value={form.class_id ? `${form.class_id}|${form.section_id ?? ''}` : null}
@@ -479,21 +479,21 @@ export default function ExamDatesScreen() {
               <View style={{ height: 16 }} />
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
+        <TimePickerModal
+          visible={showTimePicker}
+          initialTime={form[activeTimeField] ?? ''}
+          onConfirm={confirmTime}
+          onCancel={() => setShowTimePicker(false)}
+        />
+        <DatePickerModal
+          visible={showDatePicker}
+          initialDate={form.exam_date || ''}
+          onConfirm={confirmDate}
+          onCancel={() => setShowDatePicker(false)}
+        />
       </Modal>
       <ConfirmModal {...modalProps} />
-      <TimePickerModal
-        visible={showTimePicker}
-        initialTime={form[activeTimeField] ?? ''}
-        onConfirm={confirmTime}
-        onCancel={() => setShowTimePicker(false)}
-      />
-      <DatePickerModal
-        visible={showDatePicker}
-        initialDate={form.exam_date || ''}
-        onConfirm={confirmDate}
-        onCancel={() => setShowDatePicker(false)}
-      />
     </AppLayout>
   );
 }
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
   filterRow: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },
   filterLabel: { fontSize: 12, fontWeight: '600', marginBottom: 6 },
   chips: { flexDirection: 'row', gap: 6, paddingRight: 16 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
+  chip: { paddingHorizontal: 14, minHeight: 40, justifyContent: 'center', borderRadius: 20, borderWidth: 1 },
   chipText: { fontSize: 12, fontWeight: '500' },
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
   subjectText: { fontSize: 14, fontWeight: '600', marginBottom: 3 },
   metaText: { fontSize: 12, marginBottom: 2 },
   rowActions: { flexDirection: 'row', gap: 4 },
-  iconBtn: { padding: 6 },
+  iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   fab: {
     position: 'absolute', bottom: 24, right: 24, width: 56, height: 56,
     borderRadius: 28, alignItems: 'center', justifyContent: 'center',

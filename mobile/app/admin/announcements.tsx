@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { AppLayout } from '@/components';
 import { useToastContext } from '@/components/ToastProvider';
@@ -53,6 +53,7 @@ function AnnouncementsScreenContent() {
 
   return (
     <AppLayout title="Announcements">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
@@ -110,7 +111,7 @@ function AnnouncementsScreenContent() {
             <View style={[styles.previewBox, { backgroundColor: inputBg, borderColor: borderCol }]}>
               <Text style={[styles.previewLabel, { color: colors['muted-foreground'] }]}>Message Preview</Text>
               <Text style={[styles.previewText, { color: colors.foreground }]}>
-                School will remain closed on {holidayDate} for {holidayName}. — COS360
+                School will remain closed on {holidayDate} for {holidayName}. - COS360
               </Text>
             </View>
           )}
@@ -132,6 +133,7 @@ function AnnouncementsScreenContent() {
 
         <View style={{ height: 48 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
     </AppLayout>
   );
 }

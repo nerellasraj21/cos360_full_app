@@ -93,7 +93,7 @@ export default function MarkEntrySummaryScreen() {
   const selectedCs = classSections.find(cs => cs.id === selectedCsId);
   const csLabel = (cs: ExamClassSection) => {
     const sectionLabel = cs.section_name ?? (cs.section_id ? sectionNameMap[cs.section_id] : null);
-    return [cs.class_name ?? classNameMap[cs.class_id] ?? cs.class_id, sectionLabel].filter(Boolean).join(' – ') || cs.class_id;
+    return [cs.class_name ?? classNameMap[cs.class_id], sectionLabel].filter(Boolean).join(' – ') || 'Class';
   };
 
   const configs = useMemo(
@@ -159,7 +159,7 @@ export default function MarkEntrySummaryScreen() {
 
   return (
     <AppLayout title="Mark Entry">
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {exam && (
           <Text style={[styles.subtitle, { color: colors['muted-foreground'] }]}>
             {exam.exam_name} · {exam.board} · {exam.exam_type}
@@ -254,7 +254,7 @@ export default function MarkEntrySummaryScreen() {
                     </Text>
                   ) : (
                     <View style={{ maxHeight: 320 }}>
-                      <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                      <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                         {filteredStudents.map((s: { id: string; name: string; admissionNumber: string }) => (
                           <TouchableOpacity
                             key={s.id}
@@ -310,7 +310,7 @@ export default function MarkEntrySummaryScreen() {
                         <View key={cfg.id} style={[styles.subjectRow, { borderBottomColor: borderCol }]}>
                           <View style={styles.rowBetween}>
                             <Text style={[styles.subjectName, { color: colors.foreground }]}>
-                              {cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? cfg.subject_id}
+                              {cfg.subject_name ?? subjectNameMap[cfg.subject_id] ?? 'Subject'}
                             </Text>
                             {totalMarks > 0 && (
                               <Text style={[styles.maxMarks, { color: '#556ee6' }]}>{totalMarks}</Text>
@@ -367,23 +367,23 @@ const styles = StyleSheet.create({
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     marginHorizontal: 12, marginTop: 10, borderRadius: 8, borderWidth: 1,
-    paddingHorizontal: 10, height: 36,
+    paddingHorizontal: 10, height: 44,
   },
   searchInput: { flex: 1, fontSize: 13, padding: 0 },
   selectAllRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 12, paddingVertical: 10, marginTop: 8, borderBottomWidth: 1,
+    paddingHorizontal: 12, minHeight: 44, marginTop: 8, borderBottomWidth: 1,
   },
   selectAllText: { fontSize: 12, fontWeight: '600' },
   studentRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: 1,
+    paddingHorizontal: 12, minHeight: 48, borderBottomWidth: 1,
   },
   studentName: { fontSize: 13, fontWeight: '600' },
   studentMeta: { fontSize: 11, marginTop: 1 },
   enterMarksBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: 8, paddingHorizontal: 12, minHeight: 40,
   },
   enterMarksBtnText: { color: 'white', fontSize: 12, fontWeight: '700' },
   subjectRow: { padding: 12, borderBottomWidth: 1, gap: 8 },

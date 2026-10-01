@@ -11,6 +11,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -461,7 +463,7 @@ export default function RolesPermissionsScreen() {
         </View>
       </View>
 
-      {item.description && (
+      {!!item.description && (
         <ThemedText style={styles.roleDescription}>
           {item.description}
         </ThemedText>
@@ -548,7 +550,7 @@ export default function RolesPermissionsScreen() {
         <ThemedView style={styles.container}>
           <View style={styles.centerContainer}>
             <ThemedText type="title">Access Denied</ThemedText>
-            <ThemedText>You don't have permission to view roles and permissions</ThemedText>
+            <ThemedText>You don&apos;t have permission to view roles and permissions</ThemedText>
           </View>
         </ThemedView>
       }
@@ -946,7 +948,7 @@ export default function RolesPermissionsScreen() {
         transparent={true}
         onRequestClose={() => setIsRoleModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
             <View style={styles.modalHeader}>
               <ThemedText type="title" style={styles.modalTitle}>
@@ -1016,7 +1018,7 @@ export default function RolesPermissionsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Permission Modal */}
@@ -1417,9 +1419,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },

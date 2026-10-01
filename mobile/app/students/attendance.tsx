@@ -683,7 +683,7 @@ function StaffAttendanceView() {
         </View>
 
         {/* Stats cards row */}
-        {selectedClass && (
+        {!!selectedClass && (
           <View style={sStyles.statsRow}>
             <View style={[sStyles.statCard, { backgroundColor: '#DCFCE7' }]}>
               <ThemedText style={[sStyles.statNum, { color: '#16A34A' }]}>{stats.present}</ThemedText>

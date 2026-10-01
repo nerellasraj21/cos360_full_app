@@ -143,14 +143,14 @@ function StudentReportsScreenContent() {
               <View style={[styles.rowCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
                 <View style={styles.rowHeader}>
                   <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>
-                    {rec.student_name || `Student #${rec.student_id?.slice(0, 8)}`}
+                    {rec.student_name || rec.date}
                   </Text>
                   <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
-                    <Text style={[styles.statusText, { color: sc.text }]}>{rec.status}</Text>
+                    <Text style={[styles.statusText, { color: sc.text }]}>{rec.status ?? ''}</Text>
                   </View>
                 </View>
                 <Text style={[styles.rowSub, { color: colors['muted-foreground'] }]}>
-                  {rec.date}{rec.class_name ? ` · ${rec.class_name}` : ''}
+                  {rec.student_name ? `${rec.date}${rec.class_name ? ` · ${rec.class_name}` : ''}` : rec.remarks || ''}
                 </Text>
               </View>
             );
@@ -166,10 +166,10 @@ const styles = StyleSheet.create({
   bannerDecor: { position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.12)' },
   bannerIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   bannerTitle: { color: 'white', fontSize: 16, fontWeight: '700', flex: 1 },
-  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 11, borderRadius: 8 },
   exportBtnText: { color: 'white', fontSize: 12, fontWeight: '700' },
   filterBar: { flexDirection: 'row', gap: 8, padding: 12, borderBottomWidth: 1 },
-  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderWidth: 1 },
   filterChipText: { fontSize: 12, fontWeight: '600' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   loadingText: { fontSize: 14 },

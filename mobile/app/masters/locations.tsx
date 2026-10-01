@@ -11,6 +11,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -172,7 +174,7 @@ export default function LocationsScreen() {
         <ThemedView style={styles.container}>
           <View style={styles.centered}>
             <Ionicons name="lock-closed" size={48} color={colors['muted-foreground']} />
-            <ThemedText style={styles.accessDeniedText}>You don't have permission to view locations</ThemedText>
+            <ThemedText style={styles.accessDeniedText}>You don&apos;t have permission to view locations</ThemedText>
           </View>
         </ThemedView>
       }
@@ -245,7 +247,7 @@ export default function LocationsScreen() {
           transparent
           onRequestClose={() => setIsModalVisible(false)}
         >
-          <View style={styles.overlay}>
+          <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={[styles.modal, { backgroundColor: colors.background }]}>
               <View style={styles.modalHeader}>
                 <ThemedText type="title" style={styles.modalTitle}>
@@ -313,7 +315,7 @@ export default function LocationsScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
         <ConfirmModal {...modalProps} />
       </ThemedView>
@@ -346,7 +348,7 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   badgeText: { fontSize: 11, fontWeight: '700' },
   actions: { flexDirection: 'row', gap: 6 },
-  actionBtn: { width: 30, height: 30, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  actionBtn: { width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 48, gap: 8 },
   accessDeniedText: { fontSize: 15, textAlign: 'center', marginTop: 12 },
   emptyTitle: { fontSize: 16, fontWeight: '600', marginTop: 8 },

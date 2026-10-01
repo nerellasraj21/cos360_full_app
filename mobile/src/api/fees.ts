@@ -1278,7 +1278,7 @@ export const feeReportsApi = {
     report_type: keyof typeof FEE_REPORT_EXPORT_TYPES;
     format?: 'csv' | 'xlsx';
     filters?: Record<string, any>;
-  }): Promise<Blob> => {
+  }): Promise<string> => {
     const response = await apiClient.post(
       '/reports/fees/export',
       {
@@ -1286,9 +1286,9 @@ export const feeReportsApi = {
         format: data.format ?? 'csv',
         filters: data.filters ?? {},
       },
-      { responseType: 'blob' },
+      { responseType: 'text', transformResponse: (r) => r },
     );
-    return response.data;
+    return typeof response.data === 'string' ? response.data : '';
   },
 };
 

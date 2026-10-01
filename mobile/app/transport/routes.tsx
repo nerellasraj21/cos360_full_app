@@ -6,7 +6,7 @@ import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard
 import CustomDropdown from '@/components/ui/dropdown';
 import { TimePickerModal, formatTime12h } from '@/components/ui';
 import { useTheme } from '@/contexts';
-import type { Route as TransportRoute, RouteCreate, RouteUpdate } from '../../src/api';
+import type { Route as TransportRoute } from '../../src/api';
 import { useRoutes, useCreateRoute, useUpdateRoute, useDeleteRoute, useCreateRouteStop } from '../../hooks/use-transport';
 import { PERMISSION_RESOURCES } from '../../src/types/permissions';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,9 +15,10 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { escapeCsv } from '@/src/utils/exportCsv';
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   FlatList,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   RefreshControl,
@@ -343,7 +344,7 @@ export default function RoutesScreen() {
     }
   };
 
-  const renderRouteItem = useCallback(({ item, index }: { item: TransportRoute; index: number }) => (
+  const renderRouteItem = ({ item, index }: { item: TransportRoute; index: number }) => (
     <View style={[styles.routeCard, { backgroundColor: colors.card }]}>
       <View style={styles.routeHeader}>
         <View style={styles.routeInfo}>
@@ -393,7 +394,7 @@ export default function RoutesScreen() {
         <View style={styles.detailRow}>
           <Ionicons name="time" size={16} color={colors['muted-foreground']} />
           <ThemedText style={styles.detailText}>
-            {item.start_time} - {item.end_time} ({item.route_type}, {item.trip_type})
+            {item.start_time ? formatTime12h(item.start_time) : ''} - {item.end_time ? formatTime12h(item.end_time) : ''}
           </ThemedText>
         </View>
         <View style={styles.detailRow}>
@@ -402,11 +403,11 @@ export default function RoutesScreen() {
             Number of Stops: {item.number_of_stops}
           </ThemedText>
         </View>
-        {item.created_at && (
+        {!!item.created_at && (
           <View style={styles.detailRow}>
             <Ionicons name="calendar" size={16} color={colors['muted-foreground']} />
             <ThemedText style={styles.detailText}>
-              Created: {new Date(item.created_at).toLocaleDateString()}
+              Created: {new Date(item.created_at).toLocaleDateString('en-IN')}
             </ThemedText>
           </View>
         )}
@@ -422,7 +423,7 @@ export default function RoutesScreen() {
         </ThemedText>
       </TouchableOpacity>
     </View>
-  ), [colors]);
+  );
 
   if (error) {
     return (
@@ -551,6 +552,7 @@ export default function RoutesScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={isLoading}
@@ -621,7 +623,7 @@ export default function RoutesScreen() {
           transparent={true}
           onRequestClose={() => setIsModalVisible(false)}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
               <View style={styles.modalHeader}>
                 <ThemedText type="title" style={styles.modalTitle}>
@@ -633,7 +635,7 @@ export default function RoutesScreen() {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.modalBody}>
+              <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
                 <View style={styles.formGroup}>
                   <ThemedText style={styles.label}>Route Name *</ThemedText>
                   <TextInput
@@ -756,6 +758,7 @@ export default function RoutesScreen() {
                           <View style={styles.stopRowHeader}>
                             <ThemedText style={styles.stopRowIndex}>Stop {idx + 1}</ThemedText>
                             <TouchableOpacity
+                              style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
                               onPress={() => removeStopRow(stop.key)}
                               accessibilityLabel="Remove stop"
                             >
@@ -831,7 +834,7 @@ export default function RoutesScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Time Picker — separate Modal, layers above the form Modal on both platforms */}
@@ -886,7 +889,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: 8,
   },
   addButtonText: {
@@ -898,7 +901,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
   },
@@ -967,7 +970,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     marginTop: 12,
-    paddingVertical: 8,
+    paddingVertical: 13,
     borderRadius: 8,
     borderWidth: 1,
   },
@@ -1001,7 +1004,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     marginTop: 12,
-    paddingVertical: 10,
+    paddingVertical: 14,
     borderRadius: 8,
   },
   stopsFooterButtonText: {
@@ -1062,9 +1065,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1234,7 +1237,7 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     alignItems: 'center',
   },

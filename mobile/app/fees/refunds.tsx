@@ -23,7 +23,10 @@ import { roleBlocksFees } from '@/src/lib/menuUtils';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -34,6 +37,11 @@ import {
 
 
 // Inline INR currency formatter
+const formatReason = (reason?: string | null): string =>
+  String(reason ?? '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
 const formatINR = (amount: number | string | undefined | null): string => {
   const num = Number(amount ?? 0);
   return `₹${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -82,15 +90,6 @@ export default function FeeRefundsScreen() {
     transactionDetails: null as any,
   });
 
-  const [statistics, setStatistics] = useState({
-    totalRefunds: 0,
-    totalAmount: 0,
-    pendingCount: 0,
-    approvedCount: 0,
-    processedCount: 0,
-    rejectedCount: 0,
-  });
-
   const { colors } = useTheme();
   const { activeAcademicYearId } = useAcademicYear();
   const { user } = useAuth();
@@ -123,7 +122,7 @@ export default function FeeRefundsScreen() {
   }, [isFeeBlocked, router]);
 
   // Queries
-  const { data: refunds = [], isLoading, error } = useQuery({
+  const { data: refunds = [], isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['feeRefunds', activeAcademicYearId],
     queryFn: () => feeRefundsApi.getFeeRefunds(activeAcademicYearId || undefined),
   });
@@ -218,8 +217,7 @@ export default function FeeRefundsScreen() {
   }));
 
   // Calculate statistics
-  useEffect(() => {
-    const stats = refundsWithStatus.reduce(
+  const statistics = refundsWithStatus.reduce(
       (acc, refund) => {
         acc.totalRefunds += 1;
         acc.totalAmount += Number(refund.refund_amount) || 0;
@@ -231,8 +229,6 @@ export default function FeeRefundsScreen() {
       },
       { totalRefunds: 0, totalAmount: 0, pendingCount: 0, approvedCount: 0, processedCount: 0, rejectedCount: 0 }
     );
-    setStatistics(stats);
-  }, [refundsWithStatus]);
 
   const resetForm = () => {
     setFormData({
@@ -337,7 +333,7 @@ export default function FeeRefundsScreen() {
 
     // Validate against transaction amount
     const transaction = transactions.find(t => t.id === formData.fee_transaction_id);
-    if (transaction && formData.refund_amount > transaction.total_amount) {
+    if (transaction && formData.refund_amount > Number(transaction.total_amount)) {
       showError('Error', 'Refund amount cannot exceed transaction amount');
       return;
     }
@@ -398,13 +394,13 @@ export default function FeeRefundsScreen() {
             Student: {student?.display_name || 'Unknown'}
           </Text>
           <Text style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
-            Transaction: {transaction?.id?.slice(-8) || item.transaction_id?.slice(-8) || 'N/A'}
+            Transaction: {transaction?.transaction_number || 'N/A'}
           </Text>
           <Text style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
             Amount: {formatINR(item.refund_amount)}
           </Text>
           <Text style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
-            Reason: {item.refund_reason}
+            Reason: {formatReason(item.refund_reason)}
           </Text>
           <Text style={[styles.refundDetails, { color: colors['muted-foreground'] }]}>
             Date: {new Date(item.refund_date).toLocaleDateString()}
@@ -431,7 +427,7 @@ export default function FeeRefundsScreen() {
 
           {item.status === 'pending' && (
             <>
-              <ApprovePermissionGuard resource={PERMISSION_RESOURCES.FEE_REFUNDS}>
+              <ApprovePermissionGuard resource={PERMISSION_RESOURCES.FEE_REFUNDS} fallback={null} loadingFallback={null}>
                 <TouchableOpacity
                   style={[styles.actionButton, { backgroundColor: '#10b981' }]}
                   onPress={() => handleApprove(item)}
@@ -515,6 +511,16 @@ export default function FeeRefundsScreen() {
     <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.FEE_REFUNDS}>
       <AppLayout title="Fee Refunds">
         <View style={styles.container}>
+        <FlatList
+          data={filteredRefunds}
+          keyExtractor={(item) => item.id}
+          renderItem={renderRefundItem}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={colors.primary} />}
+          ListHeaderComponent={
+            <View>
         {/* Statistics */}
         <View style={styles.statsContainer}>
           <View style={[styles.statCard, { backgroundColor: colors.card }]}>
@@ -580,7 +586,7 @@ export default function FeeRefundsScreen() {
               onChangeText={(text) => setFilters(prev => ({ ...prev, requested_date_from: text }))}
               placeholder="From YYYY-MM-DD"
               placeholderTextColor={colors['muted-foreground']}
-              keyboardType="numeric"
+              keyboardType="numbers-and-punctuation"
             />
             <TextInput
               style={[styles.filterInput, styles.filterHalf, { backgroundColor: colors.background, color: colors.foreground, borderColor: colors.border }]}
@@ -588,13 +594,13 @@ export default function FeeRefundsScreen() {
               onChangeText={(text) => setFilters(prev => ({ ...prev, requested_date_to: text }))}
               placeholder="To YYYY-MM-DD"
               placeholderTextColor={colors['muted-foreground']}
-              keyboardType="numeric"
+              keyboardType="numbers-and-punctuation"
             />
           </View>
         </View>
 
         <View style={styles.header}>
-          <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_REFUNDS}>
+          <CreatePermissionGuard resource={PERMISSION_RESOURCES.FEE_REFUNDS} fallback={null} loadingFallback={null}>
             <TouchableOpacity
               style={[styles.addButton, { backgroundColor: colors.primary }]}
               onPress={handleCreate}
@@ -605,12 +611,8 @@ export default function FeeRefundsScreen() {
           </CreatePermissionGuard>
         </View>
 
-        <FlatList
-          data={filteredRefunds}
-          keyExtractor={(item) => item.id}
-          renderItem={renderRefundItem}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
+            </View>
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="cash-outline" size={48} color={colors['muted-foreground']} />
@@ -628,7 +630,7 @@ export default function FeeRefundsScreen() {
           transparent={true}
           onRequestClose={() => setIsModalVisible(false)}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.foreground }]}>Create Refund</Text>
@@ -638,8 +640,8 @@ export default function FeeRefundsScreen() {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.form}>
-                <Text style={styles.label}>Student *</Text>
+              <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
+                <Text style={[styles.label, { color: colors.foreground }]}>Student *</Text>
                 <CustomDropdown
                   data={students.map(s => ({
                     value: s.id,
@@ -660,11 +662,11 @@ export default function FeeRefundsScreen() {
                   placeholder="Select Student"
                 />
 
-                <Text style={styles.label}>Fee Transaction *</Text>
+                <Text style={[styles.label, { color: colors.foreground }]}>Fee Transaction *</Text>
                 <CustomDropdown
                   data={formData.student_id ? transactions.filter(t => t.student_id === formData.student_id).map(t => ({
                     value: t.id,
-                    label: `${new Date(t.transaction_date || '').toLocaleDateString()} - ${formatINR(t.total_amount)} (${t.payment_method})`
+                    label: `${new Date(t.transaction_date || '').toLocaleDateString()} - ${formatINR(t.total_amount)} (${String(t.payment_method ?? '').replace(/_/g, ' ')})`
                   })) : []}
                   value={formData.fee_transaction_id}
                   onChange={(value) => {
@@ -673,14 +675,14 @@ export default function FeeRefundsScreen() {
                     setFormData(prev => ({
                       ...prev,
                       fee_transaction_id: transactionId,
-                      refund_amount: transaction?.total_amount || 0,
+                      refund_amount: Number(transaction?.total_amount) || 0,
                     }));
                   }}
                   placeholder={formData.student_id ? "Select Transaction" : "Select Student First"}
                   disabled={!formData.student_id}
                 />
 
-                <Text style={styles.label}>Refund Amount *</Text>
+                <Text style={[styles.label, { color: colors.foreground }]}>Refund Amount *</Text>
                 <TextInput
                   style={[styles.input, {
                     backgroundColor: colors.background,
@@ -694,7 +696,7 @@ export default function FeeRefundsScreen() {
                   keyboardType="numeric"
                 />
 
-                <Text style={styles.label}>Refund Reason *</Text>
+                <Text style={[styles.label, { color: colors.foreground }]}>Refund Reason *</Text>
                 <CustomDropdown
                   data={[
                     { value: 'fee_adjustment', label: 'Fee Adjustment' },
@@ -709,7 +711,7 @@ export default function FeeRefundsScreen() {
 
                 {formData.refund_reason === 'other' && (
                   <>
-                    <Text style={styles.label}>Detailed Reason *</Text>
+                    <Text style={[styles.label, { color: colors.foreground }]}>Detailed Reason *</Text>
                     <TextInput
                       style={[styles.input, {
                         backgroundColor: colors.background,
@@ -746,7 +748,7 @@ export default function FeeRefundsScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Summary Modal */}
@@ -756,11 +758,11 @@ export default function FeeRefundsScreen() {
           transparent={true}
           onRequestClose={() => setSummaryModal(prev => ({ ...prev, visible: false }))}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
-                <Text>
-                  Refund Summary - Transaction {summaryModal.transactionId?.slice(-8) || 'N/A'}
+                <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+                  Refund Summary{summaryModal.transactionDetails?.transaction_number ? ` - ${summaryModal.transactionDetails.transaction_number}` : ''}
                 </Text>
                 <TouchableOpacity onPress={() => setSummaryModal(prev => ({ ...prev, visible: false }))}
               accessibilityLabel="Close">
@@ -768,7 +770,7 @@ export default function FeeRefundsScreen() {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.form}>
+              <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
                 {refundSummary ? (
                   <View>
                     <Text style={[styles.summaryText, { color: colors.foreground }]}>
@@ -783,7 +785,7 @@ export default function FeeRefundsScreen() {
                           Amount: {formatINR(refund.refund_amount)}
                         </Text>
                         <Text style={[styles.summaryRefundText, { color: colors['muted-foreground'] }]}>
-                          Reason: {refund.refund_reason}
+                          Reason: {formatReason(refund.refund_reason)}
                         </Text>
                         <Text style={[styles.summaryRefundText, { color: colors['muted-foreground'] }]}>
                           Date: {new Date(refund.refund_date).toLocaleDateString()}
@@ -807,7 +809,7 @@ export default function FeeRefundsScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* M-5: Combined Approve / Reject Action Modal with action selector */}
@@ -817,7 +819,7 @@ export default function FeeRefundsScreen() {
           transparent={true}
           onRequestClose={() => setActionModal({ visible: false, refund: null, action: 'approve' })}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.foreground }]}>Process Refund Action</Text>
@@ -827,7 +829,7 @@ export default function FeeRefundsScreen() {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.form}>
+              <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
                 <Text style={[styles.label, { color: colors.foreground }]}>Action *</Text>
                 <CustomDropdown
                   data={[
@@ -880,7 +882,7 @@ export default function FeeRefundsScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* M-6: Process Refund Modal with Reference Number input */}
@@ -890,7 +892,7 @@ export default function FeeRefundsScreen() {
           transparent={true}
           onRequestClose={() => setProcessModal({ visible: false, refund: null })}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.foreground }]}>Process Refund</Text>
@@ -938,7 +940,7 @@ export default function FeeRefundsScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Cancel Refund Modal — collects a mandatory reason, matches web's cancel workflow */}
@@ -948,7 +950,7 @@ export default function FeeRefundsScreen() {
           transparent={true}
           onRequestClose={() => setCancelModal({ visible: false, refund: null })}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.foreground }]}>Cancel Refund</Text>
@@ -998,7 +1000,7 @@ export default function FeeRefundsScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         </View>
@@ -1056,7 +1058,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: 8,
   },
   addButtonText: {
@@ -1106,8 +1108,11 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     gap: 8,
+    marginLeft: 8,
   },
   actionButton: {
+    minWidth: 44,
+    minHeight: 44,
     padding: 8,
     borderRadius: 6,
     alignItems: 'center',
@@ -1149,6 +1154,7 @@ const styles = StyleSheet.create({
   },
   form: {
     marginBottom: 20,
+    flexShrink: 1,
   },
   label: {
     marginBottom: 8,
@@ -1168,14 +1174,14 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
   },
   submitButton: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     alignItems: 'center',
   },

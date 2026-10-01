@@ -11,8 +11,11 @@ import type { TransactionItem } from '@/src/types/expense';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
+import { expenseAttachmentsApi } from '@/src/api/expense';
 import React, { useState } from 'react';
 import {
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -157,7 +160,7 @@ export default function CreateExpenseTransactionScreen() {
       return;
     }
 
-    const idempotencyKey = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const idempotencyKey = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const submitData = {
       expense_type_id: formData.expense_type_id,
@@ -172,7 +175,16 @@ export default function CreateExpenseTransactionScreen() {
     };
 
     createMutation.mutate(submitData, {
-      onSuccess: () => {
+      onSuccess: async (created: any) => {
+        if (attachments.length > 0 && created?.id) {
+          try {
+            for (const file of attachments) {
+              await expenseAttachmentsApi.uploadAttachment(created.id, file as any, 'invoice');
+            }
+          } catch {
+            showError('Attachment Upload Failed', 'Transaction saved, but some attachments could not be uploaded. Add them from the transaction details.');
+          }
+        }
         showSuccess('Created', 'Transaction created successfully.');
         router.back();
       },
@@ -190,7 +202,8 @@ export default function CreateExpenseTransactionScreen() {
   return (
     <CreatePermissionGuard resource={PERMISSION_RESOURCES.EXPENSE_TRANSACTIONS}>
       <AppLayout title="Create New Transaction">
-        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView style={styles.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.form}>
           {/* Expense Type */}
           <ThemedText style={styles.label}>Expense Type *</ThemedText>
@@ -241,7 +254,7 @@ export default function CreateExpenseTransactionScreen() {
             <View key={index} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.itemHeaderRow}>
                 <ThemedText style={styles.itemLabel}>Item #{index + 1}</ThemedText>
-                <TouchableOpacity onPress={() => removeItem(index)}
+                <TouchableOpacity style={styles.iconBtn} onPress={() => removeItem(index)}
               accessibilityLabel="Delete">
                   <Ionicons name="trash" size={18} color="#EF4444" />
                 </TouchableOpacity>
@@ -423,7 +436,7 @@ export default function CreateExpenseTransactionScreen() {
                   </ThemedText>
                 ) : null}
               </View>
-              <TouchableOpacity onPress={() => removeAttachment(index)} accessibilityLabel="Remove attachment">
+              <TouchableOpacity style={styles.iconBtn} onPress={() => removeAttachment(index)} accessibilityLabel="Remove attachment">
                 <Ionicons name="trash" size={18} color="#EF4444" />
               </TouchableOpacity>
             </View>
@@ -457,6 +470,7 @@ export default function CreateExpenseTransactionScreen() {
           onCancel={() => setShowDatePicker(false)}
         />
         </ScrollView>
+        </KeyboardAvoidingView>
       </AppLayout>
     </CreatePermissionGuard>
   );
@@ -532,7 +546,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: 6,
     gap: 4,
   },
@@ -565,7 +579,7 @@ const styles = StyleSheet.create({
   itemInput: {
     borderWidth: 1,
     borderRadius: 6,
-    padding: 10,
+    padding: 12,
     marginBottom: 8,
     fontSize: 14,
   },
@@ -577,6 +591,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
   },
+  iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   itemFinalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

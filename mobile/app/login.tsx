@@ -472,7 +472,7 @@ const LoginScreen: React.FC = () => {
           </View>
 
           {/* Error Banner */}
-          {error && (
+          {!!error && (
             <View style={styles.errorBanner}>
               <Ionicons name="warning" size={18} color="white" />
               <Text style={styles.errorBannerText}>{error}</Text>

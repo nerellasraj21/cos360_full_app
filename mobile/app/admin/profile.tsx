@@ -15,7 +15,7 @@ const ROW = ({ label, value, colors }: { label: string; value: string | null | u
 );
 
 export default function AdminProfileScreen() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { colors, theme } = useTheme();
   const router = useRouter();
   const cardBg  = theme === 'dark' ? '#1a1a2e' : '#ffffff';
@@ -40,7 +40,7 @@ export default function AdminProfileScreen() {
           </View>
           <Text style={[styles.username, { color: colors.foreground }]}>{user?.username}</Text>
           <Text style={[styles.role, { color: colors['muted-foreground'] }]}>
-            {user?.role ?? 'Administrator'}
+            {role?.name ?? 'Administrator'}
           </Text>
         </View>
 
@@ -54,7 +54,7 @@ export default function AdminProfileScreen() {
             <ROW label="Username" value={user?.username} colors={colors} />
             <ROW label="Email" value={profile?.email ?? user?.email} colors={colors} />
             <ROW label="Full Name" value={profile?.entity_name} colors={colors} />
-            <ROW label="Role" value={profile?.role_name ?? user?.role} colors={colors} />
+            <ROW label="Role" value={profile?.role_name ?? role?.name} colors={colors} />
             <ROW label="Status" value={profile?.is_active ? 'Active' : 'Inactive'} colors={colors} />
           </View>
         )}

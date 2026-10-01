@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { fireEvent } from '@testing-library/react-native';
+import { act, fireEvent } from '@testing-library/react-native';
 import {
   __navigationDispatchMock,
   __resetFormDirtyGuardNavMock,
@@ -97,145 +97,177 @@ beforeEach(() => {
 });
 
 describe('withFormDirtyGuard', () => {
-  it('renders the wrapped screen with no confirmation dialog while clean', () => {
-    const { queryByText } = renderWithProviders(
+  it('renders the wrapped screen with no confirmation dialog while clean', async () => {
+    const { queryByText } = await renderWithProviders(
       <GuardedSimpleForm isDirty={false} value="" onChangeValue={() => {}} />
     );
 
     expect(queryByText('Discard changes?')).toBeNull();
   });
 
-  it('does not show a dialog or block navigation when the form is clean', () => {
-    const { queryByText } = renderWithProviders(
+  it('does not show a dialog or block navigation when the form is clean', async () => {
+    const { queryByText } = await renderWithProviders(
       <GuardedSimpleForm isDirty={false} value="" onChangeValue={() => {}} />
     );
 
-    __triggerBeforeRemove();
+    await act(async () => {
+
+      __triggerBeforeRemove();
+
+    });
 
     expect(queryByText('Discard changes?')).toBeNull();
     expect(__navigationDispatchMock).not.toHaveBeenCalled();
   });
 
-  it('shows the confirmation dialog when leaving a screen with unsaved changes', () => {
-    const { queryByText } = renderWithProviders(
+  it('shows the confirmation dialog when leaving a screen with unsaved changes', async () => {
+    const { queryByText } = await renderWithProviders(
       <GuardedSimpleForm isDirty={true} value="edited" onChangeValue={() => {}} />
     );
 
     expect(queryByText('Discard changes?')).toBeNull();
 
-    __triggerBeforeRemove();
+    await act(async () => {
+
+      __triggerBeforeRemove();
+
+    });
 
     expect(
       queryByText('You have unsaved changes. If you leave now, they will be lost.')
     ).not.toBeNull();
   });
 
-  it('blocks navigation (no dispatch) until the user explicitly chooses to discard', () => {
-    const { getByText, queryByText } = renderWithProviders(
+  it('blocks navigation (no dispatch) until the user explicitly chooses to discard', async () => {
+    const { getByText, queryByText } = await renderWithProviders(
       <GuardedSimpleForm isDirty={true} value="edited" onChangeValue={() => {}} />
     );
 
-    __triggerBeforeRemove();
+    await act(async () => {
+
+      __triggerBeforeRemove();
+
+    });
     expect(queryByText('Discard changes?')).not.toBeNull();
 
     // Merely having the dialog open must not have let navigation through.
     expect(__navigationDispatchMock).not.toHaveBeenCalled();
 
     // Choosing to stay: dialog closes, navigation still never dispatched.
-    fireEvent.press(getByText('Keep Editing'));
+    await fireEvent.press(getByText('Keep Editing'));
     expect(queryByText('Discard changes?')).toBeNull();
     expect(__navigationDispatchMock).not.toHaveBeenCalled();
 
     // A second leave attempt must still be caught — the guard doesn't
     // one-shot itself after a cancel.
-    __triggerBeforeRemove();
+    await act(async () => {
+      __triggerBeforeRemove();
+    });
     expect(queryByText('Discard changes?')).not.toBeNull();
 
     // Choosing to discard completes the navigation that was blocked.
-    fireEvent.press(getByText('Discard'));
+    await fireEvent.press(getByText('Discard'));
     expect(queryByText('Discard changes?')).toBeNull();
     expect(__navigationDispatchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('dispatches the exact action that was originally blocked', () => {
-    const { getByText } = renderWithProviders(
+  it('dispatches the exact action that was originally blocked', async () => {
+    const { getByText } = await renderWithProviders(
       <GuardedSimpleForm isDirty={true} value="edited" onChangeValue={() => {}} />
     );
 
     const blockedAction = { type: 'GO_BACK', source: 'test-back-button' };
-    __triggerBeforeRemove(blockedAction);
+    await act(async () => {
+      __triggerBeforeRemove(blockedAction);
+    });
 
-    fireEvent.press(getByText('Discard'));
+    await fireEvent.press(getByText('Discard'));
 
     expect(__navigationDispatchMock).toHaveBeenCalledWith(blockedAction);
   });
 
-  it('invokes onDiscard after the user confirms leaving', () => {
+  it('invokes onDiscard after the user confirms leaving', async () => {
     const onDiscard = jest.fn();
     const Guarded = withFormDirtyGuard(SimpleForm, { onDiscard });
-    const { getByText } = renderWithProviders(
+    const { getByText } = await renderWithProviders(
       <Guarded isDirty={true} value="edited" onChangeValue={() => {}} />
     );
 
-    __triggerBeforeRemove();
-    fireEvent.press(getByText('Discard'));
+    await act(async () => {
+
+      __triggerBeforeRemove();
+
+    });
+    await fireEvent.press(getByText('Discard'));
 
     expect(onDiscard).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('withFormDirtyGuard across a multi-step form', () => {
-  it('keeps guarding as isDirty flips true from step 0 and survives moving to step 1', () => {
-    const { getByTestId, queryByText } = renderWithProviders(<WizardHarness />);
+  it('keeps guarding as isDirty flips true from step 0 and survives moving to step 1', async () => {
+    const { getByTestId, queryByText } = await renderWithProviders(<WizardHarness />);
 
     // Untouched wizard: leaving is not blocked.
-    __triggerBeforeRemove();
+    await act(async () => {
+      __triggerBeforeRemove();
+    });
     expect(queryByText('Your progress across all steps will be lost.')).toBeNull();
 
     // Edit a field on step 0.
-    fireEvent.changeText(getByTestId('name-input'), 'Jane Doe');
+    await fireEvent.changeText(getByTestId('name-input'), 'Jane Doe');
 
     // Move to step 1 — the field from step 0 is gone from the tree, but the
     // dirty snapshot (and thus the guard) must persist across the step
     // change since it's the same underlying form state.
-    fireEvent.press(getByTestId('next-step'));
+    await fireEvent.press(getByTestId('next-step'));
     expect(getByTestId('step').props.children).toBe(1);
 
-    __triggerBeforeRemove();
+    await act(async () => {
+
+      __triggerBeforeRemove();
+
+    });
     expect(
       queryByText('Your progress across all steps will be lost.')
     ).not.toBeNull();
   });
 
-  it('accumulates edits from multiple steps and still blocks a single "Keep Editing"/"Discard" cycle correctly', () => {
-    const { getByTestId, getByText, queryByText } = renderWithProviders(
+  it('accumulates edits from multiple steps and still blocks a single "Keep Editing"/"Discard" cycle correctly', async () => {
+    const { getByTestId, getByText, queryByText } = await renderWithProviders(
       <WizardHarness />
     );
 
-    fireEvent.changeText(getByTestId('name-input'), 'Jane Doe');
-    fireEvent.press(getByTestId('next-step'));
-    fireEvent.changeText(getByTestId('address-input'), '221B Baker Street');
+    await fireEvent.changeText(getByTestId('name-input'), 'Jane Doe');
+    await fireEvent.press(getByTestId('next-step'));
+    await fireEvent.changeText(getByTestId('address-input'), '221B Baker Street');
 
-    __triggerBeforeRemove();
+    await act(async () => {
+
+      __triggerBeforeRemove();
+
+    });
     expect(
       queryByText('Your progress across all steps will be lost.')
     ).not.toBeNull();
 
     // Stay and keep editing — nothing should navigate away.
-    fireEvent.press(getByText('Keep Editing'));
+    await fireEvent.press(getByText('Keep Editing'));
     expect(__navigationDispatchMock).not.toHaveBeenCalled();
     expect(getByTestId('address-input').props.value).toBe('221B Baker Street');
 
     // Now discard — the blocked navigation finally goes through.
-    __triggerBeforeRemove();
-    fireEvent.press(getByText('Discard'));
+    await act(async () => {
+      __triggerBeforeRemove();
+    });
+    await fireEvent.press(getByText('Discard'));
     expect(__navigationDispatchMock).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('FormDirtyGuard (component form)', () => {
-  it('guards inline JSX children the same way the HOC guards a wrapped screen', () => {
-    const { getByText, queryByText } = renderWithProviders(
+  it('guards inline JSX children the same way the HOC guards a wrapped screen', async () => {
+    const { getByText, queryByText } = await renderWithProviders(
       <FormDirtyGuard isDirty={true} message="Inline children changes will be lost.">
         <Text>Inline form content</Text>
       </FormDirtyGuard>
@@ -244,10 +276,14 @@ describe('FormDirtyGuard (component form)', () => {
     expect(queryByText('Inline form content')).not.toBeNull();
     expect(queryByText('Inline children changes will be lost.')).toBeNull();
 
-    __triggerBeforeRemove();
+    await act(async () => {
+
+      __triggerBeforeRemove();
+
+    });
     expect(queryByText('Inline children changes will be lost.')).not.toBeNull();
 
-    fireEvent.press(getByText('Discard'));
+    await fireEvent.press(getByText('Discard'));
     expect(__navigationDispatchMock).toHaveBeenCalledTimes(1);
   });
 });

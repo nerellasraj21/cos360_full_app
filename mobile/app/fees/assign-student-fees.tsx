@@ -10,11 +10,9 @@ import { ThemedView } from '@/components/themed-view';
 import { ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { useToastContext } from '@/components/ToastProvider';
 import CustomDropdown from '@/components/ui/dropdown';
-import { Colors } from '@/constants/theme';
-import { useAuth } from '@/contexts';
+import { useAuth, useTheme } from '@/contexts';
 import { roleBlocksFees } from '@/src/lib/menuUtils';
 import { useAcademicYear } from '@/contexts/AcademicYearContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { feeClassMappingsApi, feeStudentMappingsApi, type FeeClassMappingResponse } from '@/src/api/fees';
 import { classSectionsApi } from '@/src/api/masters';
 import { studentAdmissionsApi } from '@/src/api/students';
@@ -23,8 +21,7 @@ import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { formatINR } from '@/src/utils/currency';
 
 export function AssignStudentFeesContent() {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
+  const { colors } = useTheme();
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToastContext();
   const { activeAcademicYearId } = useAcademicYear();
@@ -195,7 +192,7 @@ export function AssignStudentFeesContent() {
   return (
     <ReadOrListPermissionGuard resource={PERMISSION_RESOURCES.FEE_STUDENT_MAPPINGS}>
       <ThemedView style={styles.container}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           {/* Pickers */}
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <ThemedText style={styles.label}>Class</ThemedText>
@@ -278,13 +275,13 @@ export function AssignStudentFeesContent() {
             </View>
           )}
 
-          {selectedStudentId && bodyLoading && (
+          {!!selectedStudentId && bodyLoading && (
             <View style={styles.placeholderBox}>
               <ThemedText style={{ color: colors['muted-foreground'] }}>Loading fee structure...</ThemedText>
             </View>
           )}
 
-          {selectedStudentId && !bodyLoading && (
+          {!!selectedStudentId && !bodyLoading && (
             <>
               {/* Student summary */}
               <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -443,7 +440,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 14, fontWeight: '700' },
   label: { fontSize: 12, fontWeight: '600', marginTop: 8, marginBottom: 4 },
-  compactDropdown: { height: 38, paddingHorizontal: 10, paddingVertical: 4 },
+  compactDropdown: { height: 44, paddingHorizontal: 10, paddingVertical: 4 },
   compactDropdownContainer: { marginBottom: 0 },
   compactDropdownText: { fontSize: 13 },
   labelRow: {
@@ -457,8 +454,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 3,
     marginTop: 8,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
   },
   placeholderBox: {
     alignItems: 'center',
@@ -487,9 +484,9 @@ const styles = StyleSheet.create({
   feeAmount: { fontSize: 12, marginTop: 2 },
   feeAction: { minWidth: 84, alignItems: 'flex-end' },
   assignButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 8,
     borderWidth: 1,
   },
   assignButtonText: { fontSize: 12, fontWeight: '600' },

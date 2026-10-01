@@ -4,6 +4,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { useToastContext } from '@/components/ToastProvider';
 import { ReadOrListPermissionGuard, CreatePermissionGuard, UpdatePermissionGuard, DeletePermissionGuard } from '@/components/PermissionGuards';
 import CustomDropdown from '@/components/ui/dropdown';
+import { DatePickerModal } from '@/components/ui';
 import { useTheme } from '@/contexts';
 import { Trip, Vehicle } from '../../src/api';
 import { feeCategoriesApi, feeTypesApi } from '../../src/api/fees';
@@ -22,10 +23,12 @@ import {
 import { PERMISSION_RESOURCES } from '../../src/types/permissions';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -72,6 +75,7 @@ export default function VehiclesScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [datePickerField, setDatePickerField] = useState<null | 'driving_licence_exp_date' | 'insurance_expiry_date'>(null);
   const [formData, setFormData] = useState({ ...defaultForm });
 
   // Trips assigned to the vehicle being created/edited
@@ -397,7 +401,7 @@ export default function VehiclesScreen() {
     }
   };
 
-  const renderVehicleItem = useCallback(({ item, index }: { item: Vehicle; index: number }) => (
+  const renderVehicleItem = ({ item, index }: { item: Vehicle; index: number }) => (
     <View style={[styles.vehicleCard, { backgroundColor: colors.card }]}>
       <View style={styles.vehicleHeader}>
         <View style={styles.vehicleInfo}>
@@ -437,12 +441,6 @@ export default function VehiclesScreen() {
 
       <View style={styles.vehicleDetails}>
         <View style={styles.detailRow}>
-          <Ionicons name="finger-print" size={16} color={colors['muted-foreground']} />
-          <ThemedText style={styles.detailText}>
-            ID: {item.id}
-          </ThemedText>
-        </View>
-        <View style={styles.detailRow}>
           <Ionicons name="car" size={16} color={colors['muted-foreground']} />
           <ThemedText style={styles.detailText}>
             {item.registration_number}
@@ -460,7 +458,7 @@ export default function VehiclesScreen() {
           <View style={styles.detailRow}>
             <Ionicons name="time" size={16} color={colors['muted-foreground']} />
             <ThemedText style={styles.detailText}>
-              Licence Expiry: {new Date(item.driving_licence_exp_date).toLocaleDateString()}
+              Licence Expiry: {new Date(item.driving_licence_exp_date).toLocaleDateString('en-IN')}
             </ThemedText>
           </View>
         )}
@@ -468,7 +466,7 @@ export default function VehiclesScreen() {
           <View style={styles.detailRow}>
             <Ionicons name="cash" size={16} color={colors['muted-foreground']} />
             <ThemedText style={styles.detailText}>
-              Fees: ₹{item.fees}
+              Fees: ₹{Number(item.fees).toLocaleString('en-IN')}
             </ThemedText>
           </View>
         )}
@@ -485,7 +483,7 @@ export default function VehiclesScreen() {
           <View style={styles.detailRow}>
             <Ionicons name="shield-checkmark" size={16} color={colors['muted-foreground']} />
             <ThemedText style={styles.detailText}>
-              Insurance Expiry: {new Date(item.insurance_expiry_date).toLocaleDateString()}
+              Insurance Expiry: {new Date(item.insurance_expiry_date).toLocaleDateString('en-IN')}
             </ThemedText>
           </View>
         )}
@@ -497,17 +495,17 @@ export default function VehiclesScreen() {
             </ThemedText>
           </View>
         )}
-        {item.created_at && (
+        {!!item.created_at && (
           <View style={styles.detailRow}>
             <Ionicons name="calendar" size={16} color={colors['muted-foreground']} />
             <ThemedText style={styles.detailText}>
-              Created: {new Date(item.created_at).toLocaleDateString()}
+              Created: {new Date(item.created_at).toLocaleDateString('en-IN')}
             </ThemedText>
           </View>
         )}
       </View>
     </View>
-  ), [colors]);
+  );
 
   if (error) {
     return (
@@ -586,6 +584,7 @@ export default function VehiclesScreen() {
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContainer}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             refreshControl={
               <RefreshControl
                 refreshing={isLoading}
@@ -654,7 +653,7 @@ export default function VehiclesScreen() {
           transparent={true}
           onRequestClose={() => setIsModalVisible(false)}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
               <View style={styles.modalHeader}>
                 <ThemedText type="title" style={styles.modalTitle}>
@@ -746,13 +745,16 @@ export default function VehiclesScreen() {
 
                 <View style={styles.formGroup}>
                   <ThemedText style={styles.label}>Driving Licence Expiry Date</ThemedText>
-                  <TextInput
-                    style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={colors['muted-foreground']}
-                    value={formData.driving_licence_exp_date}
-                    onChangeText={(text) => setFormData(prev => ({ ...prev, driving_licence_exp_date: text }))}
-                  />
+                  <TouchableOpacity
+                    style={[styles.input, styles.dateField, { borderColor: colors.border }]}
+                    onPress={() => setDatePickerField('driving_licence_exp_date')}
+                    accessibilityLabel="Select licence expiry date"
+                  >
+                    <ThemedText style={{ color: formData.driving_licence_exp_date ? colors.foreground : colors['muted-foreground'], fontSize: 16 }}>
+                      {formData.driving_licence_exp_date || 'Select date'}
+                    </ThemedText>
+                    <Ionicons name="calendar-outline" size={18} color={colors['muted-foreground']} />
+                  </TouchableOpacity>
                 </View>
 
                 <View style={styles.formGroup}>
@@ -792,13 +794,16 @@ export default function VehiclesScreen() {
 
                 <View style={styles.formGroup}>
                   <ThemedText style={styles.label}>Insurance Expiry Date</ThemedText>
-                  <TextInput
-                    style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={colors['muted-foreground']}
-                    value={formData.insurance_expiry_date}
-                    onChangeText={(text) => setFormData(prev => ({ ...prev, insurance_expiry_date: text }))}
-                  />
+                  <TouchableOpacity
+                    style={[styles.input, styles.dateField, { borderColor: colors.border }]}
+                    onPress={() => setDatePickerField('insurance_expiry_date')}
+                    accessibilityLabel="Select insurance expiry date"
+                  >
+                    <ThemedText style={{ color: formData.insurance_expiry_date ? colors.foreground : colors['muted-foreground'], fontSize: 16 }}>
+                      {formData.insurance_expiry_date || 'Select date'}
+                    </ThemedText>
+                    <Ionicons name="calendar-outline" size={18} color={colors['muted-foreground']} />
+                  </TouchableOpacity>
                 </View>
 
                 <View style={styles.formGroup}>
@@ -849,6 +854,7 @@ export default function VehiclesScreen() {
                               </ThemedText>
                             </View>
                             <TouchableOpacity
+                              style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
                               onPress={() => removeTrip(trip._key)}
                               accessibilityLabel="Remove trip"
                             >
@@ -899,8 +905,17 @@ export default function VehiclesScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
+        <DatePickerModal
+          visible={datePickerField !== null}
+          initialDate={datePickerField ? formData[datePickerField] : ''}
+          onConfirm={(date) => {
+            if (datePickerField) setFormData(prev => ({ ...prev, [datePickerField]: date }));
+            setDatePickerField(null);
+          }}
+          onCancel={() => setDatePickerField(null)}
+        />
         <ConfirmModal
           visible={pendingDeleteVehicle !== null}
           title="Delete Vehicle"
@@ -924,6 +939,11 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  dateField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -939,7 +959,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: 8,
   },
   addButtonText: {
@@ -1006,9 +1026,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1089,7 +1109,7 @@ const styles = StyleSheet.create({
   },
   toggleBtn: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 8,
     alignSelf: 'flex-start',
   },
@@ -1120,8 +1140,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     gap: 4,
   },
   addTripText: {
@@ -1195,14 +1215,14 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
   },
   submitButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
   },

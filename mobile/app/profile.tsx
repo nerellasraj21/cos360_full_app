@@ -43,15 +43,6 @@ export default function ProfileScreen() {
   const isStaff = roleName === 'staff' || roleName === 'teacher' || roleName === 'admin';
   const isParent = roleName === 'parent' || roleName === 'guardian' || roleName === 'father' || roleName === 'mother';
 
-  // Debug logging
-  console.log('Profile Screen - Role Info:', {
-    roleName,
-    isStudent,
-    isStaff,
-    isParent,
-    userRole: role?.name
-  });
-
   // Conditionally fetch profile data based on role
   const studentQuery = useStudentProfile({ enabled: isStudent });
   const staffQuery = useStaffProfile({ enabled: isStaff });
@@ -125,7 +116,7 @@ export default function ProfileScreen() {
           <AppHeader title="Profile" />
           <View style={styles.centerContent}>
             <ThemedText style={styles.errorText}>
-              You don't have permission to view profile information.
+              You don&apos;t have permission to view profile information.
             </ThemedText>
           </View>
           <AppFooter />
@@ -162,7 +153,7 @@ export default function ProfileScreen() {
                   Failed to load profile information
                 </ThemedText>
                 <ThemedText style={[styles.errorSubtext, { color: colors['muted-foreground'] }]}>
-                  {profileQuery.error.message || 'Please try again later'}
+                  {profileQuery.error?.message || 'Please try again later'}
                 </ThemedText>
                 <View style={styles.buttonRow}>
                   <TouchableOpacity
@@ -187,7 +178,7 @@ export default function ProfileScreen() {
                 Profile not available for your role
               </ThemedText>
               <ThemedText style={[styles.errorSubtext, { color: colors['muted-foreground'] }]}>
-                Role: {role?.name || 'Unknown'}
+                Please contact your administrator.
               </ThemedText>
             </View>
           ) : (

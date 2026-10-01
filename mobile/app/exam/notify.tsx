@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -30,16 +30,22 @@ const AUDIENCE_OPTIONS: { label: string; value: TargetAudience; icon: string }[]
   { label: 'Both', value: 'both', icon: 'people-circle' },
 ];
 
+const TYPE_OPTIONS: { label: string; value: string }[] = [
+  { label: 'Hall Ticket Available', value: 'hall_ticket_available' },
+  { label: 'Results Published', value: 'results_published' },
+  { label: 'Exam Schedule', value: 'exam_schedule' },
+  { label: 'Custom', value: 'custom' },
+];
+
 const ACCENT = '#EF4444';
 
 export default function ExamNotifyScreen() {
-  const router = useRouter();
   const { colors, theme } = useTheme();
   const { showSuccess, showError } = useToastContext();
   const { examId } = useLocalSearchParams<{ examId?: string }>();
 
   const [selectedExamId, setSelectedExamId] = useState<string | null>(examId ?? null);
-  const [notificationType, setNotificationType] = useState('');
+  const [notificationType, setNotificationType] = useState('custom');
   const [message, setMessage] = useState('');
   const [targetAudience, setTargetAudience] = useState<TargetAudience>('students');
   const [sendPush, setSendPush] = useState(true);
@@ -64,7 +70,7 @@ export default function ExamNotifyScreen() {
         'Notifications Queued',
         `${result.notifications_queued} notification(s) queued successfully.`
       );
-      setNotificationType('');
+      setNotificationType('custom');
       setMessage('');
     },
     onError: (error: any) => {
@@ -114,7 +120,7 @@ export default function ExamNotifyScreen() {
         <AppLayout title="Exam Notifications">
           <View style={styles.centered}>
             <Ionicons name="lock-closed" size={48} color={colors['muted-foreground']} />
-            <ThemedText style={styles.accessDeniedText}>You don't have permission to send notifications</ThemedText>
+            <ThemedText style={styles.accessDeniedText}>You don&apos;t have permission to send notifications</ThemedText>
           </View>
         </AppLayout>
       }
@@ -169,7 +175,7 @@ export default function ExamNotifyScreen() {
                 ))}
               </ScrollView>
             )}
-            {selectedExam && (
+            {!!selectedExam && (
               <View style={[styles.selectedExamInfo, { backgroundColor: ACCENT + '10' }]}>
                 <Ionicons name="school" size={16} color={ACCENT} />
                 <ThemedText style={[styles.selectedExamText, { color: ACCENT }]}>
@@ -182,14 +188,24 @@ export default function ExamNotifyScreen() {
           {/* Notification Type */}
           <ThemedView style={[styles.section, { backgroundColor: cardBg, borderColor: borderCol }]}>
             <ThemedText style={styles.sectionTitle}>Notification Type *</ThemedText>
-            <TextInput
-              style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
-              placeholder="e.g. exam_reminder, result_published, schedule_change"
-              placeholderTextColor={colors['muted-foreground']}
-              value={notificationType}
-              onChangeText={setNotificationType}
-              autoCapitalize="none"
-            />
+            <View style={styles.typeWrap}>
+              {TYPE_OPTIONS.map(opt => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[
+                    styles.chip,
+                    { borderColor: notificationType === opt.value ? ACCENT : borderCol },
+                    notificationType === opt.value && { backgroundColor: ACCENT + '18' },
+                  ]}
+                  onPress={() => setNotificationType(opt.value)}
+                  activeOpacity={0.75}
+                >
+                  <ThemedText style={[styles.chipText, notificationType === opt.value && { color: ACCENT, fontWeight: '600' }]}>
+                    {opt.label}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </View>
           </ThemedView>
 
           {/* Message */}
@@ -311,8 +327,9 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 12, letterSpacing: 0.3 },
   loadingText: { fontSize: 13, fontStyle: 'italic' },
   chipRow: { gap: 8, paddingBottom: 4 },
+  typeWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
-    borderWidth: 1.5, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, maxWidth: 180,
+    borderWidth: 1.5, borderRadius: 20, paddingHorizontal: 14, minHeight: 44, justifyContent: 'center', maxWidth: 220,
   },
   chipText: { fontSize: 13 },
   selectedExamInfo: {
@@ -329,7 +346,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', gap: 6,
   },
   audienceBtnText: { fontSize: 12 },
-  channelRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  channelRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
   channelLabel: { fontSize: 15 },
   sendBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
