@@ -163,3 +163,5 @@ api_routes.json
 
 # Legacy data migration reports contain personal data
 migration_reports/
+
+student_documents/

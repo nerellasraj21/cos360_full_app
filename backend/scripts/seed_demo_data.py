@@ -42,11 +42,17 @@ class Api:
         self.token = body["access_token"]
         self.user_id = body["user"]["id"]
 
-    def call(self, method, path, json=None, params=None, quiet=False, label=None):
+    def call(self, method, path, json=None, params=None, quiet=False, label=None, files=None, data=None):
         relogged = False
         for attempt in range(8):
             r = self.http.request(
-                method, path, json=json, params=params, headers={"Authorization": f"Bearer {self.token}"}
+                method,
+                path,
+                json=json,
+                params=params,
+                files=files,
+                data=data,
+                headers={"Authorization": f"Bearer {self.token}"},
             )
             if r.status_code == 401 and not relogged:
                 relogged = True
@@ -960,7 +966,7 @@ def seed_fee_payments():
         target = studs[1]
         cs, cd = api.call("GET", f"/fee/concessions/student/{target['id']}", params={"academic_year_id": api.year_id})
         if ok(cs):
-            existing = cd.get("concessions") if isinstance(cd, dict) else cd
+            existing = [i for i in (cd.get("items") or []) if float(i.get("concession_amount") or 0) > 0]
             if existing:
                 existed("fee_concessions")
             else:
@@ -1218,6 +1224,16 @@ def seed_exams():
             date(2026, 9, 16),
             ("2026-06-10", "2026-09-30"),
             "1-B",
+        ),
+        (
+            "Unit Test 1 - Class 2A",
+            "formative",
+            "Term 1",
+            ["Class 2"],
+            [("Written", 25)],
+            date(2026, 9, 21),
+            ("2026-06-10", "2026-09-30"),
+            "2-A",
         ),
         (
             "Half Yearly Examination 2026",
@@ -1789,6 +1805,360 @@ def seed_expense():
                 CREATED[f"expense_{action}s"] += 1
 
 
+BAD_EXAMS = ["Unit Test 1 - Class 3"]
+
+
+def cleanup_bad_exams():
+    section("exam cleanup")
+    status, data = api.call("GET", "/exams", params={"academic_year_id": api.year_id}, quiet=True)
+    for e in rows(data) if ok(status) else []:
+        if e["exam_name"] not in BAD_EXAMS:
+            continue
+        st, _ = api.call("DELETE", f"/exams/{e['id']}", label=e["exam_name"])
+        if ok(st):
+            CREATED["exams_deleted"] += 1
+
+
+def seed_remark_grades():
+    section("remark grades")
+    status, data = api.call("GET", "/remark-grades", quiet=True)
+    have = {g["name"] for g in rows(data)} if ok(status) else set()
+    name = "Co-Scholastic Grading"
+    if name in have:
+        existed("remark_grade_sets")
+        return
+    create(
+        "remark_grade_sets",
+        "POST",
+        "/remark-grades",
+        {
+            "name": name,
+            "options": [
+                {"grade_letter": "A", "label": "Excellent", "sort_order": 1},
+                {"grade_letter": "B", "label": "Good", "sort_order": 2},
+                {"grade_letter": "C", "label": "Satisfactory", "sort_order": 3},
+                {"grade_letter": "D", "label": "Needs Improvement", "sort_order": 4},
+            ],
+        },
+    )
+
+
+def seed_extra_exam_results():
+    section("extra exam results")
+    name = "Unit Test 1 - Class 2A"
+    eid = IDS.get("exams", {}).get(name)
+    if not eid:
+        return
+    status, data = api.call("GET", f"/exams/{eid}", quiet=True)
+    if ok(status) and data.get("status") == "published":
+        existed("exams_published")
+        return
+    status, data = api.call("GET", f"/exams/{eid}/results", quiet=True)
+    if ok(status) and rows(data):
+        existed("exam_results")
+    else:
+        status, cfgs = api.call("GET", f"/exams/{eid}/subject-configs", quiet=True)
+        if not ok(status):
+            return
+        for cfg in rows(cfgs):
+            sec = cfg.get("section_id") or "00000000-0000-0000-0000-000000000000"
+            st, grid = api.call(
+                "GET",
+                f"/exams/{eid}/marks",
+                params={
+                    "class_id": cfg["class_id"],
+                    "section_id": sec,
+                    "subject_config_id": cfg["id"],
+                    "page_size": 100,
+                },
+                label="marks grid",
+            )
+            if not ok(st):
+                continue
+            students = grid if isinstance(grid, list) else (grid.get("items") or [])
+            comp_max = {c["id"]: float(c.get("max_marks") or 25) for c in cfg.get("components", [])}
+            entries = []
+            for s_i, srow in enumerate(students):
+                for cid, mx in comp_max.items():
+                    seed = (s_i + 5) * 37 + sum(ord(ch) for ch in str(cfg["subject_id"])[:6]) + len(entries) * 11
+                    entries.append(
+                        {
+                            "student_id": srow["student_id"],
+                            "component_id": cid,
+                            "marks_obtained": pseudo_marks(seed, mx),
+                            "is_absent": False,
+                        }
+                    )
+            if entries:
+                d = create(
+                    "exam_mark_batches",
+                    "POST",
+                    f"/exams/{eid}/marks",
+                    {"exam_id": eid, "subject_config_id": cfg["id"], "marks": entries, "attempt_number": 1},
+                    label="marks 2A",
+                )
+                if d is not None:
+                    CREATED["exam_marks"] += len(entries)
+        create("exam_results_computed", "POST", f"/exams/{eid}/compute", None, label="compute 2A")
+    st, _ = api.call("POST", f"/exams/{eid}/publish", label="publish 2A")
+    if ok(st):
+        CREATED["exams_published"] += 1
+
+
+def seed_certificates():
+    section("certificates")
+    status, data = api.call("GET", "/certificates/types/", params={"skip": 0, "limit": 100}, quiet=True)
+    have = {t["name"] for t in rows(data)} if ok(status) else set()
+    types = [
+        ("Bonafide Certificate", "Confirms the student is currently enrolled"),
+        ("Transfer Certificate", "Issued when a student leaves the school"),
+        ("Conduct Certificate", "Certifies the conduct of the student"),
+        ("Study Certificate", "Certifies the classes studied at the school"),
+    ]
+    for name, desc in types:
+        if name in have:
+            existed("certificate_types")
+            continue
+        create("certificate_types", "POST", "/certificates/types/", {"name": name, "description": desc})
+
+    def body(title, text):
+        return (
+            '<div style="font-family:Georgia,serif;border:4px double #1e3a8a;padding:32px;max-width:720px;margin:auto">'
+            '<h2 style="text-align:center;color:#1e3a8a;margin:0">{{school_name}}</h2>'
+            '<p style="text-align:center;margin:4px 0 24px">Academic Year {{academic_year}}</p>'
+            f'<h3 style="text-align:center;text-decoration:underline">{title}</h3>'
+            f'<p style="line-height:1.8">{text}</p>'
+            '<p style="margin-top:48px">Date: {{issue_date}}</p>'
+            '<p style="text-align:right">Principal</p></div>'
+        )
+
+    templates = [
+        (
+            "Bonafide Certificate",
+            "blue",
+            body(
+                "BONAFIDE CERTIFICATE",
+                "This is to certify that <b>{{student_name}}</b>, Admission No. {{admission_number}}, "
+                "is a bonafide student of this school studying in Class {{class_name}} {{section}} "
+                "during the academic year {{academic_year}}.",
+            ),
+        ),
+        (
+            "Conduct Certificate",
+            "green",
+            body(
+                "CONDUCT CERTIFICATE",
+                "This is to certify that <b>{{student_name}}</b>, Admission No. {{admission_number}}, "
+                "studying in Class {{class_name}} {{section}}, bears a good moral character and "
+                "has shown satisfactory conduct during the academic year {{academic_year}}.",
+            ),
+        ),
+        (
+            "Study Certificate",
+            "orange",
+            body(
+                "STUDY CERTIFICATE",
+                "This is to certify that <b>{{student_name}}</b>, Admission No. {{admission_number}}, "
+                "has studied in this school and is presently in Class {{class_name}} {{section}} "
+                "for the academic year {{academic_year}}.",
+            ),
+        ),
+        (
+            "Transfer Certificate",
+            "red",
+            body(
+                "TRANSFER CERTIFICATE",
+                "This is to certify that <b>{{student_name}}</b>, Admission No. {{admission_number}}, "
+                "son/daughter of {{father_name}}, studied in Class {{class_name}} {{section}} of this school "
+                "and is granted transfer from {{date_of_leaving}}.",
+            ),
+        ),
+    ]
+    status, data = api.call("GET", "/issuable-certificates/templates/", quiet=True)
+    tpl = {t["name"]: t for t in rows(data)} if ok(status) else {}
+    for name, theme, html in templates:
+        if name in tpl:
+            existed("certificate_templates")
+            continue
+        d = create(
+            "certificate_templates",
+            "POST",
+            "/issuable-certificates/templates/",
+            {"name": name, "html_template": html, "color_theme": theme},
+        )
+        if d:
+            tpl[name] = d
+
+    section("issued certificates")
+    studs = IDS.get("students", [])
+    school = "Demo School"
+    plan = [
+        (0, "Bonafide Certificate"),
+        (3, "Bonafide Certificate"),
+        (9, "Conduct Certificate"),
+        (14, "Study Certificate"),
+        (20, "Conduct Certificate"),
+    ]
+    for idx, tname in plan:
+        if idx >= len(studs) or tname not in tpl:
+            continue
+        stu = studs[idx]
+        status, data = api.call("GET", "/issuable-certificates/issued/", params={"student_id": stu["id"]}, quiet=True)
+        if ok(status) and any(c.get("template_id") == tpl[tname]["id"] for c in rows(data)):
+            existed("issued_certificates")
+            continue
+        html = tpl[tname]["html_template"]
+        values = {
+            "school_name": school,
+            "academic_year": "2026-27",
+            "student_name": stu["name"],
+            "admission_number": str(stu.get("admission_number") or ""),
+            "class_name": stu["class"],
+            "section": stu["section"],
+            "father_name": "",
+            "date_of_leaving": "",
+            "issue_date": "01-10-2026",
+        }
+        for k, v in values.items():
+            html = html.replace("{{" + k + "}}", v)
+        create(
+            "issued_certificates",
+            "POST",
+            "/issuable-certificates/generate/",
+            {
+                "student_id": stu["id"],
+                "template_id": tpl[tname]["id"],
+                "edited_html": html,
+                "remarks": "Demo issue",
+            },
+            label=f"{stu['name']}/{tname}",
+        )
+
+
+def seed_communication_templates():
+    section("communication templates")
+    status, data = api.call("GET", "/communication/templates", quiet=True)
+    have = {(t["name"], t["channel"]) for t in rows(data)} if ok(status) else set()
+    templates = [
+        (
+            "Fee Reminder",
+            "sms",
+            None,
+            "Dear Parent, the fee of Rs {{amount}} for {{student_name}} is due on {{due_date}}. "
+            "Please pay at the school office. - Demo School",
+        ),
+        (
+            "Exam Schedule",
+            "email",
+            "Exam schedule for {{class_name}}",
+            "Dear Parent,\n\nThe {{exam_name}} for {{student_name}} ({{class_name}}) begins on {{start_date}}. "
+            "The detailed timetable is available in the parent app.\n\nRegards,\nDemo School",
+        ),
+        (
+            "Holiday Notice",
+            "whatsapp",
+            None,
+            "Dear Parent, the school will remain closed on {{holiday_date}} on account of {{occasion}}. "
+            "Classes resume on {{resume_date}}. - Demo School",
+        ),
+    ]
+    for name, channel, subject, body in templates:
+        if (name, channel) in have:
+            existed("communication_templates")
+            continue
+        payload = {"name": name, "channel": channel, "body": body}
+        if subject:
+            payload["subject"] = subject
+        create("communication_templates", "POST", "/communication/templates", payload)
+
+
+TIMETABLE_SLOTS = [
+    ("09:00", "10:00", "subject"),
+    ("10:00", "10:45", "subject"),
+    ("10:45", "11:00", "special"),
+    ("11:00", "11:45", "subject"),
+    ("11:45", "12:30", "subject"),
+    ("12:30", "13:15", "special"),
+    ("13:15", "14:00", "subject"),
+    ("14:00", "14:45", "subject"),
+]
+
+
+def seed_timetable():
+    section("timetable")
+    days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+    for cname in ("Class 1", "Class 2"):
+        c = IDS["classes"].get(cname)
+        if not c:
+            continue
+        subs = [IDS["subjects"][s] for s in EXAM_SUBJECTS[cname] + ["Computer Science", "Art and Craft"]]
+        subs = [x for x in subs if x]
+        for sname, sid in sorted(c["sections"].items()):
+            status, data = api.call("GET", f"/students/timetable/frontend/{sid}", quiet=True)
+            if ok(status) and isinstance(data, dict) and data.get("timetable_data"):
+                existed("timetables")
+                continue
+            period = 0
+            slots = []
+            for start, end, kind in TIMETABLE_SLOTS:
+                if kind == "special":
+                    slots.append(
+                        {
+                            "time": {"from": start, "to": end},
+                            "type": "special",
+                            "label": "SNACKS" if start == "10:45" else "LUNCH",
+                        }
+                    )
+                    continue
+                slots.append(
+                    {
+                        "time": {"from": start, "to": end},
+                        "type": "subject",
+                        "subjects": {day: subs[(period + d_i * 2) % len(subs)] for d_i, day in enumerate(days)},
+                    }
+                )
+                period += 1
+            d = create(
+                "timetables",
+                "POST",
+                "/students/timetable/frontend",
+                {"section_id": sid, "timetable_data": slots},
+                label=f"{cname}/{sname}",
+            )
+            if d:
+                CREATED["timetable_slots"] += d.get("created_slots", 0)
+
+
+SAMPLE_PDF = (
+    b"%PDF-1.1\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+    b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+    b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\n"
+    b"trailer<</Root 1 0 R/Size 4>>\n%%EOF\n"
+)
+
+
+def seed_student_documents():
+    section("student documents")
+    studs = IDS.get("students", [])
+    for idx, dtype in [(1, "Birth Certificate"), (2, "Aadhaar Card")]:
+        if idx >= len(studs):
+            continue
+        stu = studs[idx]
+        status, data = api.call("GET", "/students/documents/", params={"student_id": stu["id"]}, quiet=True)
+        if ok(status) and any(x.get("document_type") == dtype for x in rows(data)):
+            existed("student_documents")
+            continue
+        st, d = api.call(
+            "POST",
+            "/students/documents/",
+            data={"student_id": stu["id"], "document_type": dtype},
+            files={"document_file": ("sample.pdf", SAMPLE_PDF, "application/pdf")},
+            label=stu["name"],
+        )
+        if ok(st):
+            CREATED["student_documents"] += 1
+
+
 def count_of(path, params=None, page=100):
     status, data = api.call("GET", path, params=params, quiet=True)
     if not ok(status):
@@ -1833,6 +2203,11 @@ def verify():
         ("expense departments", "/expense/departments/", {"active_only": "false"}),
         ("expense types", "/expense/types/", {"active_only": "false"}),
         ("expense transactions", "/expense/transactions/", {"limit": 200}),
+        ("expense audit logs", "/expense/audit/logs", {"limit": 500}),
+        ("remark grade sets", "/remark-grades", None),
+        ("certificate types", "/certificates/types/", {"limit": 100}),
+        ("certificate templates", "/issuable-certificates/templates/", None),
+        ("communication templates", "/communication/templates", None),
     ]
     for eid_name, eid in exam_ids.items():
         checks.append((f"exam results [{eid_name}]", f"/exams/{eid}/results", None))
@@ -1840,6 +2215,22 @@ def verify():
         checks.append((f"exam ineligible hall tickets [{eid_name}]", f"/exams/{eid}/hall-tickets/ineligible", None))
     status, data = api.call("GET", "/masters/class_sections/read_all", quiet=True)
     classes = rows(data) if ok(status) else []
+    tt = 0
+    for c in classes:
+        for sec in c.get("sections") or []:
+            st, d = api.call("GET", f"/students/timetable/frontend/{sec['id']}", quiet=True)
+            if ok(st) and isinstance(d, dict) and d.get("timetable_data"):
+                tt += 1
+    print(f"  sections with timetable: {tt}")
+    issued = 0
+    docs = 0
+    for stu in IDS.get("students", []):
+        st, d = api.call("GET", "/issuable-certificates/issued/", params={"student_id": stu["id"]}, quiet=True)
+        issued += len(rows(d)) if ok(st) else 0
+        st, d = api.call("GET", "/students/documents/", params={"student_id": stu["id"]}, quiet=True)
+        docs += len(rows(d)) if ok(st) else 0
+    print(f"  issued certificates: {issued}")
+    print(f"  student documents: {docs}")
     print(f"  classes: {len(classes)}")
     print(f"  sections: {sum(len(c.get('sections') or []) for c in classes)}")
     mapped = 0
@@ -1883,10 +2274,17 @@ def main():
         seed_fee_student_mappings,
         seed_fee_payments,
         seed_exam_setup,
+        cleanup_bad_exams,
         seed_exams,
         seed_exam_marks_and_results,
+        seed_extra_exam_results,
+        seed_remark_grades,
         seed_transport,
         seed_expense,
+        seed_certificates,
+        seed_communication_templates,
+        seed_timetable,
+        seed_student_documents,
         verify,
     ]
     for step in steps:
