@@ -2,7 +2,7 @@
 Local File Management Service for Student Certificates
 
 Handles file upload, stale file movement, and URL generation using local disk storage.
-Files are stored under media/{tenant}/{module}/{student_id}/{uuid}.{ext}
+Files are stored under media/{tenant_id}/{module}/{student_id}/{uuid}.{ext}
 """
 
 import logging
@@ -62,7 +62,7 @@ class FileManager:
             )
 
     async def upload_file(
-        self, tenant: str, module: str, student_id: str, file: UploadFile
+        self, tenant_id: str, module: str, student_id: str, file: UploadFile
     ) -> str:
         """
         Save uploaded file to local disk.
@@ -95,7 +95,7 @@ class FileManager:
                 await self._validate_pdf_magic_bytes(file_data)
 
             file_uuid = str(uuid.uuid4())
-            save_dir = os.path.join(MEDIA_ROOT, tenant, module, student_id)
+            save_dir = os.path.join(MEDIA_ROOT, tenant_id, module, student_id)
             os.makedirs(save_dir, exist_ok=True)
 
             filename = f"{file_uuid}{ext}"
@@ -103,7 +103,7 @@ class FileManager:
             with open(abs_path, "wb") as f:
                 f.write(file_data)
 
-            file_key = f"{tenant}/{module}/{student_id}/{filename}"
+            file_key = f"{tenant_id}/{module}/{student_id}/{filename}"
             log.info(f"File saved locally: {file_key}")
             return file_key
 
@@ -117,14 +117,14 @@ class FileManager:
             )
 
     async def upload_bytes(
-        self, tenant: str, module: str, student_id: str, data: bytes, ext: str, content_type: str
+        self, tenant_id: str, module: str, student_id: str, data: bytes, ext: str, content_type: str
     ) -> str:
         """
         Save raw bytes to local disk (used for signatures and other pre-read data).
         Returns the file key.
         """
         try:
-            save_dir = os.path.join(MEDIA_ROOT, tenant, module, student_id)
+            save_dir = os.path.join(MEDIA_ROOT, tenant_id, module, student_id)
             os.makedirs(save_dir, exist_ok=True)
 
             filename = f"{uuid.uuid4()}{ext}"
@@ -132,7 +132,7 @@ class FileManager:
             with open(abs_path, "wb") as f:
                 f.write(data)
 
-            file_key = f"{tenant}/{module}/{student_id}/{filename}"
+            file_key = f"{tenant_id}/{module}/{student_id}/{filename}"
             log.info(f"File saved locally: {file_key}")
             return file_key
 
@@ -143,7 +143,7 @@ class FileManager:
                 detail=f"Error uploading file: {str(e)}",
             )
 
-    async def move_to_stale(self, file_key: str, tenant: str) -> str:
+    async def move_to_stale(self, file_key: str, tenant_id: str) -> str:
         """Move file to stale zone by prefixing with 'stale/'."""
         try:
             stale_key = f"{STALE_PREFIX}/{file_key}"

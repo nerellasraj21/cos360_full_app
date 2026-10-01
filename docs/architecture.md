@@ -45,14 +45,13 @@ Related: `docs/permissions.md` (permission system end to end), `docs/modules/*.m
 - `migrations/env.py` requires `MIGRATION_DATABASE_URL` (the owner role) and sets no `search_path`. On a clean database `alembic upgrade head` creates everything and autogenerate reports no drift.
 
 ### Known gaps (shared-schema migration)
-Converted: models and base, session layer, middleware, login, refresh and set-password, provisioning, role seeding, token blacklist. Still written for per-tenant schemas, and wrong against the shared schema until converted:
-- Celery tasks take a `tenant_schema` argument and run `SET search_path`; endpoints pass `request.headers.get("cschema")`.
-- Code that treats `TenantService.get_tenant_schema(...)` as a schema name (report endpoints, `communication_endpoints.py`). It now returns the tenant id.
-- `tenant_data_endpoints.py`, `fix_permissions_endpoints.py`, `test_setup_endpoints.py`, `setup_endpoints.py` and `service/schema/*` use `"{schema}".table` SQL or `ON CONFLICT` targets that no longer match.
+Converted: models and base, session layer, middleware, login, refresh and set-password, provisioning, role seeding, token blacklist, Celery tasks and their call sites, report endpoints and cache keys, certificates and media paths, expense, super-admin tenant data, and the permission services. Not converted:
+- `POST /super_admin/setup/initialize` and `GET /super_admin/setup/status` (`setup_endpoints.py`) are unauthenticated. Initialize creates a super admin with a hardcoded password and returns it, and its `CREATE TABLE IF NOT EXISTS` cannot run as the app role.
+- `/auth/seed/*` except `all-role-permissions` is unauthenticated.
+- `app/db/session.py` is the older helper that builds an engine per call. Plan, super-admin auth, seed and setup code still import its `get_public_db`.
 - Web and mobile still send `cschema` on every request; mobile has no tenant lookup before login.
-- Photos, logos and signatures are not tenant-prefixed on disk, and `/media` is a public static mount.
-- `scripts/` still assume schemas.
-
+- `scripts/` still assume per-tenant schemas.
+- `permission_endpoints.py` still has the `/test/` and `/debug-roles/` leftovers.
 ## 2. Request lifecycle and layering
 
 Middleware order is outermost to innermost, because Starlette runs the last-added middleware first: `CORSMiddleware` → `TenantMiddleware` → `SuperAdminMiddleware` → `RequestContextMiddleware` → `GlobalErrorMiddleware` → router. All of them are registered in `backend/app/main.py`.
@@ -84,7 +83,7 @@ async def create_x(body: XCreate, request: Request, db: AsyncSession = Depends(g
 - **Refresh:** `POST /api/v1/auth/refresh` `{refresh_token}` returns a new access and refresh token pair. It checks the blacklist, that the refresh token's `tenant_id` matches the request tenant (403 otherwise), and that the user is still active. Tokens without `tenant_id` get 401.
 - **Logout:** `POST /auth/logout` blacklists the access token, and the refresh token if one is sent, in `public.token_blacklist` (SHA-256 hashes; a migrated table, not created at runtime). `get_current_user_token` checks the blacklist on **every** request, which costs one extra DB query per request. A database error in that check fails open.
 - The tenant comes from the token's `tenant_id`, and a `cschema` header that disagrees is rejected with 403, so a token cannot be replayed against another tenant. Tokens issued before this claim existed are rejected with 401.
-- Super-admin routes (`/api/v1/super_admin/...`) use `Depends(get_current_super_admin)`, which requires `user_type == "super_admin"`. `SuperAdminMiddleware` only sets flags on `request.state`. Tenant data is reached through path params (`/super_admin/tenant-data/{tenant_schema}/...`), and the schema is validated first.
+- Super-admin routes (`/api/v1/super_admin/...`) use `Depends(get_current_super_admin)`, which requires `user_type == "super_admin"`. `SuperAdminMiddleware` only sets flags on `request.state`. Tenant data is reached through a tenant id in the path (`/super_admin/tenant-data/{tenant_id}/...`), which is validated against `public.tenants` before a tenant session is opened for it.
 
 ## 4. Client ↔ API contract (web and mobile)
 
@@ -114,8 +113,8 @@ async def create_x(body: XCreate, request: Request, db: AsyncSession = Depends(g
 - Files are stored on local disk under `backend/media/` and served **publicly with no auth** by `app.mount("/media", StaticFiles(...))` in `main.py`. Anyone who has the URL can fetch the file.
 - Clients build URLs as `baseURL.replace(/\/api\/v\d+$/, '') + photo_url`, because stored paths start with `/media/...`.
 - Layouts:
-  - Student and staff photos and school images go to `media/{student,staff,school}/...`. These paths are **not** tenant-scoped.
-  - Certificates and received documents go to `media/<cschema header value>/<module>/<student_id>/<uuid>.<ext>` via `app/service/student/file_manager.py`. Deleted files are moved under `media/stale/...`.
+  - Student and staff photos and school images go to `media/<tenant_id>/{student/photos,staff/photos,school/images,school/signatures}/...`. Files and stored URLs written before the shared-schema change keep their old unprefixed paths, and nothing is moved on disk.
+  - Certificates and received documents go to `media/<tenant_id>/<module>/<student_id>/<uuid>.<ext>` via `app/service/student/file_manager.py`. Deleted files are moved under `media/stale/...`.
 - `S3_*` settings exist but the code does not use them. Method names such as `generate_presigned_url` / `delete_from_s3` are historical: they return `/media/...` paths and delete local files.
 - There is no shared volume across hosts. With several app instances, `media/` must live on shared storage.
 
@@ -128,7 +127,7 @@ async def create_x(body: XCreate, request: Request, db: AsyncSession = Depends(g
   - certificate tasks
   - communication `send_notification_batch`
 - Beat runs `cleanup_stale_files` daily at 02:00 UTC. It deletes stale media older than `STALE_FILE_TTL_DAYS`.
-- Tasks have no request context. They currently receive the tenant schema as an argument (endpoints pass `request.headers.get("cschema")`) and run `asyncio.run(...)` once per task with their own engine and `SET search_path`. That is not converted to `tenant_id` yet (see §1 known gaps).
+- Tasks have no request context. They receive the tenant id as an argument (call sites pass `get_tenant_id_from_request(request)`) and open `task_tenant_session(tenant_id)` from `app/tasks/tenant_context.py`, which owns its engine because each task runs in its own `asyncio.run` event loop. Cross-tenant jobs such as `cleanup_stale_files` list active tenants with `task_platform_session()` and open one tenant session each. The exam tasks (`aggregate_compute`, `excel_upload`, `pdf_generation`, `notification`) are placeholders that no endpoint enqueues.
 - Blocking (sync) HTTP calls inside async code run via `await loop.run_in_executor(None, fn, ...)` so they don't stall the event loop (e.g. `_call_provider` in `tasks/communication/send_tasks.py` and the fee-receipt SMS in `fee_collection_service.py`).
 - Neither docker-compose file has a worker or Redis. Start the worker separately with `backend/scripts/start_celery_worker.py`. Most `.delay()` call sites are not wrapped in try/except, so an unreachable broker fails the request **after** the DB commit. `service/communication/dispatch_service.py` is the exception: it catches and logs the error.
 
@@ -139,12 +138,11 @@ async def create_x(body: XCreate, request: Request, db: AsyncSession = Depends(g
 - **Rate limiting:** slowapi `limiter` is registered, but without `SlowAPIMiddleware` the default `1000/hour` limit is never applied. Only endpoints decorated with `@rate_limit_api()` / `@rate_limit_dropdown()` / `@rate_limit_create()` are limited. Keep the parentheses; the endpoint must also take `request: Request`. `/auth/login` is not limited. Storage is Redis if it is reachable at import time, otherwise in-memory per process.
 - **Processes:** prod runs `uvicorn --workers 4` (`backend/start.sh`). The tenant lookup cache (60 s TTL) and the in-memory rate limits are **per process**.
 - **Model before migration:** a model column that doesn't exist in the database breaks every query on that model with a 500. Apply the migration **before** deploying the code that adds the column.
-- **Unauthenticated dev routers are mounted in every environment:**
-  - `/auth/test-setup/*`
-  - `/auth/seed/*`
-  - `/auth/fix-permissions/*`
-  - `/super_admin/setup/initialize`
+- **Unauthenticated routers still mounted in every environment:**
+  - `/auth/seed/*`, except `POST /auth/seed/all-role-permissions`, which now needs an Admin
+  - `/super_admin/setup/initialize` and `/super_admin/setup/status`
 
+  The old `/auth/test-setup/*` and `/auth/fix-permissions/*` routers were removed.
   See the security notes in `docs/permissions.md`.
 - **Logging:** `configure_logging` writes to `cos360_errors.log`, and many services log at INFO/"DEBUG n" on every request.
 - **Web academic year side effect:** an Admin login on web calls `updateAcademicYear(id, { is_active: true })` (`web/src/api/auth.ts`), and the backend then deactivates every other year. Logging in with a non-current year changes the active year for the whole tenant. The `academic_year_id` inside the JWT is not used by the backend to scope queries.

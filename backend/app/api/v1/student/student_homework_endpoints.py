@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.tenant_session import get_tenant_db
+from app.db.tenant_session import get_tenant_db, get_tenant_id_from_request
 from app.models.communication.communication_model import NotificationQueue
 from app.models.masters.parent_model import Parent
 from app.models.student.student_homework_model import StudentHomework
@@ -109,7 +109,7 @@ async def send_homework_reminders(
     await db.commit()
 
     if queue_ids:
-        send_notification_batch.delay(queue_ids, "sms", request.headers.get("cschema", "public"))
+        send_notification_batch.delay(queue_ids, "sms", get_tenant_id_from_request(request))
 
     return {
         "status": "queued",

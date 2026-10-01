@@ -71,7 +71,8 @@ graph LR
   n35 -.->|shapes| n8
   n36[/"whatsapp-plain-text"/]
   n36 -.->|shapes| n1
-  n37[/"worker-gets-tenant-schema"/]
+  n37[/"worker-gets-tenant-id"/]
+  n38[/"worker-gets-tenant-schema"/]
 ```
 
 ## Features
@@ -175,14 +176,14 @@ Implements: `feature:communication/async-delivery`, `feature:communication/messa
 3. Client fetches {estimated_count} `endpoint:GET /communication/send/preview-count`; it uses _resolve_raw and does not filter by channel, so recipients without a phone or email are still counted `service:app/service/communication/recipient_resolver.py`
 4. User picks a channel, then an active template for it `endpoint:GET /communication/templates`; web also narrows templates by a context keyword match on the template name.
 5. User fills in any non-system variables.
-6. Client posts {template_id, channel, target_type, target_ref, variables} `endpoint:POST /communication/send`; the endpoint checks communications:create and resolves the tenant schema via TenantService.get_tenant_schema(client_name), falling back to cos360_masters.
+6. Client posts {template_id, channel, target_type, target_ref, variables} `endpoint:POST /communication/send`; the endpoint checks communications:create and takes the tenant id from the request.
 7. queue_and_dispatch loads the template and rejects an inactive one with 400 `service:app/service/communication/dispatch_service.py` `service:app/service/communication/template_service.py` `table:message_templates`
 8. Recipients are resolved and those missing the contact for the channel are dropped silently (not logged, not counted) `service:app/service/communication/recipient_resolver.py` `table:parents` `table:staff` `table:student_parent_links`
 9. Non-system template variables must all be present in variables, otherwise 400 before anything is queued.
 10. Body is rendered with Jinja2 per recipient (system vars first, user vars override); a render error writes a failed log (message empty) for that recipient only `table:notification_log`
 11. One queue row per recipient is inserted with status queued and the rendered text, then committed `table:notification_queue`
-12. send_notification_batch.delay(queue_ids, channel, tenant_schema) is called `job:app/tasks/communication/send_tasks.py`; a .delay failure is swallowed and the endpoint returns {queued_count}.
-13. The Celery worker opens its own engine and runs SET search_path TO <tenant_schema>, public `job:app/tasks/communication/send_tasks.py`
+12. send_notification_batch.delay(queue_ids, channel, tenant_id) is called `job:app/tasks/communication/send_tasks.py`; a .delay failure is swallowed and the endpoint returns {queued_count}.
+13. The Celery worker opens a tenant session for tenant_id, which sets app.tenant_id for each transaction `job:app/tasks/communication/send_tasks.py` `service:app/tasks/tenant_context.py`
 14. For each row it marks status processing and calls the provider: sms via MSG91 Flow API `service:app/service/communication/msg91_service.py`, whatsapp via Meta Cloud API text message, email via SendGrid.
 15. On success the queue row becomes done and a notification_log row is written with status sent and provider_message_id `table:notification_queue` `table:notification_log`
 16. On a provider error it writes a failed log and re-raises; the task retries up to 3 times with a 60 s delay.
@@ -216,9 +217,9 @@ flowchart TD
   s9 --> s10
   s11["11. One queue row per recipient is inserted with status queued and the ...<br/>table:notification_queue"]
   s10 --> s11
-  s12["12. send_notification_batch.delay(queue_ids, channel, tenant_schema) is...<br/>job:app/tasks/communication/send_tasks.py"]
+  s12["12. send_notification_batch.delay(queue_ids, channel, tenant_id) is cal...<br/>job:app/tasks/communication/send_tasks.py"]
   s11 --> s12
-  s13["13. The Celery worker opens its own engine and runs SET search_path TO ...<br/>job:app/tasks/communication/send_tasks.py"]
+  s13["13. The Celery worker opens a tenant session for tenant_id, which sets ...<br/>job:app/tasks/communication/send_tasks.py<br/>service:app/tasks/tenant_context.py"]
   s12 --> s13
   s14["14. For each row it marks status processing and calls the provider: sms...<br/>service:app/service/communication/msg91_service.py"]
   s13 --> s14
@@ -282,9 +283,9 @@ Implements: `feature:communication/holiday-announcement`
 2. It posts holiday_name, holiday_date and reason as query params, not a JSON body; that is the backend contract `endpoint:POST /announcements/send-holiday-notice`
 3. The endpoint checks announcements:send_sms.
 4. It inserts one queue row (recipient_name All Parents, no phone, target_type holiday_announcement) with target_ref {msg91_template_id, variables var1..3} and commits `table:notification_queue`
-5. It dispatches send_notification_batch.delay([id], sms, cschema header) `job:app/tasks/communication/send_tasks.py`
+5. It dispatches send_notification_batch.delay([id], sms, tenant_id) with the request's tenant id `job:app/tasks/communication/send_tasks.py`
 
-- Failure: The row has no dlt_te_id and no phone, and the cschema header is a client name, so the SMS cannot currently succeed.
+- Failure: The row has no dlt_te_id and no phone, so the SMS cannot currently succeed.
 
 ```mermaid
 flowchart TD
@@ -295,7 +296,7 @@ flowchart TD
   s2 --> s3
   s4["4. It inserts one queue row (recipient_name All Parents, no phone, tar...<br/>table:notification_queue"]
   s3 --> s4
-  s5["5. It dispatches send_notification_batch.delay((id), sms, cschema header)<br/>job:app/tasks/communication/send_tasks.py"]
+  s5["5. It dispatches send_notification_batch.delay((id), sms, tenant_id) w...<br/>job:app/tasks/communication/send_tasks.py"]
   s4 --> s5
 ```
 
@@ -311,7 +312,7 @@ Implements: `feature:communication/module-sms-triggers`
 2. It looks up recipients itself, typically the first linked parent's phone per student, skipping those without one `table:students` `table:student_parent_links` `table:parents`
 3. It builds NotificationQueue rows directly: template_id None, a hard-coded rendered_message, target_ref {msg91_template_id from env, variables var1..N} `table:notification_queue`
 4. It commits the rows.
-5. It calls send_notification_batch.delay(queue_ids, sms, cschema header) `job:app/tasks/communication/send_tasks.py`; a .delay failure returns 500 after the rows are committed.
+5. It calls send_notification_batch.delay(queue_ids, sms, tenant_id) with the request's tenant id `job:app/tasks/communication/send_tasks.py`; a .delay failure returns 500 after the rows are committed.
 6. The worker processes the rows as in compose-and-send, passing msg91_template_id and variables to MSG91 `service:app/service/communication/msg91_service.py`
 
 - Failure: Rows omit dlt_te_id and their variable order does not match the sms_templates registry, so MSG91 rejects them.
@@ -327,7 +328,7 @@ flowchart TD
   s2 --> s3
   s4["4. It commits the rows."]
   s3 --> s4
-  s5["5. It calls send_notification_batch.delay(queue_ids, sms, cschema head...<br/>job:app/tasks/communication/send_tasks.py"]
+  s5["5. It calls send_notification_batch.delay(queue_ids, sms, tenant_id) w...<br/>job:app/tasks/communication/send_tasks.py"]
   s4 --> s5
   s6["6. The worker processes the rows as in compose-and-send, passing msg91...<br/>service:app/service/communication/msg91_service.py"]
   s5 --> s6
@@ -503,8 +504,8 @@ flowchart TD
 
 ### communication/tenant-isolation-by-schema
 
-- **Decision**: Templates, queue and logs are tenant tables (BaseOrg), and the worker opens its own engine and sets search_path to the tenant schema.
-- **Why**: Tenant isolation comes from the schema-per-tenant model; the worker runs outside the request, so it must set the schema context itself.
+- **Decision**: Templates, queue and logs are tenant tables (BaseOrg), and the worker opens its own tenant session for the tenant id.
+- **Why**: Tenant isolation comes from tenant_id and row-level security; the worker runs outside the request, so it must scope its own session.
 - Shapes: `job:app/tasks/communication/send_tasks.py`, `table:message_templates`, `table:notification_log`, `table:notification_queue`
 
 ### communication/variables-derived-server-side (unintended)
@@ -527,12 +528,21 @@ flowchart TD
 - **Tradeoff**: Meta delivers free-form text only inside the 24-hour customer-service window, so business-initiated messages may not arrive.
 - Shapes: `feature:communication/async-delivery`, `job:app/tasks/communication/send_tasks.py`
 
-### communication/worker-gets-tenant-schema
+### communication/worker-gets-tenant-id (active)
+
+- **Decision**: Pass the request's tenant id to the notification worker, never the raw cschema header.
+- **Why**: The worker scopes its session by tenant id, and the client name is only a login hint that may differ from, or be absent in, an authenticated request.
+- **Since**: 2026-10
+- Shapes: `endpoint:POST /announcements/send-holiday-notice`, `endpoint:POST /communication/send`, `job:app/tasks/communication/send_tasks.py`
+- Supersedes: `decision:communication/worker-gets-tenant-schema`
+
+### communication/worker-gets-tenant-schema (superseded)
 
 - **Decision**: Pass the resolved tenant schema name to the worker, not the cschema header (the client name).
 - **Why**: The worker sets search_path from it, and the client name differs from the schema name for some tenants, in which case the worker cannot find the rows and skips them.
 - Note: Only /communication/send follows this; the holiday endpoint and every module trigger pass the raw cschema header.
 - Shapes: `endpoint:POST /announcements/send-holiday-notice`, `endpoint:POST /communication/send`, `job:app/tasks/communication/send_tasks.py`
+- Superseded by: `decision:communication/worker-gets-tenant-id`
 
 ## Concepts
 

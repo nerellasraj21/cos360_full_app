@@ -163,7 +163,7 @@ Implements: `feature:expense/record-expense`
 
 1. The web or mobile form `web:src/components/expense/ExpenseTransactionForm.tsx` `mobile:app/expense/transactions/create.tsx` computes the total from client-side line items (unit price x quantity, with tax and discount).
 2. It sends only the final amount, with a client-generated idempotency_key, to `endpoint:POST /expense/transactions`; line items are not sent and `table:expense_transaction_items` is never written.
-3. The endpoint fills org_id with the tenant id looked up from the cschema client name `table:public.tenants`.
+3. The endpoint fills org_id with the request's tenant id `service:app/db/tenant_session.py`
 4. The service rejects a duplicate idempotency_key, sets requires_approval (override, or amount > 1000.00, or payment_method in check/wire_transfer) and saves the transaction as pending `service:app/service/expense/expense_transaction_service.py` `table:expense_transactions`.
 
 - Note: Clients never send academic_year_id and the backend sets no default, so year-filtered summaries omit UI-created transactions.
@@ -174,7 +174,7 @@ flowchart TD
   s1["1. The web or mobile form   computes the total from client-side line i...<br/>web:src/components/expense/ExpenseTransactionForm.tsx<br/>mobile:app/expense/transactions/create.tsx"]
   s2["2. It sends only the final amount, with a client-generated idempotency...<br/>endpoint:POST /expense/transactions<br/>table:expense_transaction_items"]
   s1 --> s2
-  s3["3. The endpoint fills org_id with the tenant id looked up from the csc...<br/>table:public.tenants"]
+  s3["3. The endpoint fills org_id with the request's tenant id<br/>service:app/db/tenant_session.py"]
   s2 --> s3
   s4["4. The service rejects a duplicate idempotency_key, sets requires_appr...<br/>service:app/service/expense/expense_transaction_service.py<br/>table:expense_transactions"]
   s3 --> s4
@@ -236,8 +236,8 @@ flowchart TD
 ### expense/department-reference-checked-in-service (active)
 
 - **Decision**: ExpenseTransactionService checks on create and update that a department_id exists and is active, instead of relying on a foreign key.
-- **Why**: Tenant schemas are cloned without FK constraints, so the database cannot reject an unknown or inactive department.
-- **Alternatives**: Adding an FK in the migration, which cloned schemas would not carry and which would block deactivated departments on old rows.
+- **Why**: Most foreign keys have no ON DELETE rule and an inactive department is still a valid row, so the service checks that the department is known and active.
+- **Alternatives**: Adding a foreign key in the migration, which would not stop an inactive department on old rows.
 - **Since**: 2026-09
 - Shapes: `feature:expense/expense-departments`, `service:app/service/expense/expense_transaction_service.py`
 
@@ -257,7 +257,7 @@ flowchart TD
 
 ### expense/org-id-from-tenant
 
-- **Decision**: Every expense table keeps org_id NOT NULL, filled on create with public.tenants.id looked up from the cschema client name; tenant isolation itself comes from the schema.
+- **Decision**: Every expense table keeps org_id NOT NULL, filled on create with the request's tenant id; tenant isolation itself comes from tenant_id and row-level security.
 - **Why**: org_id is a leftover from the earlier single-schema design.
 - Shapes: `feature:expense/categories-and-types`, `feature:expense/record-expense`, `table:expense_transactions`, `table:public.tenants`
 

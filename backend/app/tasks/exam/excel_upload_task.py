@@ -28,7 +28,7 @@ def process_excel_upload(
     subject_config_id: str,
     teacher_user_id: str,
     file_bytes: bytes,
-    tenant_schema: str | None = None,
+    tenant_id: str,
 ):
     """
     Parse an uploaded Excel file and persist marks for each student row.
@@ -40,17 +40,14 @@ def process_excel_upload(
         subject_config_id: UUID of the ExamSubjectConfig
         teacher_user_id: UUID of the uploading teacher
         file_bytes: Raw bytes of the .xlsx file
-        tenant_schema: PostgreSQL search_path schema for multi-tenant
+        tenant_id: UUID of the tenant the exam belongs to
     """
     import asyncio
     import uuid
 
-    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-    from sqlalchemy.orm import sessionmaker
-
-    from app.core.config import settings
     from app.service.exam.excel_service import parse_excel_upload
     from app.service.exam.mark_entry_service import upsert_marks
+    from app.tasks.tenant_context import task_tenant_session
 
     try:
         logger.info(
@@ -62,13 +59,7 @@ def process_excel_upload(
         )
 
         async def _run():
-            engine = create_async_engine(settings.DATABASE_URL, echo=False)
-            async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-            async with async_session() as db:
-                if tenant_schema:
-                    await db.execute(f"SET search_path TO {tenant_schema}, public")
-
+            async with task_tenant_session(tenant_id) as db:
                 payload = await parse_excel_upload(
                     db,
                     file_bytes=io.BytesIO(file_bytes),
@@ -85,7 +76,6 @@ def process_excel_upload(
                     upload_method="excel_upload",
                 )
                 await db.commit()
-            await engine.dispose()
 
         asyncio.run(_run())
         logger.info("Excel upload processed successfully for exam=%s", exam_id)

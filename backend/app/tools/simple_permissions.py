@@ -52,7 +52,6 @@ async def get_current_user(
     """Get current user information from token"""
     try:
         user_id = token.get("sub")
-        tenant_schema = getattr(request.state, "schema_name", None)
 
         if not user_id:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token: missing user ID")
@@ -64,7 +63,6 @@ async def get_current_user(
             "role": token.get("role"),
             "client_name": token.get("client_name"),
             "tenant_id": token.get("tenant_id"),
-            "tenant_schema": tenant_schema,
         }
 
     except HTTPException:
@@ -112,7 +110,7 @@ async def check_role_plan_permission(db: AsyncSession, client_name: str, role: s
     Role permission checking for tenant schema.
 
     NOTE: Plan validation happens during tenant onboarding when permissions are copied
-    from public.plan_resource_access to {tenant_schema}.resource_permissions.
+    from public.plan_resource_access to the tenant's resource_permissions.
     Runtime checks ONLY query tenant schema - this is by design.
 
     Args:
@@ -147,7 +145,7 @@ async def check_role_plan_permission_with_error(
     Role permission checking with error handling.
 
     NOTE: Plan validation happens during tenant onboarding when permissions are copied
-    from public.plan_resource_access to {tenant_schema}.resource_permissions.
+    from public.plan_resource_access to the tenant's resource_permissions.
     Runtime checks ONLY query tenant schema - this is by design.
 
     Args:

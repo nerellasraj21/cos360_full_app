@@ -147,7 +147,7 @@ Implements: `feature:certificates/issued-certificate-files`, `feature:certificat
 2. Pick the section `endpoint:GET /certificates/selector/sections` and student `endpoint:GET /certificates/selector/students`; students match the admission's current class and section, and inactive students are included.
 3. Web can also search the student dropdown client-side and keeps the selection in sessionStorage (cert_page_selection).
 4. Upload multipart student_id, certificate_type_id, remarks? and file: Received tab `endpoint:POST /certificates/received`, Issue -> Upload tab `endpoint:POST /certificates/issued` with issue_date.
-5. The service checks role == Admin plus the student_certificates permission, and FileManager writes media/{cschema}/{module}/{student_id}/{uuid}.{ext} after size, extension, %PDF and filename checks `service:app/service/student/student_certificate_service.py` `service:app/service/student/file_manager.py`.
+5. The service checks role == Admin plus the student_certificates permission, and FileManager writes media/{tenant_id}/{module}/{student_id}/{uuid}.{ext} after size, extension, %PDF and filename checks `service:app/service/student/student_certificate_service.py` `service:app/service/student/file_manager.py`.
 6. It inserts the student_certificates row and a file_audit_log row `table:student_certificates` `table:file_audit_log`.
 7. The page lists the student's certificates `endpoint:GET /certificates/by-student/{student_id}` as {items, total, has_next}.
 

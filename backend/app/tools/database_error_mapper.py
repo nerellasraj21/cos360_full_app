@@ -101,11 +101,6 @@ DATABASE_CONSTRAINT_MESSAGES = {
         "error_code": "TENANT_CLIENT_NAME_DUPLICATE",
         "field": "client_name",
     },
-    "tenants_schema_name_key": {
-        "message": "Tenant with this schema name already exists",
-        "error_code": "TENANT_SCHEMA_NAME_DUPLICATE",
-        "field": "schema_name",
-    },
     "role_templates_name_key": {
         "message": "Role template with this name already exists",
         "error_code": "ROLE_TEMPLATE_DUPLICATE",

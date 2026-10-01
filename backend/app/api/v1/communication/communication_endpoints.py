@@ -19,9 +19,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.tenant_session import TenantService, get_tenant_db
+from app.db.tenant_session import get_tenant_db, get_tenant_id_from_request
 from app.middleware.rate_limit_middleware import rate_limit_api
-from app.middleware.tenant_middleware import get_client_name_from_request
 from app.models.communication.communication_model import NotificationLog
 from app.schemas.communication.communication_schema import (
     LogListResponse,
@@ -205,10 +204,6 @@ async def send_notification_endpoint(
     except (ValueError, AttributeError):
         triggered_by = uuid.uuid4()
 
-    # Determine tenant schema for Celery worker (must pass schema name)
-    client_name = get_client_name_from_request(request)
-    tenant_schema = await TenantService.get_tenant_schema(client_name) or "cos360_masters"
-
     queued_count = await queue_and_dispatch(
         db=db,
         template_id=data.template_id,
@@ -216,7 +211,7 @@ async def send_notification_endpoint(
         target_ref=data.target_ref,
         user_vars=data.variables,
         triggered_by=triggered_by,
-        tenant_schema=tenant_schema,
+        tenant_id=get_tenant_id_from_request(request),
         channel=data.channel.value if data.channel else None,
         message=data.message,
     )

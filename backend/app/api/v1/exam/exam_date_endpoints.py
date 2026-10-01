@@ -4,7 +4,7 @@ import uuid
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.tenant_session import get_tenant_db
+from app.db.tenant_session import get_tenant_db, get_tenant_id_from_request
 from app.schemas.exam.exam_date_schema import (
     ExamDateBulkCreate,
     ExamDateCreate,
@@ -216,7 +216,7 @@ async def send_exam_schedule(
     await db.commit()
 
     if queue_ids:
-        send_notification_batch.delay(queue_ids, "sms", request.headers.get("cschema", "public"))
+        send_notification_batch.delay(queue_ids, "sms", get_tenant_id_from_request(request))
 
     return {
         "status": "queued",

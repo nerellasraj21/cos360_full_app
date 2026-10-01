@@ -10,7 +10,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.tenant_session import TenantService, get_tenant_db
+from app.db.tenant_session import get_tenant_db, get_tenant_id_from_request
 from app.schemas.reports.financial_report_schemas import (
     ExpenditureReportFilter,
     FinancialSummary,
@@ -57,8 +57,7 @@ async def get_expenditure_report(
 
         # Get user info
         user_id_str = current_user.get("sub")
-        client_name = getattr(request.state, "client_name", None)
-        tenant_id = await TenantService.get_tenant_schema(client_name)
+        tenant_id = get_tenant_id_from_request(request)
 
         # Convert user_id to UUID
         from uuid import UUID as UUIDImport
@@ -133,8 +132,7 @@ async def get_ledger_report(
 
         # Get user info
         user_id_str = current_user.get("sub")
-        client_name = getattr(request.state, "client_name", None)
-        tenant_id = await TenantService.get_tenant_schema(client_name)
+        tenant_id = get_tenant_id_from_request(request)
 
         # Convert user_id to UUID
         from uuid import UUID as UUIDImport
@@ -203,8 +201,7 @@ async def get_financial_summary(
 
         # Get user info
         user_id_str = current_user.get("sub")
-        client_name = getattr(request.state, "client_name", None)
-        tenant_id = await TenantService.get_tenant_schema(client_name)
+        tenant_id = get_tenant_id_from_request(request)
 
         # Convert user_id to UUID
         from uuid import UUID as UUIDImport
@@ -252,8 +249,7 @@ async def export_financial_report(
 
         # Get user info
         user_id_str = current_user.get("sub")
-        client_name = getattr(request.state, "client_name", None)
-        tenant_id = await TenantService.get_tenant_schema(client_name)
+        tenant_id = get_tenant_id_from_request(request)
 
         # Convert user_id to UUID
         from uuid import UUID as UUIDImport

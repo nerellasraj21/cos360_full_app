@@ -6,13 +6,13 @@ _Generated from `docs/graph/graph.jsonl` by `scripts/graph/kg_render.py`. Do not
 |---|---|---|---|---|
 | [auth](auth.md) | 8 | 6 | 17 | 9 |
 | [certificates](certificates.md) | 8 | 6 | 10 | 8 |
-| [communication](communication.md) | 9 | 7 | 21 | 9 |
+| [communication](communication.md) | 9 | 7 | 22 | 9 |
 | [exam](exam.md) | 18 | 13 | 17 | 20 |
 | [expense](expense.md) | 10 | 4 | 7 | 8 |
 | [fee](fee.md) | 13 | 11 | 16 | 16 |
 | [masters](masters.md) | 11 | 8 | 7 | 16 |
-| [platform](platform.md) | 0 | 6 | 27 | 10 |
-| [reports-dashboards](reports-dashboards.md) | 11 | 5 | 10 | 7 |
+| [platform](platform.md) | 0 | 6 | 28 | 10 |
+| [reports-dashboards](reports-dashboards.md) | 11 | 5 | 11 | 7 |
 | [staff](staff.md) | 10 | 5 | 10 | 5 |
 | [students](students.md) | 11 | 8 | 15 | 10 |
 | [tenants-and-admin](tenants-and-admin.md) | 10 | 5 | 5 | 5 |

@@ -93,10 +93,6 @@ class TenantService:
         return False
 
     @staticmethod
-    async def get_tenant_schema(client_name: str) -> str | None:
-        return await TenantService.get_tenant_id(client_name)
-
-    @staticmethod
     async def clear_cache():
         _tenant_cache.clear()
 
@@ -178,6 +174,13 @@ async def resolve_request_tenant_id(request: Request) -> str:
         )
 
     request.state.tenant_id = tenant_id
+    return tenant_id
+
+
+def get_tenant_id_from_request(request: Request) -> str:
+    tenant_id = getattr(request.state, "tenant_id", None)
+    if not tenant_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tenant could not be determined")
     return tenant_id
 
 

@@ -218,7 +218,7 @@ async def get_tenant_roles(request: Request, db: AsyncSession = Depends(get_tena
         return {
             "roles": role_data,
             "total_roles": len(roles),
-            "tenant_schema": getattr(request.state, "schema_name", "unknown"),
+            "tenant_id": getattr(request.state, "tenant_id", None),
         }
 
     except Exception as e:
@@ -382,8 +382,8 @@ async def update_role_permission(
             # Create new permission record
             await db.execute(
                 text("""
-                INSERT INTO resource_permissions (role_id, resource, action, is_granted)
-                VALUES (:role_id, :resource, :action, :is_granted)
+                INSERT INTO resource_permissions (id, role_id, resource, action, is_granted)
+                VALUES (gen_random_uuid(), :role_id, :resource, :action, :is_granted)
             """),
                 {"role_id": role_id, "resource": resource, "action": action, "is_granted": is_granted},
             )
@@ -501,8 +501,8 @@ async def bulk_update_role_permissions(role_id: UUID, request: Request, db: Asyn
                 # Create new
                 await db.execute(
                     text("""
-                    INSERT INTO resource_permissions (role_id, resource, action, is_granted)
-                    VALUES (:role_id, :resource, :action, :is_granted)
+                    INSERT INTO resource_permissions (id, role_id, resource, action, is_granted)
+                    VALUES (gen_random_uuid(), :role_id, :resource, :action, :is_granted)
                 """),
                     {"role_id": role_id, "resource": resource, "action": action, "is_granted": is_granted},
                 )
@@ -1205,9 +1205,9 @@ async def apply_permission_template(
                 # Insert or update permission
                 await db.execute(
                     text("""
-                    INSERT INTO resource_permissions (role_id, resource, action, is_granted)
-                    VALUES (:role_id, :resource, :action, true)
-                    ON CONFLICT (role_id, resource, action) 
+                    INSERT INTO resource_permissions (id, role_id, resource, action, is_granted)
+                    VALUES (gen_random_uuid(), :role_id, :resource, :action, true)
+                    ON CONFLICT (tenant_id, role_id, resource, action)
                     DO UPDATE SET is_granted = true
                 """),
                     {"role_id": role_id, "resource": resource, "action": action},

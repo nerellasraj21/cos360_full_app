@@ -13,7 +13,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.middleware.tenant_middleware import get_client_name_from_request
 from app.models.auth.role_model import Role
 from app.models.auth.user_model import User
 from app.schemas.auth.access_validation_schema import AccessValidationRequest, AccessValidationResponse
@@ -146,7 +145,7 @@ class AccessValidationService:
             resource, action = resource_action
 
             # Step 3: Check permissions using existing dual-layer validation
-            client_name = get_client_name_from_request(request)
+            client_name = getattr(request.state, "client_name", None) or ""
 
             has_access = await check_role_plan_permission(
                 db=db, client_name=client_name, role=role.name, resource=resource, action=action

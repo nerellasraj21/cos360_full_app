@@ -24,7 +24,7 @@ def compute_exam_aggregates(
     exam_id: str,
     class_id: str | None = None,
     section_id: str | None = None,
-    tenant_schema: str | None = None,
+    tenant_id: str,
 ):
     """
     Compute total marks, grades, and ranks for an exam.
@@ -35,14 +35,11 @@ def compute_exam_aggregates(
         exam_id: UUID of the exam
         class_id: Scope to a specific class (or None for all)
         section_id: Scope to a specific section (or None for all)
-        tenant_schema: PostgreSQL search_path schema for multi-tenant
+        tenant_id: UUID of the tenant the exam belongs to
     """
     import asyncio
 
-    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-    from sqlalchemy.orm import sessionmaker
-
-    from app.core.config import settings
+    from app.tasks.tenant_context import task_tenant_session
 
     try:
         logger.info(
@@ -53,13 +50,7 @@ def compute_exam_aggregates(
         )
 
         async def _run():
-            engine = create_async_engine(settings.DATABASE_URL, echo=False)
-            async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-            async with async_session() as db:
-                if tenant_schema:
-                    await db.execute(f"SET search_path TO {tenant_schema}, public")
-
+            async with task_tenant_session(tenant_id) as db:
                 # TODO Sprint 5: Implement aggregate computation.
                 # Steps:
                 # 1. Load all StudentMark rows for this exam (optionally filtered)
@@ -71,8 +62,6 @@ def compute_exam_aggregates(
                 # 7. Upsert StudentExamResult rows
                 logger.warning("Aggregate compute not yet implemented (Sprint 5 placeholder)")
                 await db.commit()
-
-            await engine.dispose()
 
         asyncio.run(_run())
         logger.info("Aggregate compute completed for exam=%s", exam_id)

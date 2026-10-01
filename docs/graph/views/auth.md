@@ -117,7 +117,7 @@ Log out by blacklisting the bearer access token and the refresh token from the b
 
 ### auth/profile-audit
 
-Every profile view, profile update and password change writes a profile_audit_logs row in the tenant schema; password changes are flagged sensitive.
+Every profile view, profile update and password change writes a profile_audit_logs row for the tenant; password changes are flagged sensitive.
 - Note: No endpoint reads these logs.
 - Note: Audit errors are caught and logged, not raised, and every profile GET is a DB write.
 - Note: /profile/change-password records Teacher and custom roles with profile_type unknown and fills org_id with the user id as a placeholder.
@@ -197,7 +197,7 @@ Implements: `feature:auth/first-login-password`
 6. The backend verifies the change_password token type, rejects an inactive user (401) or one whose is_first_login is no longer TRUE (400), hashes the new password, clears is_first_login through raw SQL `table:users` and returns a full login payload (SetPasswordResponse).
 7. Web calls login(data) with the response and goes straight in; mobile completePasswordSetup stores the response with storeAuthData and runs the same completeLogin steps as a normal login `mobile:app/set-password.tsx`.
 
-- Failure: If the tenant schema lacks the is_first_login column, the check silently passes and the user logs in normally.
+- Failure: An error reading users.is_first_login is swallowed, so the user logs in without the forced change.
 
 ```mermaid
 flowchart TD
@@ -304,7 +304,7 @@ Implements: `feature:auth/token-refresh`
 1. The client posts refresh_token `endpoint:POST /auth/refresh`.
 2. The backend checks the token type is refresh and that the token is not blacklisted `service:app/service/auth/token_blacklist_service.py` `table:public.token_blacklist`.
 3. The backend re-validates that the tenant in the client_name claim exists `service:app/service/auth/multi_tenant_auth_service.py` `table:public.tenants`.
-4. The backend re-reads the user in the tenant schema `table:users` `table:roles`: an inactive or missing user gets 401; the role claim comes from the user's current role, and the other claims are copied from the old refresh token.
+4. The backend re-reads the user for the tenant `table:users` `table:roles`: an inactive or missing user gets 401; the role claim comes from the user's current role, and the other claims are copied from the old refresh token.
 5. The backend returns a new access/refresh pair `service:app/tools/jwt_utils.py`; the old refresh token is not revoked.
 
 - Failure: On web a failed refresh logs the store out and redirects to /login `web:src/api/index.ts`.
@@ -317,7 +317,7 @@ flowchart TD
   s1 --> s2
   s3["3. The backend re-validates that the tenant in the client_name claim e...<br/>service:app/service/auth/multi_tenant_auth_service.py<br/>table:public.tenants"]
   s2 --> s3
-  s4["4. The backend re-reads the user in the tenant schema  : an inactive o...<br/>table:users<br/>table:roles"]
+  s4["4. The backend re-reads the user for the tenant  : an inactive or miss...<br/>table:users<br/>table:roles"]
   s3 --> s4
   s5["5. The backend returns a new access/refresh pair ; the old refresh tok...<br/>service:app/tools/jwt_utils.py"]
   s4 --> s5
@@ -387,8 +387,9 @@ flowchart TD
 ### auth/first-login-flag-raw-sql
 
 - **Decision**: users.is_first_login is not in the SQLAlchemy User model; it is read and written only with raw SQL inside try/except.
-- **Why**: Tenant schemas without the column (it was added by hand and no Alembic revision creates it) keep working instead of failing login.
-- **Tradeoff**: If a schema lacks the column the first-login check silently passes.
+- **Why**: The column was not on the User model when this was written, so raw SQL inside try/except kept login working if the read failed.
+- **Tradeoff**: A failed read silently skips the forced password change.
+- Note: users.is_first_login is on the User model and in the baseline migration, so the raw SQL is no longer needed for compatibility.
 - Shapes: `concept:auth/first-login`, `flow:auth/first-login-password-change`, `service:app/service/auth/multi_tenant_auth_service.py`, `table:users`
 
 ### auth/menus-from-login-response
@@ -453,7 +454,7 @@ flowchart TD
 
 ### auth/refresh-rereads-user (active)
 
-- **Decision**: /auth/refresh re-reads the user's is_active flag and current role name from the tenant schema before issuing new tokens; other claims are still copied from the old refresh token.
+- **Decision**: /auth/refresh re-reads the user's is_active flag and current role name for the tenant before issuing new tokens; other claims are still copied from the old refresh token.
 - **Why**: Copying the role claim let a deactivated or demoted user keep old rights for up to 7 days by refreshing.
 - **Alternatives**: Rotating and revoking the refresh token on every refresh, which breaks web tabs that still hold the previous token.
 - **Tradeoff**: One query per refresh; the client's menu and permission map still change only at the next login, and the old refresh token is not revoked or rotated.
@@ -509,7 +510,7 @@ The role, menu tree and permission map returned at login and persisted by the cl
 
 ### auth/profile-audit-log
 
-A tenant-schema row recording a profile view, profile update or password change (password changes flagged sensitive).
+A tenant row recording a profile view, profile update or password change (password changes flagged sensitive).
 - Related: `feature:auth/profile-audit`, `table:profile_audit_logs`
 
 ### auth/token-blacklist

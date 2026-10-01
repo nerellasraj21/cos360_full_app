@@ -308,7 +308,7 @@ class RoleListResponse(BaseModel):
     total_roles: int
     system_roles: list[str] = Field(description="List of protected system role names")
     custom_roles: list[str] = Field(description="List of custom role names")
-    tenant_schema: str = Field(description="Current tenant schema")
+    tenant_id: str | None = Field(default=None, description="Current tenant id")
 
     class Config:
         json_schema_extra = {
@@ -329,6 +329,6 @@ class RoleListResponse(BaseModel):
                 "total_roles": 6,
                 "system_roles": ["Admin", "Teacher", "Staff", "Student", "Parent"],
                 "custom_roles": ["Office Manager"],
-                "tenant_schema": "test_tenant_schema",
+                "tenant_id": "6f1c1a6e-3c1d-4b5e-9a57-0e3f6d2b8a11",
             }
         }

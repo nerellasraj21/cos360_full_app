@@ -64,11 +64,15 @@ graph LR
   n24 -.->|shapes| n10
   n25[/"report-audit-in-public-schema"/]
   n25 -.->|shapes| n2
-  n26[/"tenant-schema-via-tenant-service"/]
-  n26 -.->|shapes| n2
+  n26[/"tenant-id-from-request"/]
   n26 -.->|shapes| n9
   n26 -.->|shapes| n10
   n26 -.->|shapes| n14
+  n27[/"tenant-schema-via-tenant-service"/]
+  n27 -.->|shapes| n2
+  n27 -.->|shapes| n9
+  n27 -.->|shapes| n10
+  n27 -.->|shapes| n14
 ```
 
 ## Features
@@ -150,7 +154,7 @@ Staff summary and per-staff detail reports with export.
 - Parity: No web page. Mobile app/reports/staff-reports.tsx shows the staff attendance report and stats for Today / 7 / 30 / 90 days.
 - Flows: [reports-dashboards/fetch-report](#reports-dashboardsfetch-report)
 - Implemented by: `endpoint:GET /reports/staff/details/{staff_id}`, `endpoint:GET /reports/staff/summary`, `endpoint:POST /reports/staff/export`, `mobile:app/reports/staff-reports.tsx`, `mobile:src/api/staff.ts`, `service:app/service/reports/staff_report_service.py`
-- Shaped by: [reports-dashboards/per-group-report-permissions](#reports-dashboardsper-group-report-permissions), [reports-dashboards/tenant-schema-via-tenant-service](#reports-dashboardstenant-schema-via-tenant-service)
+- Shaped by: [reports-dashboards/per-group-report-permissions](#reports-dashboardsper-group-report-permissions), [reports-dashboards/tenant-id-from-request](#reports-dashboardstenant-id-from-request), [reports-dashboards/tenant-schema-via-tenant-service](#reports-dashboardstenant-schema-via-tenant-service)
 
 ### reports-dashboards/student-reports
 
@@ -160,7 +164,7 @@ Student summary and per-student detail reports with csv/xlsx/pdf export.
 - Note: A bare except turns permission 403s into 500s on these endpoints.
 - Flows: [reports-dashboards/fetch-report](#reports-dashboardsfetch-report)
 - Implemented by: `endpoint:GET /reports/students/details/{student_id}`, `endpoint:GET /reports/students/summary`, `endpoint:POST /reports/students/export`, `service:app/service/reports/student_report_service.py`
-- Shaped by: [reports-dashboards/per-group-report-permissions](#reports-dashboardsper-group-report-permissions), [reports-dashboards/tenant-schema-via-tenant-service](#reports-dashboardstenant-schema-via-tenant-service)
+- Shaped by: [reports-dashboards/per-group-report-permissions](#reports-dashboardsper-group-report-permissions), [reports-dashboards/tenant-id-from-request](#reports-dashboardstenant-id-from-request), [reports-dashboards/tenant-schema-via-tenant-service](#reports-dashboardstenant-schema-via-tenant-service)
 
 ### reports-dashboards/web-home-dashboard
 
@@ -230,7 +234,7 @@ Implements: `feature:reports-dashboards/attendance-reports`, `feature:reports-da
 
 
 1. Client calls GET /reports/<group>/<report>?page=1&page_size=100&date_from=...&date_to=...&<filters>, for example `endpoint:GET /reports/fees/collection-summary` or `endpoint:GET /reports/attendance/staff`.
-2. The endpoint checks <group>_reports:read and derives the tenant schema from request.state.client_name via TenantService (fee, attendance, financial) `service:app/service/reports/fee_report_service.py`.
+2. The endpoint checks <group>_reports:read and takes the tenant id from the request `service:app/service/reports/fee_report_service.py`.
 3. It returns a ReportResponse {data:[...], total_count, page, page_size, total_pages}; page_size is capped at 1000 (default 100).
 4. Stats endpoints such as `endpoint:GET /reports/fees/collection-summary/stats` return a group-specific summary object.
 
@@ -239,7 +243,7 @@ Implements: `feature:reports-dashboards/attendance-reports`, `feature:reports-da
 ```mermaid
 flowchart TD
   s1["1. Client calls GET /reports/<group>/<report>?page=1&page_size=100&dat...<br/>endpoint:GET /reports/fees/collection-summary<br/>endpoint:GET /reports/attendance/staff"]
-  s2["2. The endpoint checks <group>_reports:read and derives the tenant sch...<br/>service:app/service/reports/fee_report_service.py"]
+  s2["2. The endpoint checks <group>_reports:read and takes the tenant id fr...<br/>service:app/service/reports/fee_report_service.py"]
   s1 --> s2
   s3["3. It returns a ReportResponse {data:(...), total_count, page, page_si..."]
   s2 --> s3
@@ -247,7 +251,7 @@ flowchart TD
   s3 --> s4
 ```
 
-Shaped by: [reports-dashboards/tenant-schema-via-tenant-service](#reports-dashboardstenant-schema-via-tenant-service)
+Shaped by: [reports-dashboards/tenant-id-from-request](#reports-dashboardstenant-id-from-request), [reports-dashboards/tenant-schema-via-tenant-service](#reports-dashboardstenant-schema-via-tenant-service)
 
 ### reports-dashboards/mobile-hub-and-home
 
@@ -365,11 +369,20 @@ Shaped by: [reports-dashboards/menu-driven-module-hubs](#reports-dashboardsmenu-
 - **Why**: Export history is cross-tenant infrastructure and does not need a per-tenant migration.
 - Shapes: `feature:reports-dashboards/export-audit-download`, `table:public.report_audit`
 
-### reports-dashboards/tenant-schema-via-tenant-service
+### reports-dashboards/tenant-id-from-request (active)
+
+- **Decision**: Report endpoints take the tenant id from the request (get_tenant_id_from_request), and report cache keys include the tenant id.
+- **Why**: request.state.schema_name was never set and current_schema() is the same for every tenant now, so keys built from it would mix tenants.
+- **Since**: 2026-10
+- Shapes: `feature:reports-dashboards/staff-reports`, `feature:reports-dashboards/student-reports`, `flow:reports-dashboards/fetch-report`
+- Supersedes: `decision:reports-dashboards/tenant-schema-via-tenant-service`
+
+### reports-dashboards/tenant-schema-via-tenant-service (superseded)
 
 - **Decision**: Report endpoints should derive the tenant with TenantService.get_tenant_schema(request.state.client_name), not request.state.schema_name.
 - **Why**: The only middleware that sets request.state.schema_name (app/middleware/middleware.py) is not registered, so that value is None; student, staff, audit and download endpoints still use it.
 - Shapes: `feature:reports-dashboards/export-audit-download`, `feature:reports-dashboards/staff-reports`, `feature:reports-dashboards/student-reports`, `flow:reports-dashboards/fetch-report`
+- Superseded by: `decision:reports-dashboards/tenant-id-from-request`
 
 ## Concepts
 

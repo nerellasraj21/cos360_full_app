@@ -6,14 +6,12 @@ Handles background jobs including stale file cleanup.
 
 import asyncio
 import logging
-from datetime import datetime
 
-from sqlalchemy import select, text
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy import text
 
 from app.celery_app import celery_app
-from app.config import settings
 from app.service.student.file_manager import file_manager
+from app.tasks.tenant_context import task_platform_session, task_tenant_session
 
 log = logging.getLogger("students.certificate_tasks")
 
@@ -21,7 +19,7 @@ log = logging.getLogger("students.certificate_tasks")
 @celery_app.task(name="cleanup_stale_files", time_limit=300, soft_time_limit=240)
 def cleanup_stale_files():
     """
-    Daily cleanup of expired stale file registry entries across all tenants.
+    Daily cleanup of expired stale file registry entries across all tenants (one tenant session per tenant).
 
     Runs at 2 AM UTC daily. Deletes S3 objects and DB records for expired files.
     Task is idempotent: S3 NoSuchKey errors are caught and logged (non-critical).
@@ -34,64 +32,41 @@ async def _cleanup_stale_files_async():
     try:
         log.info("Starting stale file cleanup task")
 
-        engine = create_async_engine(settings.DATABASE_URL, echo=False)
-        Session = async_sessionmaker(bind=engine, expire_on_commit=False)
+        async with task_platform_session() as db:
+            result = await db.execute(text("SELECT id FROM tenants WHERE is_active = TRUE"))
+            tenant_ids = [str(row[0]) for row in result.fetchall()]
 
-        # 1. Get all active tenant schemas from public.tenants
-        async with Session() as db:
-            await db.execute(text("SET search_path TO public"))
+        log.info(f"Found {len(tenant_ids)} active tenants")
 
-            result = await db.execute(
-                text(
-                    """
-                    SELECT schema_name FROM tenants WHERE is_active = TRUE
-                    """
-                )
-            )
-            schemas = [row[0] for row in result.fetchall()]
-
-        log.info(f"Found {len(schemas)} active tenant schemas")
-
-        # 2. For each schema, cleanup expired stale files
         total_deleted = 0
-        for schema_name in schemas:
+        for tenant_id in tenant_ids:
             try:
-                deleted_count = await _cleanup_schema_stale_files(
-                    Session, schema_name
-                )
+                deleted_count = await _cleanup_tenant_stale_files(tenant_id)
                 total_deleted += deleted_count
             except Exception as e:
-                log.error(f"Error cleaning up schema {schema_name}: {str(e)}")
+                log.error(f"Error cleaning up tenant {tenant_id}: {str(e)}")
                 continue
 
         log.info(f"Stale file cleanup complete. Total files deleted: {total_deleted}")
-
-        await engine.dispose()
 
     except Exception as e:
         log.error(f"Error in stale file cleanup task: {str(e)}", exc_info=True)
         raise
 
 
-async def _cleanup_schema_stale_files(
-    Session: async_sessionmaker, schema_name: str
-) -> int:
+async def _cleanup_tenant_stale_files(tenant_id: str) -> int:
     """
-    Cleanup stale files for a specific tenant schema.
+    Cleanup stale files for a specific tenant.
 
     Args:
-        Session: AsyncSession maker
-        schema_name: Tenant schema name
+        tenant_id: Tenant id
 
     Returns:
         Count of deleted files
     """
     deleted_count = 0
 
-    async with Session() as db:
-        # Set schema search path
-        await db.execute(text(f"SET search_path TO {schema_name}, public"))
-
+    async with task_tenant_session(tenant_id) as db:
         # Query expired stale files
         result = await db.execute(
             text(
@@ -105,7 +80,7 @@ async def _cleanup_schema_stale_files(
         expired_files = result.fetchall()
 
         log.info(
-            f"Found {len(expired_files)} expired stale files in {schema_name}"
+            f"Found {len(expired_files)} expired stale files for tenant {tenant_id}"
         )
 
         # For each expired file, delete from S3 and DB

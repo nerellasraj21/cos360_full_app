@@ -28,7 +28,7 @@ async def check_user_resource_access(
     It checks role permissions from the tenant schema and resolves user context.
 
     NOTE: Plan permissions are checked ONLY during tenant onboarding when permissions
-    are copied from public.plan_resource_access to {tenant_schema}.resource_permissions.
+    are copied from public.plan_resource_access to the tenant's resource_permissions.
     Runtime checks ONLY query the tenant schema - this is by design per the dual-layer
     permission architecture.
 
@@ -73,7 +73,6 @@ async def check_user_resource_access(
             await _validate_entity_access(user_context, resource, target_entity_id)
 
         # Step 5: Set additional context info
-        user_context.tenant_schema = getattr(request.state, "schema_name", None)
 
         logger.info(
             f"Access granted: {user_context.username} ({user_context.role}) -> {resource}:{action} [{user_context.access_scope}]"

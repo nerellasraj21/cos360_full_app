@@ -17,7 +17,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_public_db
+from app.db.tenant_session import PublicAsyncSessionLocal
 from app.models.reports.report_audit import ReportAudit
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ class BaseReportService:
         )
 
         # Use public database session for audit operations
-        async with get_public_db() as public_db:
+        async with PublicAsyncSessionLocal() as public_db:
             public_db.add(audit_record)
             await public_db.flush()
             await public_db.commit()
@@ -61,7 +61,7 @@ class BaseReportService:
     ):
         """Update audit record status"""
         # Use public database session for audit operations
-        async with get_public_db() as public_db:
+        async with PublicAsyncSessionLocal() as public_db:
             result = await public_db.execute(select(ReportAudit).where(ReportAudit.id == audit_id))
             audit_record = result.scalar_one_or_none()
 
@@ -382,15 +382,12 @@ class BaseReportService:
 
         return True, ""
 
-    def get_tenant_schema_name(self) -> str:
-        """Get current tenant schema name"""
+    def get_tenant_id(self) -> str:
+        """Get current tenant id"""
         return self.tenant_id
 
     async def execute_tenant_query(self, query_text: str, params: dict[str, Any] = None):
-        """Execute query in tenant schema context"""
-        # Set search path to tenant schema
-        await self.db.execute(text(f"SET search_path TO {self.tenant_id}, public"))
-
+        """Execute query in the tenant session (row-level security scopes it to the tenant)"""
         if params:
             result = await self.db.execute(text(query_text), params)
         else:

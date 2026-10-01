@@ -3,14 +3,12 @@ from fastapi import APIRouter
 from app.api.v1.admin.permission_endpoints import router as admin_permission_router
 from app.api.v1.admin.user_management_endpoints import router as admin_user_management_router
 from app.api.v1.auth.access_validation_endpoints import router as access_validation_router
-from app.api.v1.auth.fix_permissions_endpoints import router as fix_permissions_router
 from app.api.v1.auth.login_endpoints import router as login_router
 from app.api.v1.auth.menu_endpoints import router as menu_router
 from app.api.v1.auth.permissions_endpoints import router as permissions_router
 from app.api.v1.auth.resource_permission_endpoints import router as resource_permission_router
 from app.api.v1.auth.role_endpoints import router as role_router
 from app.api.v1.auth.seed_endpoints import router as seed_router
-from app.api.v1.auth.test_setup_endpoints import router as test_setup_router
 from app.api.v1.exam.audit_endpoints import router as exam_audit_router
 from app.api.v1.exam.board_pattern_endpoints import router as board_pattern_router
 from app.api.v1.exam.exam_date_endpoints import router as exam_date_router
@@ -146,8 +144,6 @@ router.include_router(fee_collection_router)
 router.include_router(fee_concession_router)
 router.include_router(fee_old_router)
 router.include_router(seed_router)
-router.include_router(test_setup_router)
-router.include_router(fix_permissions_router)
 router.include_router(super_admin_auth_router)
 router.include_router(super_admin_setup_router)
 router.include_router(super_admin_system_router)

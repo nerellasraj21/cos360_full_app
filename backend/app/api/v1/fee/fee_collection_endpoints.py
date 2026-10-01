@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.tenant_session import get_tenant_db
+from app.db.tenant_session import get_tenant_db, get_tenant_id_from_request
 from app.middleware.rate_limit_middleware import rate_limit_api
 from app.models.fee.fee_transaction_model import FeeTransaction
 from app.schemas.fee.fee_collection_schema import (
@@ -454,7 +454,7 @@ async def send_receipt_sms(
     await db.commit()
 
     if queue_ids:
-        send_notification_batch.delay(queue_ids, "sms", request.headers.get("cschema", "public"))
+        send_notification_batch.delay(queue_ids, "sms", get_tenant_id_from_request(request))
 
     return {
         "status": "queued",

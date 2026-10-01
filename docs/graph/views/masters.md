@@ -137,7 +137,7 @@ States -> districts -> mandals shared by all tenants in the public schema, seede
 ### masters/master-dropdowns
 
 Dropdown endpoints for years, classes, sections, subjects, categories, CSMs and lookups, cached per tenant, consumed by shared dropdown components on web and mobile.
-- Note: Backend dropdowns and the academic-year list are cached in memory for 5 minutes (TTLCache keyed by current_schema()), per process; expect stale dropdowns after edits.
+- Note: Backend dropdowns and the academic-year list are cached in memory for 5 minutes (TTLCache keyed by the tenant id), per process; expect stale dropdowns after edits.
 - Note: Items are {id, name} (years use {id, title}); salary ranges and admission types return {value, label} instead.
 - Note: Only ClassesDropdown and SectionsByClassDropdown from the web dropdown-system are in use; several entries in constants/dropdown/endpoints.ts are stale.
 - Note: Mobile CustomDropdown crashes on search if any label is undefined; map with label: x.name || ''.
@@ -316,13 +316,13 @@ flowchart TD
 Implements: `feature:masters/caste-lookups`, `feature:masters/location-lookups`
 
 
-1. Once per tenant, an Admin calls `endpoint:POST /auth/seed/caste-data` to seed castes and sub-castes into the tenant schema `table:castes` `table:sub_castes`.
+1. Once per tenant, an Admin calls `endpoint:POST /auth/seed/caste-data` to seed castes and sub-castes for the tenant `table:castes` `table:sub_castes`.
 2. Once per deployment, `endpoint:POST /auth/seed/location-data` (unauthenticated) seeds states, districts and mandals into the public schema `table:public.states` `table:public.districts` `table:public.mandals`.
 3. The admission form then reads `endpoint:GET /masters/castes/dropdown` -> `endpoint:GET /masters/castes/{caste_id}/sub-castes/dropdown` and `endpoint:GET /masters/locations/states/dropdown` -> `endpoint:GET /masters/locations/states/{state_id}/districts/dropdown` -> `endpoint:GET /masters/locations/districts/{district_id}/mandals/dropdown`; changing a parent clears its children.
 
 ```mermaid
 flowchart TD
-  s1["1. Once per tenant, an Admin calls  to seed castes and sub-castes into...<br/>endpoint:POST /auth/seed/caste-data<br/>table:castes<br/>table:sub_castes"]
+  s1["1. Once per tenant, an Admin calls  to seed castes and sub-castes for ...<br/>endpoint:POST /auth/seed/caste-data<br/>table:castes<br/>table:sub_castes"]
   s2["2. Once per deployment,  (unauthenticated) seeds states, districts and...<br/>endpoint:POST /auth/seed/location-data<br/>table:public.states<br/>table:public.districts<br/>table:public.mandals"]
   s1 --> s2
   s3["3. The admission form then reads  ->  and  ->  -> ; changing a parent ...<br/>endpoint:GET /masters/castes/dropdown<br/>endpoint:GET /masters/castes/{caste_id}/sub-castes/dropdown<br/>endpoint:GET /masters/locations/states/dropdown<br/>endpoint:GET /masters/locations/states/{state_id}/districts/dropdown<br/>endpoint:GET /masters/locations/districts/{district_id}/mandals/dropdown"]
@@ -393,7 +393,7 @@ Shaped by: [masters/one-active-academic-year](#mastersone-active-academic-year)
 
 ### masters/castes-per-tenant-locations-shared
 
-- **Decision**: Castes and sub-castes live in each tenant schema; states, districts and mandals live once in the public schema.
+- **Decision**: Castes and sub-castes are tenant tables; states, districts and mandals are shared platform tables with no tenant_id.
 - **Why**: Schools can customise caste and sub-caste lists, while states, districts and mandals are the same for everyone.
 - Shapes: `feature:masters/caste-lookups`, `feature:masters/location-lookups`, `flow:masters/seed-lookup-masters`, `table:castes`, `table:public.districts`, `table:public.mandals`, `table:public.states`
 

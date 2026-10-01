@@ -90,7 +90,7 @@ because `env.py` prefers `DATABASE_URL`. Don't copy it anywhere.
 ## Production hardening still open (from the AWS pre-flight list; still true in code)
 
 - `/docs` and `/redoc` use HTTP-basic credentials hardcoded in `app/main.py`. Move them to settings/secrets.
-- Unauthenticated test/seed routers are registered in `main_router.py`: `/auth/test-setup/*`, `/auth/seed/*`, `/auth/fix-permissions/*`. Remove them or gate
+- Unauthenticated routers are registered in `main_router.py`: `/auth/seed/*` (except `all-role-permissions`, which needs an Admin) and `/super_admin/setup/*`. Remove them or gate
   them behind `ENVIRONMENT != production` plus super-admin auth before any public deploy.
 - Set `ALLOWED_ORIGINS` to explicit domains.
 

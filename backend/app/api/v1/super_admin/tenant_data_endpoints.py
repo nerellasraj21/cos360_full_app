@@ -1,9 +1,13 @@
+from datetime import datetime
 import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import text
+from sqlalchemy import func, select, text
 
+from app.db.tenant_session import PublicAsyncSessionLocal
+from app.models.auth.resource_permission_model import ResourcePermission
+from app.models.reports.report_audit import ReportAudit
 from app.service.super_admin.database_service import SuperAdminDatabaseService
 from app.tools.simple_permissions import get_current_super_admin, super_admin_only
 
@@ -12,70 +16,70 @@ router = APIRouter(prefix="/super_admin/tenant-data", tags=["Super Admin/Tenant 
 logger = logging.getLogger("super_admin.tenant_data")
 
 
-@router.get("/{tenant_schema}/reports/")
+@router.get("/schemas/")
+@super_admin_only
+async def get_available_tenants(request: Request, current_super_admin: dict = Depends(get_current_super_admin)):
+    """
+    SuperAdmin: List all tenants (id, client_name, is_active, created_at).
+
+    Headers Required:
+    - Authorization: Bearer <superadmin_token>
+    """
+    try:
+        tenants = await SuperAdminDatabaseService.list_tenants()
+        return {"available_tenants": tenants, "total_tenants": len(tenants)}
+    except Exception as e:
+        logger.error(f"Error listing tenants: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list tenants")
+
+
+@router.get("/{tenant_id}/reports/")
 @super_admin_only
 async def get_tenant_reports(
-    tenant_schema: str,
+    tenant_id: UUID,
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin),
     limit: int = Query(100, description="Number of reports to return"),
     offset: int = Query(0, description="Number of reports to skip"),
 ):
     """
-    SuperAdmin: Access tenant reports - ULTIMATE ACCESS
+    SuperAdmin: Report export history of one tenant (from the report audit log).
 
-    **Capabilities**:
-    - Access any tenant's reports data
-    - No restrictions on data access
-    - Complete system visibility
-    - Bypass all permission checks
-
-    **Headers Required**:
+    Headers Required:
     - Authorization: Bearer <superadmin_token>
-    - X-SuperAdmin-Target-Tenant: <tenant_schema>
     """
     try:
-        # Validate tenant schema exists
-        if not await SuperAdminDatabaseService.validate_tenant_schema(tenant_schema):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Tenant schema '{tenant_schema}' not found or not accessible",
+        await SuperAdminDatabaseService.validate_tenant(tenant_id)
+
+        async with PublicAsyncSessionLocal() as db:
+            scope = ReportAudit.tenant_id == str(tenant_id)
+            rows = (
+                (
+                    await db.execute(
+                        select(ReportAudit)
+                        .where(scope)
+                        .order_by(ReportAudit.created_at.desc())
+                        .limit(limit)
+                        .offset(offset)
+                    )
+                )
+                .scalars()
+                .all()
             )
-
-        # Set target schema in request state for database service
-        request.state.target_schema = tenant_schema
-
-        # Get tenant reports using SuperAdmin database service
-        async for db in SuperAdminDatabaseService.get_database_context(request):
-            # Query tenant reports (assuming reports table exists)
-            result = await db.execute(
-                text("""
-                SELECT id, title, description, created_at, updated_at, created_by
-                FROM reports 
-                ORDER BY created_at DESC
-                LIMIT :limit OFFSET :offset
-            """),
-                {"limit": limit, "offset": offset},
-            )
-
-            reports = result.fetchall()
-
-            # Get total count
-            count_result = await db.execute(text("SELECT COUNT(*) FROM reports"))
-            total_count = count_result.scalar()
+            total_count = (await db.execute(select(func.count(ReportAudit.id)).where(scope))).scalar()
 
             return {
-                "tenant_schema": tenant_schema,
+                "tenant_id": str(tenant_id),
                 "reports": [
                     {
-                        "id": str(report[0]),
-                        "title": report[1],
-                        "description": report[2],
-                        "created_at": report[3].isoformat() if report[3] else None,
-                        "updated_at": report[4].isoformat() if report[4] else None,
-                        "created_by": str(report[5]) if report[5] else None,
+                        "id": str(report.id),
+                        "title": report.report_type,
+                        "description": report.status,
+                        "created_at": report.created_at.isoformat() if report.created_at else None,
+                        "updated_at": report.updated_at.isoformat() if report.updated_at else None,
+                        "created_by": str(report.user_id) if report.user_id else None,
                     }
-                    for report in reports
+                    for report in rows
                 ],
                 "total_count": total_count,
                 "limit": limit,
@@ -85,16 +89,14 @@ async def get_tenant_reports(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error accessing tenant reports for '{tenant_schema}': {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to access tenant reports: {str(e)}"
-        )
+        logger.error(f"Error accessing tenant reports for '{tenant_id}': {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to access tenant reports")
 
 
-@router.get("/{tenant_schema}/users/")
+@router.get("/{tenant_id}/users/")
 @super_admin_only
 async def get_tenant_users(
-    tenant_schema: str,
+    tenant_id: UUID,
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin),
     limit: int = Query(100, description="Number of users to return"),
@@ -102,42 +104,24 @@ async def get_tenant_users(
     is_active: bool | None = Query(None, description="Filter by active status"),
 ):
     """
-    SuperAdmin: Access tenant users - ULTIMATE ACCESS
+    SuperAdmin: Users of one tenant.
 
-    **Capabilities**:
-    - Access any tenant's user data
-    - No restrictions on data access
-    - Complete system visibility
-    - Bypass all permission checks
-
-    **Headers Required**:
+    Headers Required:
     - Authorization: Bearer <superadmin_token>
-    - X-SuperAdmin-Target-Tenant: <tenant_schema>
     """
     try:
-        # Validate tenant schema exists
-        if not await SuperAdminDatabaseService.validate_tenant_schema(tenant_schema):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Tenant schema '{tenant_schema}' not found or not accessible",
-            )
+        await SuperAdminDatabaseService.validate_tenant(tenant_id)
 
-        # Set target schema in request state for database service
-        request.state.target_schema = tenant_schema
-
-        # Build query with optional filters
         where_clause = ""
         params = {"limit": limit, "offset": offset}
 
         if is_active is not None:
-            where_clause = "WHERE is_active = :is_active"
+            where_clause = "WHERE u.is_active = :is_active"
             params["is_active"] = is_active
 
-        # Get tenant users using SuperAdmin database service
-        async for db in SuperAdminDatabaseService.get_database_context(request):
-            # Query tenant users
+        async with SuperAdminDatabaseService.open_tenant_db(tenant_id) as db:
             query = f"""
-                SELECT u.id, u.username, u.email, u.is_active, 
+                SELECT u.id, u.username, u.email, u.is_active,
                        r.name as role_name
                 FROM users u
                 LEFT JOIN roles r ON u.role_id = r.id
@@ -149,13 +133,12 @@ async def get_tenant_users(
             result = await db.execute(text(query), params)
             users = result.fetchall()
 
-            # Get total count
             count_query = f"SELECT COUNT(*) FROM users u {where_clause}"
             count_result = await db.execute(text(count_query), params)
             total_count = count_result.scalar()
 
             return {
-                "tenant_schema": tenant_schema,
+                "tenant_id": str(tenant_id),
                 "users": [
                     {
                         "id": str(user[0]),
@@ -175,16 +158,14 @@ async def get_tenant_users(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error accessing tenant users for '{tenant_schema}': {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to access tenant users: {str(e)}"
-        )
+        logger.error(f"Error accessing tenant users for '{tenant_id}': {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to access tenant users")
 
 
-@router.get("/{tenant_schema}/students/")
+@router.get("/{tenant_id}/students/")
 @super_admin_only
 async def get_tenant_students(
-    tenant_schema: str,
+    tenant_id: UUID,
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin),
     limit: int = Query(100, description="Number of students to return"),
@@ -192,55 +173,32 @@ async def get_tenant_students(
     class_id: UUID | None = Query(None, description="Filter by class ID"),
 ):
     """
-    SuperAdmin: Access tenant students - ULTIMATE ACCESS
+    SuperAdmin: Students of one tenant.
 
-    **Capabilities**:
-    - Access any tenant's student data
-    - No restrictions on data access
-    - Complete system visibility
-    - Bypass all permission checks
-
-    **Headers Required**:
+    Headers Required:
     - Authorization: Bearer <superadmin_token>
-    - X-SuperAdmin-Target-Tenant: <tenant_schema>
     """
     try:
-        # Validate tenant schema exists
-        if not await SuperAdminDatabaseService.validate_tenant_schema(tenant_schema):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Tenant schema '{tenant_schema}' not found or not accessible",
-            )
+        await SuperAdminDatabaseService.validate_tenant(tenant_id)
 
-        # Set target schema in request state for database service
-        request.state.target_schema = tenant_schema
-
-        # Build query with optional filters
-        where_clause = ""
-        params = {"limit": limit, "offset": offset}
-
-        # Get tenant students using SuperAdmin database service
-        async for db in SuperAdminDatabaseService.get_database_context(request):
-            # Query tenant students
-            query = f"""
-                SELECT s.id, s.first_name, s.last_name, 
+        async with SuperAdminDatabaseService.open_tenant_db(tenant_id) as db:
+            result = await db.execute(
+                text("""
+                SELECT s.id, s.first_name, s.last_name,
                        s.date_of_birth, s.gender
                 FROM students s
-                {where_clause}
                 ORDER BY s.first_name
                 LIMIT :limit OFFSET :offset
-            """
-
-            result = await db.execute(text(query), params)
+            """),
+                {"limit": limit, "offset": offset},
+            )
             students = result.fetchall()
 
-            # Get total count
-            count_query = f"SELECT COUNT(*) FROM students s {where_clause}"
-            count_result = await db.execute(text(count_query), params)
+            count_result = await db.execute(text("SELECT COUNT(*) FROM students s"))
             total_count = count_result.scalar()
 
             return {
-                "tenant_schema": tenant_schema,
+                "tenant_id": str(tenant_id),
                 "students": [
                     {
                         "id": str(student[0]),
@@ -260,49 +218,31 @@ async def get_tenant_students(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error accessing tenant students for '{tenant_schema}': {str(e)}")
+        logger.error(f"Error accessing tenant students for '{tenant_id}': {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to access tenant students: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to access tenant students"
         )
 
 
-@router.get("/{tenant_schema}/stats/")
+@router.get("/{tenant_id}/stats/")
 @super_admin_only
 async def get_tenant_statistics(
-    tenant_schema: str, request: Request, current_super_admin: dict = Depends(get_current_super_admin)
+    tenant_id: UUID, request: Request, current_super_admin: dict = Depends(get_current_super_admin)
 ):
     """
-    SuperAdmin: Get tenant statistics - ULTIMATE ACCESS
+    SuperAdmin: Statistics of one tenant.
 
-    **Capabilities**:
-    - Access any tenant's statistical data
-    - No restrictions on data access
-    - Complete system visibility
-    - Bypass all permission checks
-
-    **Headers Required**:
+    Headers Required:
     - Authorization: Bearer <superadmin_token>
-    - X-SuperAdmin-Target-Tenant: <tenant_schema>
     """
     try:
-        # Validate tenant schema exists
-        if not await SuperAdminDatabaseService.validate_tenant_schema(tenant_schema):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Tenant schema '{tenant_schema}' not found or not accessible",
-            )
+        await SuperAdminDatabaseService.validate_tenant(tenant_id)
 
-        # Set target schema in request state for database service
-        request.state.target_schema = tenant_schema
-
-        # Get tenant statistics using SuperAdmin database service
-        async for db in SuperAdminDatabaseService.get_database_context(request):
-            # Get various statistics
+        async with SuperAdminDatabaseService.open_tenant_db(tenant_id) as db:
             stats = {}
 
-            # User statistics
             user_stats = await db.execute(text("""
-                SELECT 
+                SELECT
                     COUNT(*) as total_users,
                     COUNT(CASE WHEN is_active = true THEN 1 END) as active_users,
                     COUNT(CASE WHEN is_active = false THEN 1 END) as inactive_users
@@ -311,9 +251,8 @@ async def get_tenant_statistics(
             user_data = user_stats.fetchone()
             stats["users"] = {"total": user_data[0], "active": user_data[1], "inactive": user_data[2]}
 
-            # Student statistics
             student_stats = await db.execute(text("""
-                SELECT 
+                SELECT
                     COUNT(*) as total_students,
                     COUNT(CASE WHEN gender = 'Male' THEN 1 END) as male_students,
                     COUNT(CASE WHEN gender = 'Female' THEN 1 END) as female_students
@@ -322,88 +261,37 @@ async def get_tenant_statistics(
             student_data = student_stats.fetchone()
             stats["students"] = {"total": student_data[0], "male": student_data[1], "female": student_data[2]}
 
-            # Class statistics
-            class_stats = await db.execute(text("""
-                SELECT COUNT(*) as total_classes
-                FROM classes
-            """))
+            class_stats = await db.execute(text("SELECT COUNT(*) as total_classes FROM classes"))
             class_data = class_stats.fetchone()
             stats["classes"] = {"total": class_data[0]}
 
             return {
-                "tenant_schema": tenant_schema,
+                "tenant_id": str(tenant_id),
                 "statistics": stats,
-                "generated_at": "2025-01-23T00:00:00Z",  # Current timestamp
+                "generated_at": datetime.utcnow().isoformat() + "Z",
             }
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error accessing tenant statistics for '{tenant_schema}': {str(e)}")
+        logger.error(f"Error accessing tenant statistics for '{tenant_id}': {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to access tenant statistics: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to access tenant statistics"
         )
 
 
-@router.get("/schemas/")
-@super_admin_only
-async def get_available_tenant_schemas(request: Request, current_super_admin: dict = Depends(get_current_super_admin)):
-    """
-    SuperAdmin: Get list of available tenant schemas - ULTIMATE ACCESS
-
-    **Capabilities**:
-    - List all available tenant schemas
-    - No restrictions on data access
-    - Complete system visibility
-    - Bypass all permission checks
-
-    **Headers Required**:
-    - Authorization: Bearer <superadmin_token>
-    """
-    try:
-        # Get all available tenant schemas
-        schemas = await SuperAdminDatabaseService.get_tenant_schemas()
-
-        # Get detailed information for each schema
-        schema_info = []
-        for schema in schemas:
-            info = await SuperAdminDatabaseService.get_tenant_info(schema)
-            if info:
-                schema_info.append(info)
-
-        return {"available_schemas": schemas, "schema_details": schema_info, "total_schemas": len(schemas)}
-
-    except Exception as e:
-        logger.error(f"Error getting available tenant schemas: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get available tenant schemas: {str(e)}",
-        )
-
-
-@router.get("/{tenant_schema}/roles/")
+@router.get("/{tenant_id}/roles/")
 @super_admin_only
 async def get_tenant_roles(
-    tenant_schema: str, request: Request, current_super_admin: dict = Depends(get_current_super_admin)
+    tenant_id: UUID, request: Request, current_super_admin: dict = Depends(get_current_super_admin)
 ):
     """
-    SuperAdmin: Get all roles in a tenant schema
-
-    **Capabilities**:
-    - List all roles in tenant
-    - View role permissions
-    - Role management support
+    SuperAdmin: All roles of one tenant with their permission counts.
     """
     try:
-        if not await SuperAdminDatabaseService.validate_tenant_schema(tenant_schema):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"Tenant schema '{tenant_schema}' not found"
-            )
+        await SuperAdminDatabaseService.validate_tenant(tenant_id)
 
-        request.state.target_schema = tenant_schema
-
-        async with SuperAdminDatabaseService.get_dynamic_tenant_db(tenant_schema) as db:
-            # Using SET search_path in get_dynamic_tenant_db, no need for schema prefix
+        async with SuperAdminDatabaseService.open_tenant_db(tenant_id) as db:
             result = await db.execute(text("""
                 SELECT r.id, r.name, r.description, COUNT(rp.id) as permission_count
                 FROM roles r
@@ -415,7 +303,7 @@ async def get_tenant_roles(
             roles = result.fetchall()
 
             return {
-                "tenant_schema": tenant_schema,
+                "tenant_id": str(tenant_id),
                 "roles": [
                     {"id": role[0], "name": role[1], "description": role[2], "permission_count": role[3]}
                     for role in roles
@@ -427,40 +315,29 @@ async def get_tenant_roles(
         raise
     except Exception as e:
         logger.error(f"Error getting tenant roles: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to get tenant roles: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get tenant roles")
 
 
-@router.get("/{tenant_schema}/roles/{role_id}/permissions/")
+@router.get("/{tenant_id}/roles/{role_id}/permissions/")
 @super_admin_only
 async def get_role_permissions(
-    tenant_schema: str, role_id: UUID, request: Request, current_super_admin: dict = Depends(get_current_super_admin)
+    tenant_id: UUID, role_id: UUID, request: Request, current_super_admin: dict = Depends(get_current_super_admin)
 ):
     """
-    SuperAdmin: Get permissions for a specific role
+    SuperAdmin: Permissions of one role in a tenant.
     """
     try:
-        if not await SuperAdminDatabaseService.validate_tenant_schema(tenant_schema):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"Tenant schema '{tenant_schema}' not found"
-            )
+        await SuperAdminDatabaseService.validate_tenant(tenant_id)
 
-        request.state.target_schema = tenant_schema
-
-        async with SuperAdminDatabaseService.get_dynamic_tenant_db(tenant_schema) as db:
-            # Using SET search_path in get_dynamic_tenant_db, no need for schema prefix
+        async with SuperAdminDatabaseService.open_tenant_db(tenant_id) as db:
             role_result = await db.execute(
-                text("""
-                SELECT id, name, description FROM roles WHERE id = :role_id
-            """),
-                {"role_id": role_id},
+                text("SELECT id, name, description FROM roles WHERE id = :role_id"), {"role_id": role_id}
             )
 
             role = role_result.fetchone()
             if not role:
                 raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail=f"Role {role_id} not found in {tenant_schema}"
+                    status_code=status.HTTP_404_NOT_FOUND, detail=f"Role {role_id} not found in tenant {tenant_id}"
                 )
 
             perms_result = await db.execute(
@@ -474,7 +351,6 @@ async def get_role_permissions(
 
             permissions = perms_result.fetchall()
 
-            # Group permissions by resource (resource:action format)
             grouped_permissions = {}
             for resource, action in permissions:
                 if resource not in grouped_permissions:
@@ -482,7 +358,7 @@ async def get_role_permissions(
                 grouped_permissions[resource].append(action)
 
             return {
-                "tenant_schema": tenant_schema,
+                "tenant_id": str(tenant_id),
                 "role": {"id": role[0], "name": role[1], "description": role[2]},
                 "permissions": [
                     {"resource": resource, "actions": actions} for resource, actions in grouped_permissions.items()
@@ -494,15 +370,13 @@ async def get_role_permissions(
         raise
     except Exception as e:
         logger.error(f"Error getting role permissions: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to get role permissions: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get role permissions")
 
 
-@router.post("/{tenant_schema}/roles/{role_id}/permissions/", status_code=status.HTTP_201_CREATED)
+@router.post("/{tenant_id}/roles/{role_id}/permissions/", status_code=status.HTTP_201_CREATED)
 @super_admin_only
 async def add_role_permission(
-    tenant_schema: str,
+    tenant_id: UUID,
     role_id: UUID,
     request: Request,
     current_super_admin: dict = Depends(get_current_super_admin),
@@ -510,60 +384,40 @@ async def add_role_permission(
     actions: str = Query(..., description="Actions (comma-separated: read,write,create,update,delete)"),
 ):
     """
-    SuperAdmin: Add permission to a tenant role
+    SuperAdmin: Add permissions to a tenant role.
 
-    **Critical Function**: Enables role-based permission management
-
-    **Impact**: Immediately affects all users with this role in the tenant
+    Impact: immediately affects all users with this role in the tenant.
     """
     try:
-        if not await SuperAdminDatabaseService.validate_tenant_schema(tenant_schema):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"Tenant schema '{tenant_schema}' not found"
-            )
+        await SuperAdminDatabaseService.validate_tenant(tenant_id)
 
-        request.state.target_schema = tenant_schema
         actions_list = [action.strip() for action in actions.split(",")]
 
-        async with SuperAdminDatabaseService.get_dynamic_tenant_db(tenant_schema) as db:
-            # Using SET search_path in get_dynamic_tenant_db, no need for schema prefix
-            role_result = await db.execute(
-                text("""
-                SELECT id, name FROM roles WHERE id = :role_id
-            """),
-                {"role_id": role_id},
-            )
+        async with SuperAdminDatabaseService.open_tenant_db(tenant_id) as db:
+            role_result = await db.execute(text("SELECT id, name FROM roles WHERE id = :role_id"), {"role_id": role_id})
 
             role = role_result.fetchone()
             if not role:
                 raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail=f"Role {role_id} not found in {tenant_schema}"
+                    status_code=status.HTTP_404_NOT_FOUND, detail=f"Role {role_id} not found in tenant {tenant_id}"
                 )
 
-            # Insert each action as a separate permission (resource:action model)
             added_permissions = []
             for action in actions_list:
-                # Check if permission already exists
-                existing_result = await db.execute(
-                    text("""
-                    SELECT id FROM resource_permissions
-                    WHERE role_id = :role_id AND resource = :resource AND action = :action
-                """),
-                    {"role_id": role_id, "resource": resource_name, "action": action},
-                )
-
-                if not existing_result.fetchone():
-                    # Insert new permission
+                existing = (
                     await db.execute(
-                        text("""
-                        INSERT INTO resource_permissions (role_id, resource, action, is_granted)
-                        VALUES (:role_id, :resource, :action, true)
-                    """),
-                        {"role_id": role_id, "resource": resource_name, "action": action},
+                        select(ResourcePermission.id).where(
+                            ResourcePermission.role_id == role_id,
+                            ResourcePermission.resource == resource_name,
+                            ResourcePermission.action == action,
+                        )
                     )
-                    added_permissions.append(action)
+                ).first()
 
-            await db.commit()
+                if not existing:
+                    db.add(ResourcePermission(role_id=role_id, resource=resource_name, action=action, is_granted=True))
+                    await db.flush()
+                    added_permissions.append(action)
 
             if not added_permissions:
                 raise HTTPException(
@@ -571,9 +425,11 @@ async def add_role_permission(
                     detail=f"All permissions for resource '{resource_name}' already exist for this role",
                 )
 
+            await db.commit()
+
             return {
                 "message": "Permissions added to role successfully",
-                "tenant_schema": tenant_schema,
+                "tenant_id": str(tenant_id),
                 "role": {"id": role[0], "name": role[1]},
                 "added_permissions": {"resource": resource_name, "actions": added_permissions},
                 "skipped": len(actions_list) - len(added_permissions),
@@ -584,6 +440,4 @@ async def add_role_permission(
         raise
     except Exception as e:
         logger.error(f"Error adding role permission: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to add role permission: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to add role permission")

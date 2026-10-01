@@ -28,7 +28,7 @@ How requests resolve to a tenant is in [../architecture.md](../architecture.md).
   - view and edit its own profile, change its password, and register other super admins;
   - list, create and edit plans (there is no delete), and add or remove `resource:action` entries on a plan;
   - list, create and toggle tenants active or inactive, and assign a plan;
-  - read any tenant's users, students, stats, reports and roles, and **write role permissions into a tenant** (`/super_admin/tenant-data/{schema}/roles/{role_id}/permissions/`);
+  - read any tenant's users, students, stats, reports and roles, and **write role permissions into a tenant** (`/super_admin/tenant-data/{tenant_id}/roles/{role_id}/permissions/`);
   - see system health and usage stats.
 
   Every super-admin action is written to `super_admin_audit`.
@@ -47,8 +47,8 @@ How requests resolve to a tenant is in [../architecture.md](../architecture.md).
 | Layer | Backend | Web | Mobile |
 |---|---|---|---|
 | Public models | `app/models/public/*` (tenant, plan, plan_menu, menu, super_admin, org, templates) | — | — |
-| Super admin API | `app/api/v1/super_admin/{auth,plan,system,setup,tenant_data}_endpoints.py` (`/super_admin/*`); `enhanced_tenant_endpoints.py` exists but is **not mounted** | `src/pages/superadmin/SuperAdminDashboard.tsx` via `/_app/superorg`, `src/api/superadmin.ts`, `src/api/organizations.ts` (all paths mismatched; see gotcha 12) | none |
-| Super admin services | `app/service/super_admin/*`; `app/service/schema/*` (template/clone services, only used by the unmounted endpoints) | — | — |
+| Super admin API | `app/api/v1/super_admin/{auth,plan,system,setup,tenant_data}_endpoints.py` (`/super_admin/*`) | `src/pages/superadmin/SuperAdminDashboard.tsx` via `/_app/superorg`, `src/api/superadmin.ts`, `src/api/organizations.ts` (all paths mismatched; see gotcha 12) | none |
+| Super admin services | `app/service/super_admin/*` (`database_service.py` validates a tenant id and opens a tenant session for it) | — | — |
 | Tenant resolution | `app/middleware/tenant_middleware.py`, `app/middleware/super_admin_middleware.py`, `app/db/tenant_session.py` (`TenantService` cache) | `src/lib/config.ts` (`getTenantFromHostname`), `src/api/index.ts` | `src/api/client.ts`, `services/authUtils.ts` (`@auth/client_schema`) |
 | User management | `app/api/v1/admin/user_management_endpoints.py` (`/admin/users`), `app/service/admin/user_management_service.py`, `app/schemas/admin/user_management_schema.py` | `src/pages/admin/UsersPage.tsx`, `src/api/admin/users.ts`, `src/pages/admin/AdminProfile.tsx` | `app/admin/users.tsx`, `app/admin/profile.tsx`, `src/api/users.ts` |
 | Role management | `app/api/v1/admin/permission_endpoints.py` (`/admin/role-mgmt`); resource-permission CRUD `app/api/v1/auth/resource_permission_endpoints.py` (`/auth/resource-permissions`) | `src/pages/auth/RolesPermissionsPage.tsx` at `/masters/rolespermissions`, `src/api/auth.ts` | `app/masters/rolespermissions.tsx` (`app/admin/{roles,permissions}.tsx` redirect there), `src/api/masters.ts` (`rolesApi`, `permissionsApi`) |
@@ -102,9 +102,9 @@ How requests resolve to a tenant is in [../architecture.md](../architecture.md).
     | Status | Endpoints |
     |---|---|
     | Intended | `/auth/academic-years`, `/auth/login`, `/auth/refresh`, `/auth/staff/set-password`, `/super_admin/auth/login`, `/health*` |
-    | **Not intended; dangerous** | `/auth/test-setup/create-test-users` (upserts known-password users in the request tenant), `/super_admin/setup/initialize` (creates a super admin with a hardcoded password and returns it), `/auth/seed/{all-role-permissions,permission-data,verify-permission-data,location-data}`, `/auth/fix-permissions/*` |
+    | **Not intended; dangerous** | `/super_admin/setup/initialize` (creates a super admin with a hardcoded password and returns it), `/auth/seed/{permission-data,verify-permission-data,location-data,caste-data}`. `POST /auth/seed/all-role-permissions` now requires an Admin, and the old `/auth/test-setup/*` and `/auth/fix-permissions/*` routers were removed. |
 
-17. **No tenant DDL remains on the registered path.** The old schema-creation SQL was removed from the system endpoints. `tenant_data_endpoints.py`, `fix_permissions_endpoints.py` and `service/schema/*` still contain per-schema SQL and are not converted.
+17. **No per-tenant DDL remains.** Super-admin tenant data uses a `{tenant_id}` path parameter, validated against `public.tenants`, and each query runs in a tenant session. `/super_admin/tenant-data/schemas/` now returns `available_tenants`. `GET .../reports/` reads `report_audit` for the tenant, because the table it used to read does not exist.
 ## Web / mobile parity
 
 | Capability | Web | Mobile |
@@ -119,7 +119,7 @@ How requests resolve to a tenant is in [../architecture.md](../architecture.md).
 ## Known gaps
 
 - Serious unauthenticated endpoints need to be removed or guarded before any public deployment (gotcha 16).
-- Per-schema code is not converted yet: `tenant_data_endpoints.py`, `fix_permissions_endpoints.py`, `test_setup_endpoints.py`, `setup_endpoints.py` and `service/schema/*` (gotcha 17), and the onboarding scripts under `scripts/`.
+- `POST /super_admin/setup/initialize` is unauthenticated and returns a hardcoded password (gotcha 16), and the onboarding scripts under `scripts/` still assume per-tenant schemas.
 - Provisioning does not seed an academic year or certificate templates, and the shared menu catalog must be imported before a plan can grant menus.
 - There is no super-admin UI and no super-admin token refresh.
 - Plan resource edits reach tenants only when the plan is re-applied (gotcha 6).

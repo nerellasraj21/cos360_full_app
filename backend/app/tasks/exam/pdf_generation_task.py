@@ -26,7 +26,7 @@ def generate_exam_pdf(
     student_ids: list | None = None,  # None = all students
     class_id: str | None = None,
     section_id: str | None = None,
-    tenant_schema: str | None = None,
+    tenant_id: str,
 ):
     """
     Generate PDF reports for an exam.
@@ -37,7 +37,7 @@ def generate_exam_pdf(
         student_ids: Specific student UUIDs, or None for all
         class_id: Filter by class UUID
         section_id: Filter by section UUID
-        tenant_schema: PostgreSQL search_path schema for multi-tenant
+        tenant_id: UUID of the tenant the exam belongs to
     """
     try:
         logger.info(

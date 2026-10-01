@@ -75,8 +75,6 @@ addopts = "--tb=short -q"
 source = ["app"]
 omit = [
     "app/api/v1/auth/test_*.py",
-    "app/api/v1/auth/test_setup_endpoints.py",
-    "app/api/v1/auth/fix_permissions_endpoints.py",
     "migrations/*",
 ]
 

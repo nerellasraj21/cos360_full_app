@@ -26,7 +26,7 @@ def send_exam_notification(
     recipient_user_ids: list[str] | None = None,  # None = auto-resolve all relevant users
     class_id: str | None = None,
     section_id: str | None = None,
-    tenant_schema: str | None = None,
+    tenant_id: str,
     extra_data: dict | None = None,
 ):
     """
@@ -38,7 +38,7 @@ def send_exam_notification(
         recipient_user_ids: Specific recipients, or None for auto-resolve
         class_id: Filter by class UUID
         section_id: Filter by section UUID
-        tenant_schema: PostgreSQL search_path for multi-tenant
+        tenant_id: UUID of the tenant the exam belongs to
         extra_data: Additional payload (e.g. download URL for hall tickets)
     """
     try:

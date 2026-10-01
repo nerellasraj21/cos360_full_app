@@ -13,7 +13,6 @@ import logging
 from typing import Any
 
 from cachetools import TTLCache
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger("cache_utils")
@@ -26,15 +25,9 @@ tenant_cache = TTLCache(maxsize=100, ttl=600)  # 10 minutes for tenant data
 
 async def get_tenant_context(db_session: AsyncSession) -> str:
     """
-    Extract tenant context from database session
+    Extract tenant context (the tenant id) from database session
     """
-    try:
-        result = await db_session.execute(text("SELECT current_schema()"))
-        schema_name = result.scalar()
-        return schema_name or "default"
-    except Exception:
-        # Fallback to default if we can't get schema
-        return "default"
+    return str(db_session.info.get("tenant_id") or "default")
 
 
 def create_cache_key(prefix: str, *args, **kwargs) -> str:
@@ -50,7 +43,7 @@ def create_cache_key(prefix: str, *args, **kwargs) -> str:
 
 async def create_tenant_cache_key(prefix: str, db_session: AsyncSession, *args, **kwargs) -> str:
     """
-    Create a tenant-aware cache key including schema context
+    Create a tenant-aware cache key including the tenant id
     """
     tenant_context = await get_tenant_context(db_session)
 
@@ -186,7 +179,7 @@ def invalidate_cache(cache_type: str = "all", pattern: str = None, tenant: str =
     Args:
         cache_type: Type of cache to invalidate ('dropdown', 'query', 'tenant', 'all')
         pattern: Pattern to match for selective invalidation
-        tenant: Tenant schema name for tenant-specific invalidation
+        tenant: Tenant id for tenant-specific invalidation
     """
     caches = {"dropdown": dropdown_cache, "query": query_cache, "tenant": tenant_cache}
 

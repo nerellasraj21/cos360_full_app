@@ -8,7 +8,6 @@ class OrganizationBase(BaseModel):
     description: str
     is_active: bool = True
     subdomain: str
-    schema_name: str
 
 
 class OrganizationCreate(OrganizationBase):
@@ -21,7 +20,6 @@ class OrganizationUpdate(OrganizationBase):
     name: str | None = None
     description: str | None = None
     subdomain: str | None = None
-    schema_name: str | None = None
 
 
 class OrganizationRead(OrganizationBase):

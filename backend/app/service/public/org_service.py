@@ -60,14 +60,6 @@ async def create_organization(db: AsyncSession, org: OrganizationCreate, request
                 request=request,
             )
 
-        if org.schema_name and len(org.schema_name) > 50:
-            raise create_validation_error(
-                message="Organization schema name cannot exceed 50 characters",
-                field="schema_name",
-                value=org.schema_name,
-                request=request,
-            )
-
         # Check for duplicate organization name
         existing_org = await db.execute(select(Organization).where(Organization.name == org.name.strip()))
         if existing_org.scalar_one_or_none():
@@ -86,18 +78,6 @@ async def create_organization(db: AsyncSession, org: OrganizationCreate, request
                 raise create_business_rule_error(
                     message=f"Organization with subdomain '{org.subdomain}' already exists",
                     rule="unique_organization_subdomain",
-                    request=request,
-                )
-
-        # Check for duplicate schema name if provided
-        if org.schema_name:
-            existing_schema = await db.execute(
-                select(Organization).where(Organization.schema_name == org.schema_name.strip())
-            )
-            if existing_schema.scalar_one_or_none():
-                raise create_business_rule_error(
-                    message=f"Organization with schema name '{org.schema_name}' already exists",
-                    rule="unique_organization_schema",
                     request=request,
                 )
 
@@ -323,28 +303,6 @@ async def update_organization(
                 raise create_business_rule_error(
                     message=f"Organization with subdomain '{update_data['subdomain']}' already exists",
                     rule="unique_organization_subdomain",
-                    request=request,
-                )
-
-        if "schema_name" in update_data and update_data["schema_name"]:
-            if len(update_data["schema_name"]) > 50:
-                raise create_validation_error(
-                    message="Organization schema name cannot exceed 50 characters",
-                    field="schema_name",
-                    value=update_data["schema_name"],
-                    request=request,
-                )
-
-            # Check for duplicate schema name (excluding current organization)
-            existing_schema = await db.execute(
-                select(Organization).where(
-                    Organization.schema_name == update_data["schema_name"].strip(), Organization.id != org_id
-                )
-            )
-            if existing_schema.scalar_one_or_none():
-                raise create_business_rule_error(
-                    message=f"Organization with schema name '{update_data['schema_name']}' already exists",
-                    rule="unique_organization_schema",
                     request=request,
                 )
 

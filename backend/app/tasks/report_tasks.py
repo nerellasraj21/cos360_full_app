@@ -11,11 +11,11 @@ from uuid import UUID
 from sqlalchemy import update
 
 from app.celery_app import celery_app
-from app.db.session import get_public_db
 from app.models.reports.report_audit import ReportAudit
 from app.schemas.reports.report_schemas import StaffSummaryFilter, StudentSummaryFilter
 from app.service.reports.staff_report_service import StaffReportService
 from app.service.reports.student_report_service import StudentReportService
+from app.tasks.tenant_context import task_platform_session, task_tenant_session
 
 logger = logging.getLogger(__name__)
 
@@ -112,9 +112,7 @@ async def _generate_student_report_async(
     """
     Async function to generate student report
     """
-    from app.db.tenant_session import get_tenant_db
-
-    async with get_tenant_db(tenant_id) as db:
+    async with task_tenant_session(tenant_id) as db:
         # Create service
         service = StudentReportService(db, UUID(user_id), tenant_id)
 
@@ -165,9 +163,7 @@ async def _generate_staff_report_async(
     """
     Async function to generate staff report
     """
-    from app.db.tenant_session import get_tenant_db
-
-    async with get_tenant_db(tenant_id) as db:
+    async with task_tenant_session(tenant_id) as db:
         # Create service
         service = StaffReportService(db, UUID(user_id), tenant_id)
 
@@ -251,7 +247,7 @@ async def update_audit_status_async(
     """
     Update audit status in database
     """
-    async with get_public_db() as db:
+    async with task_platform_session() as db:
         update_data = {"status": status, "updated_at": datetime.utcnow()}
 
         if error_message:

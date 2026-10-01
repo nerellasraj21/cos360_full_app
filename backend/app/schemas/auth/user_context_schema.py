@@ -25,7 +25,7 @@ class UserContext(BaseModel):
     allowed_entity_ids: list[UUID] | None = None  # For "related" access scope
 
     # Additional context for specific use cases
-    tenant_schema: str | None = None
+    tenant_id: str | None = None
     plan_limitations: dict | None = None
 
     class Config:

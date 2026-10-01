@@ -9,7 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.tenant_session import get_tenant_db
+from app.db.tenant_session import get_tenant_db, get_tenant_id_from_request
 from app.models.communication.communication_model import NotificationQueue
 from app.tasks.communication.send_tasks import send_notification_batch
 from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
@@ -60,7 +60,7 @@ async def send_holiday_notice(
     await db.commit()
 
     if queue_entry.id:
-        send_notification_batch.delay([str(queue_entry.id)], "sms", request.headers.get("cschema", "public"))
+        send_notification_batch.delay([str(queue_entry.id)], "sms", get_tenant_id_from_request(request))
 
     return {
         "status": "queued",

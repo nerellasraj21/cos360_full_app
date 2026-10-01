@@ -530,9 +530,9 @@ Shaped by: [fee/mandatory-fees-applied-by-backend](#feemandatory-fees-applied-by
 ### fee/audit-writes-in-savepoint-before-commit (temporary)
 
 - **Decision**: Fee audit writes (_write_audit_log in the collection, concession and old-fee services) run inside a savepoint before the request's single commit and never commit themselves.
-- **Why**: They insert into audit_logs, which exists in no schema. Run after the commit, the failed insert left the session aborted, so the payment SMS lookups that followed failed; the post-commit statements could also run on another tenant's search_path.
+- **Why**: They insert into audit_logs, which exists in no schema. Run after the commit, the failed insert left the session aborted, so the payment SMS lookups that followed failed; the post-commit statements also break the one-commit-per-request rule.
 - **Alternatives**: Removing the audit calls, or creating the table with a migration.
-- **Tradeoff**: Nothing is audited until an audit_logs table exists in each tenant schema.
+- **Tradeoff**: Nothing is audited until an audit_logs table exists for tenants.
 - **Since**: 2026-09
 - Shapes: `service:app/service/fee/fee_collection_service.py`, `service:app/service/fee/fee_concession_service.py`, `service:app/service/fee/fee_old_service.py`
 

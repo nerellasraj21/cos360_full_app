@@ -84,7 +84,6 @@ class SuperAdminAuditRead(BaseModel):
 # System Management Schemas
 class TenantCreate(BaseModel):
     client_name: str = Field(..., min_length=3, max_length=100)
-    schema_name: str = Field(..., min_length=3, max_length=100)
     is_active: bool = True
 
 

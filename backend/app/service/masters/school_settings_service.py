@@ -86,11 +86,11 @@ async def upsert_settings(db: AsyncSession, payload: SchoolSettingsUpdate) -> Sc
 
 
 async def upload_school_image(file: UploadFile, db: AsyncSession) -> SchoolSettings:
-    return await _upload_file(file, db, field="image_url", save_dir=os.path.join("media", "school", "images"))
+    return await _upload_file(file, db, field="image_url", save_dir=os.path.join("media", db.info["tenant_id"], "school", "images"))
 
 
 async def upload_school_signature(file: UploadFile, db: AsyncSession) -> SchoolSettings:
-    return await _upload_file(file, db, field="principal_signature_url", save_dir=os.path.join("media", "school", "signatures"))
+    return await _upload_file(file, db, field="principal_signature_url", save_dir=os.path.join("media", db.info["tenant_id"], "school", "signatures"))
 
 
 async def _upload_file(file: UploadFile, db: AsyncSession, field: str, save_dir: str) -> SchoolSettings:

@@ -552,8 +552,7 @@ class MultiTenantAuthService:
             bool: True if tenant is valid and active
         """
         try:
-            schema_name = await TenantService.get_tenant_schema(client_name)
-            return schema_name is not None
+            return await TenantService.get_tenant_id(client_name) is not None
         except Exception as e:
             logger.error(f"Error validating tenant '{client_name}': {str(e)}")
             return False

@@ -1,11 +1,12 @@
 import logging
+from uuid import UUID
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_public_db
+from app.db.tenant_session import PublicAsyncSessionLocal
 from app.models.auth import ResourcePermission, Role, RoleMenuPermission, User
-from app.models.public import Menu, MenuAction, Organization, PermissionTemplate, PlanMenuAccess, RoleTemplate
+from app.models.public import Menu, MenuAction, PermissionTemplate, PlanMenuAccess, RoleTemplate, Tenant
 
 logger = logging.getLogger("multi_tenant_permission_service")
 
@@ -20,7 +21,7 @@ class MultiTenantPermissionService:
 
     @staticmethod
     async def check_endpoint_permission(
-        user_id: str, resource: str, action: str, tenant_db: AsyncSession, tenant_schema: str
+        user_id: str, resource: str, action: str, tenant_db: AsyncSession, tenant_id: str
     ) -> bool:
         """
         Main permission check method - validates access at all three layers
@@ -30,7 +31,7 @@ class MultiTenantPermissionService:
             resource: Resource name (e.g., "fee_categories")
             action: Action name (e.g., "create", "update", "delete")
             tenant_db: Tenant database session
-            tenant_schema: Tenant schema name
+            tenant_id: Tenant id
 
         Returns:
             bool: True if access granted, False otherwise
@@ -55,9 +56,9 @@ class MultiTenantPermissionService:
                 return False
 
             # Layer 1: Check plan-level access
-            plan_access = await MultiTenantPermissionService._check_plan_access(tenant_schema, resource)
+            plan_access = await MultiTenantPermissionService._check_plan_access(tenant_id, resource)
             if not plan_access:
-                logger.info(f"Plan-level access denied for {tenant_schema}:{resource}")
+                logger.info(f"Plan-level access denied for {tenant_id}:{resource}")
                 return False
 
             # Layer 2: Check role-level menu access
@@ -82,19 +83,18 @@ class MultiTenantPermissionService:
             return False
 
     @staticmethod
-    async def _check_plan_access(tenant_schema: str, resource: str) -> bool:
+    async def _check_plan_access(tenant_id: str, resource: str) -> bool:
         """
         Check if the tenant's plan allows access to the resource's menu
         """
         try:
-            async with get_public_db() as public_db:
-                # Get tenant's organization and plan
-                org_query = select(Organization).where(Organization.schema_name == tenant_schema)
-                result = await public_db.execute(org_query)
-                organization = result.scalar_one_or_none()
+            async with PublicAsyncSessionLocal() as public_db:
+                tenant_query = select(Tenant).where(Tenant.id == UUID(str(tenant_id)))
+                result = await public_db.execute(tenant_query)
+                tenant = result.scalar_one_or_none()
 
-                if not organization or not organization.plan_id:
-                    logger.warning(f"Organization or plan not found for schema {tenant_schema}")
+                if not tenant or not tenant.plan_id:
+                    logger.warning(f"Tenant or plan not found for tenant {tenant_id}")
                     return False
 
                 # Find menu associated with the resource
@@ -115,7 +115,7 @@ class MultiTenantPermissionService:
                 for menu in menus:
                     plan_access_query = select(PlanMenuAccess).where(
                         and_(
-                            PlanMenuAccess.plan_id == organization.plan_id,
+                            PlanMenuAccess.plan_id == tenant.plan_id,
                             PlanMenuAccess.menu_id == menu.id,
                             PlanMenuAccess.is_active,
                         )
@@ -138,7 +138,7 @@ class MultiTenantPermissionService:
         Check role-level menu permissions
         """
         try:
-            # Get menu associated with the resource (from tenant schema if custom, fallback to inherited)
+            # Get menu associated with the resource (shared catalog)
             menu_query = select(Menu).where(
                 and_(Menu.name.ilike(f"%{resource}%"), Menu.is_active)  # Basic resource-to-menu mapping
             )
@@ -212,7 +212,7 @@ class MultiTenantPermissionService:
             return False
 
     @staticmethod
-    async def get_user_permissions(user_id: str, tenant_db: AsyncSession, tenant_schema: str) -> dict[str, list[str]]:
+    async def get_user_permissions(user_id: str, tenant_db: AsyncSession, tenant_id: str) -> dict[str, list[str]]:
         """
         Get all permissions for a user (for frontend menu building)
 
@@ -270,8 +270,7 @@ class MultiTenantPermissionService:
             str: New role ID if successful, None otherwise
         """
         try:
-            # Get template from public schema
-            async with get_public_db() as public_db:
+            async with PublicAsyncSessionLocal() as public_db:
                 template_query = select(RoleTemplate).where(RoleTemplate.id == template_id)
                 result = await public_db.execute(template_query)
                 template = result.scalar_one_or_none()
@@ -285,7 +284,6 @@ class MultiTenantPermissionService:
                 result = await public_db.execute(permissions_query)
                 template_permissions = result.scalars().all()
 
-            # Create role in tenant schema
             new_role = Role(name=role_name, description=role_description, is_system_role=False, is_custom_role=False)
             tenant_db.add(new_role)
             await tenant_db.flush()  # Get the ID

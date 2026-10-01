@@ -47,8 +47,7 @@ return row                             # expire_on_commit=False keeps it readabl
 
 ## Adding an endpoint
 1. `router = APIRouter(prefix="/<module>/<resource>", tags=["Module/Resource"])`, then import it and
-   `include_router` it in `main_router.py`. An unregistered router 404s silently
-   (e.g. `super_admin/enhanced_tenant_endpoints.py` is not registered).
+   `include_router` it in `main_router.py`. An unregistered router 404s silently.
 2. First lines of the handler:
    ```python
    current_user = await get_current_user_token(request)          # app.tools.simple_permissions

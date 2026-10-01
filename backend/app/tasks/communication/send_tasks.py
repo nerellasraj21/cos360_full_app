@@ -13,11 +13,11 @@ from typing import Any, Dict, List
 from uuid import UUID
 
 import httpx
-from sqlalchemy import select, text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.celery_app import celery_app
-from app.config import settings
+from app.tasks.tenant_context import task_tenant_session
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
     default_retry_delay=60,
     acks_late=True,
 )
-def send_notification_batch(self, queue_ids: List[str], channel: str, tenant_schema: str):
+def send_notification_batch(self, queue_ids: List[str], channel: str, tenant_id: str):
     """
     Process a batch of NotificationQueue rows.
     For each queue_id:
@@ -39,26 +39,18 @@ def send_notification_batch(self, queue_ids: List[str], channel: str, tenant_sch
       - On failure: retry up to 3 times; after 3 failures: NotificationLog(status=failed)
     """
     try:
-        asyncio.run(_process_batch(queue_ids, channel, tenant_schema))
+        asyncio.run(_process_batch(queue_ids, channel, tenant_id))
     except Exception as exc:
         logger.error("send_notification_batch failed: %s", exc, exc_info=True)
         raise self.retry(exc=exc, countdown=60)
 
 
-async def _process_batch(queue_ids: List[str], channel: str, tenant_schema: str):
-    engine = create_async_engine(settings.DATABASE_URL, echo=False)
-    Session = async_sessionmaker(bind=engine, expire_on_commit=False)
+async def _process_batch(queue_ids: List[str], channel: str, tenant_id: str):
+    async with task_tenant_session(tenant_id) as db:
+        for qid in queue_ids:
+            await _process_single(db, qid, channel)
 
-    try:
-        async with Session() as db:
-            await db.execute(text(f"SET search_path TO {tenant_schema}, public"))
-
-            for qid in queue_ids:
-                await _process_single(db, qid, channel)
-
-            await db.commit()
-    finally:
-        await engine.dispose()
+        await db.commit()
 
 
 async def _process_single(db: AsyncSession, queue_id_str: str, channel: str):

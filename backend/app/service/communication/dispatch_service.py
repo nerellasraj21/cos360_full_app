@@ -27,7 +27,7 @@ async def queue_and_dispatch(
     target_ref: Dict[str, Any],
     user_vars: Dict[str, Any],
     triggered_by: UUID,
-    tenant_schema: str,
+    tenant_id: str,
     channel: Optional[str] = None,
     message: Optional[str] = None,
 ) -> int:
@@ -147,7 +147,7 @@ async def queue_and_dispatch(
     if queue_ids:
         try:
             from app.tasks.communication.send_tasks import send_notification_batch
-            send_notification_batch.delay(queue_ids, channel, tenant_schema)
+            send_notification_batch.delay(queue_ids, channel, tenant_id)
         except Exception as exc:
             logger.error("Failed to dispatch Celery task: %s", exc, exc_info=True)
             # Don't re-raise — queue rows are committed, worker will pick them up

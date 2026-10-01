@@ -395,3 +395,24 @@ async def test_first_login_flag_forces_a_password_change(created, plan_id, clien
     assert done.status_code == 200, done.text
     final = jwt.decode(done.json()["access_token"], settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
     assert final["tenant_id"] == tenant["tenant_id"]
+
+
+async def test_expense_create_uses_the_token_tenant_without_a_header(created, plan_id, client):
+    a = await _provision(created, plan_id, "a")
+    b = await _provision(created, plan_id, "b")
+    year_a = await _add_academic_year(a["tenant_id"])
+    token = (await _login(client, a, year_a)).json()["access_token"]
+    auth = {"Authorization": f"Bearer {token}"}
+
+    category = await client.post("/api/v1/expense/categories/", json={"name": "Utilities"}, headers=auth)
+    assert category.status_code == 201, category.text
+    created_type = await client.post(
+        "/api/v1/expense/types/", json={"name": "Electricity", "category_id": category.json()["id"]}, headers=auth
+    )
+    assert created_type.status_code == 201, created_type.text
+
+    async with open_tenant_session(a["tenant_id"]) as session:
+        rows = (await session.execute(text("SELECT org_id::text, tenant_id::text FROM expense_types"))).all()
+    assert rows == [(a["tenant_id"], a["tenant_id"])]
+    async with open_tenant_session(b["tenant_id"]) as session:
+        assert (await session.execute(text("SELECT count(*) FROM expense_types"))).scalar_one() == 0

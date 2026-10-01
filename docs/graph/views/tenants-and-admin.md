@@ -102,11 +102,11 @@ Platform super admins log in separately, view and edit their own profile, change
 
 ### tenants-and-admin/super-admin-tenant-data
 
-Super admins read any tenant's users, students, stats, reports and roles, and write role permissions into a tenant schema.
+Super admins read any tenant's users, students, stats, reports and roles, and write role permissions into a tenant, through a tenant id in the path.
 - Roles: Super admin.
-- Note: The tenant schema in the path is checked with validate_tenant_schema; the X-SuperAdmin-Target-Tenant header only sets request state.
+- Note: The tenant id in the path is validated against public.tenants and each query runs in a tenant session for it; the X-SuperAdmin-Target-Tenant header only sets request state.
 - Flows: [tenants-and-admin/super-admin-session](#tenants-and-adminsuper-admin-session)
-- Implemented by: `endpoint:GET /super_admin/tenant-data/schemas`, `endpoint:GET /super_admin/tenant-data/{tenant_schema}/reports`, `endpoint:GET /super_admin/tenant-data/{tenant_schema}/roles`, `endpoint:GET /super_admin/tenant-data/{tenant_schema}/roles/{role_id}/permissions`, `endpoint:GET /super_admin/tenant-data/{tenant_schema}/stats`, `endpoint:GET /super_admin/tenant-data/{tenant_schema}/students`, `endpoint:GET /super_admin/tenant-data/{tenant_schema}/users`, `endpoint:POST /super_admin/tenant-data/{tenant_schema}/roles/{role_id}/permissions`, `service:app/service/super_admin/database_service.py`, `table:resource_permissions`, `table:roles`
+- Implemented by: `endpoint:GET /super_admin/tenant-data/schemas`, `endpoint:GET /super_admin/tenant-data/{tenant_id}/reports`, `endpoint:GET /super_admin/tenant-data/{tenant_id}/roles`, `endpoint:GET /super_admin/tenant-data/{tenant_id}/roles/{role_id}/permissions`, `endpoint:GET /super_admin/tenant-data/{tenant_id}/stats`, `endpoint:GET /super_admin/tenant-data/{tenant_id}/students`, `endpoint:GET /super_admin/tenant-data/{tenant_id}/users`, `endpoint:POST /super_admin/tenant-data/{tenant_id}/roles/{role_id}/permissions`, `service:app/service/super_admin/database_service.py`, `table:resource_permissions`, `table:roles`
 
 ### tenants-and-admin/system-health
 
@@ -121,14 +121,14 @@ Super admins list, create and toggle tenants active or inactive, and assign a pl
 - Parity: Web /superorg page exists but calls mismatched /super-admin paths with a tenant token; mobile has none.
 - Note: Tenant lookups are cached in memory forever, so deactivating a tenant has no effect until the process restarts.
 - Note: PUT /super_admin/system/tenants/{id}/plan deletes and re-inserts tenant menus flat and recreates menu grants only for Admin; do not run it on a live tenant.
-- Note: POST /super_admin/system/tenants/ creates only the tenant row, schema, a bare roles table with Admin and optional flat menus; it interpolates schema_name straight into DDL.
+- Note: POST /super_admin/system/tenants/ creates the tenant, its roles, plan-limited permissions and menu links in one transaction; the first Admin is created only when a JSON admin body is sent.
 - Flows: [tenants-and-admin/super-admin-session](#tenants-and-adminsuper-admin-session)
 - Implemented by: `endpoint:GET /super_admin/system/tenants`, `endpoint:POST /super_admin/system/tenants`, `endpoint:PUT /super_admin/system/tenants/{tenant_id}/activate`, `endpoint:PUT /super_admin/system/tenants/{tenant_id}/plan`, `service:app/service/super_admin/super_admin_service.py`, `table:menus`, `table:public.plans`, `table:public.tenants`, `table:role_menu_permissions`, `web:src/api/superadmin.ts`, `web:src/pages/superadmin/SuperAdminDashboard.tsx`
 - Shaped by: [platform/schema-per-tenant](#platformschema-per-tenant)
 
 ### tenants-and-admin/tenant-onboarding
 
-Create a new school tenant by cloning the cos360_master template schema and seeding roles, menus, permissions, an academic year and an Admin user.
+Create a new school tenant with one super-admin call that seeds roles, plan-limited permissions, menu access and an optional first Admin; an academic year is created separately.
 - Roles: Platform operator running backend scripts.
 - Note: Onboarding is script-based (backend/scripts/create_little_bunny_tenant.py and the seed_* pattern scripts); there is no working API or UI path.
 - Flows: [tenants-and-admin/onboard-tenant](#tenants-and-adminonboard-tenant)
@@ -292,7 +292,7 @@ Implements: `feature:tenants-and-admin/plan-management`, `feature:tenants-and-ad
 1. Log in with `endpoint:POST /super_admin/auth/login` against `table:public.super_admin_users`; 5 failed attempts lock the account for 30 minutes `service:app/service/super_admin/super_admin_service.py`.
 2. Call /super_admin/* endpoints with the returned Bearer token.
 3. get_current_super_admin requires the user_type claim to equal super_admin `service:app/tools/simple_permissions.py`.
-4. To work on one tenant's data, use /super_admin/tenant-data/{tenant_schema}/... `endpoint:GET /super_admin/tenant-data/{tenant_schema}/users` `endpoint:POST /super_admin/tenant-data/{tenant_schema}/roles/{role_id}/permissions`; the schema is checked with validate_tenant_schema `service:app/service/super_admin/database_service.py`.
+4. To work on one tenant's data, use /super_admin/tenant-data/{tenant_id}/... `endpoint:GET /super_admin/tenant-data/{tenant_id}/users` `endpoint:POST /super_admin/tenant-data/{tenant_id}/roles/{role_id}/permissions`; the tenant id is checked against public.tenants `service:app/service/super_admin/database_service.py`
 5. The X-SuperAdmin-Target-Tenant header only sets request state; the endpoints do not use it.
 6. Each action writes a row to `table:public.super_admin_audit`.
 7. There is no super-admin refresh endpoint, so the session ends when the 24 h access token expires.
@@ -304,7 +304,7 @@ flowchart TD
   s1 --> s2
   s3["3. get_current_super_admin requires the user_type claim to equal super...<br/>service:app/tools/simple_permissions.py"]
   s2 --> s3
-  s4["4. To work on one tenant's data, use /super_admin/tenant-data/{tenant_...<br/>endpoint:GET /super_admin/tenant-data/{tenant_schema}/users<br/>endpoint:POST /super_admin/tenant-data/{tenant_schema}/roles/{role_id}/permissions<br/>service:app/service/super_admin/database_service.py"]
+  s4["4. To work on one tenant's data, use /super_admin/tenant-data/{tenant_...<br/>endpoint:GET /super_admin/tenant-data/{tenant_id}/users<br/>endpoint:POST /super_admin/tenant-data/{tenant_id}/roles/{role_id}/permissions<br/>service:app/service/super_admin/database_service.py"]
   s3 --> s4
   s5["5. The X-SuperAdmin-Target-Tenant header only sets request state; the ..."]
   s4 --> s5

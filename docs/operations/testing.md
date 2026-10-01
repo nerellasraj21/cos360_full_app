@@ -53,8 +53,8 @@ _Last verified against code: 2026-09-29_
 
 ## Local smoke test (backend + web)
 
-- Start both servers from `.claude/launch.json` (`backend`, `web`). The backend config sets `TENANT_DEFAULT_NAME=test_tenant`, overriding `backend/.env`, so every request uses `test_tenant_schema` instead of the live school. The middleware ignores the `cschema` value (see `docs/architecture.md`), so this override is what keeps tests off production data.
-- Confirm the tenant before writing anything: `GET /api/v1/auth/academic-years` must return `test_tenant_schema`'s academic years, not `little_bunny`'s.
+- Start both servers from `.claude/launch.json` (`backend`, `web`), against the local database from `docs/operations/database-migrations.md`. The tenant is the signed `tenant_id` in the login token, and the `cschema` header only picks the tenant at login. Create a test tenant with `POST /super_admin/system/tenants/` (or the integration test helpers) rather than reusing a live school.
+- Confirm `DATABASE_URL` points at the local database before writing anything. The backend integration tests under `backend/tests/integration/test_tenant_*.py`, `test_celery_tenant_tasks.py` and `test_super_admin_tenant_data.py` need it and clean up the tenants they create.
 - Log in with the test-tenant admin from `.claude/commands/test-api.md` and keep the current academic year selected; admin login activates the chosen year for the whole tenant.
 - The backend logs errors to `backend/cos360_errors.log`, not the console. Read that file for tracebacks of 500s.
 - Backend changes need a server restart (the launch config has no `--reload`); web changes hot-reload.

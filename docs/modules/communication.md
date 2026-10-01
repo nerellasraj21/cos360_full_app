@@ -52,7 +52,7 @@ Flows, decisions, and feature map: [graph view](../graph/views/communication.md)
 ## Rules & gotchas
 1. **Render at queue time.** `notification_queue.rendered_message` is the immutable text. Editing a template never changes messages already queued. Jinja errors mark only that recipient as a `failed` log (`message=""`). The rest of the batch still goes out.
 2. **Skipped recipients are not logged.** Recipients missing a phone (sms/whatsapp) or email are dropped silently and are not counted in `queued_count`, despite the code comment and spec FR-203. `queued_count` can be less than the preview count.
-3. **Pass the tenant *schema* to the worker, not the `cschema` header.** `/communication/send` resolves it with `TenantService.get_tenant_schema(client_name)`, falling back to `cos360_masters`. The announcements endpoint and every module trigger pass `request.headers["cschema"]`, which is the client name. When client name ≠ schema name (e.g. `test_tenant` → `test_tenant_schema`), the worker cannot find the queue rows and skips them with only a warning.
+3. **Pass the tenant id to the worker, not the `cschema` header.** Every caller passes `get_tenant_id_from_request(request)`, and the worker opens `task_tenant_session(tenant_id)`, which sets `app.tenant_id` for each transaction. A queue id from another tenant is not visible to it, so it is skipped.
 4. **Worker failures roll back the batch.** `_process_single` re-raises on a provider error, so `_process_batch` never commits. The `failed` log and status are lost, and rows already sent earlier in the batch go back to `queued` and are **re-sent** on retry. After 3 retries nothing is persisted and the rows stay `queued`. Nothing checks `status == done` before sending.
 5. **SMS needs MSG91 flow id + DLT TE id + positional vars.** `msg91_service.send_sms_via_msg91` rejects any row without `template_id` and `dlt_te_id` (both mandatory for Indian DLT routes). `sms_templates.py` holds the DLT-registered bodies, their ordered `var1..N` and the env names (`MSG91_TEMPLATE_ID_*`, `MSG91_DLT_TE_ID_*`). Use `build_target_ref(key, **values)` when queueing SMS.
    - Today **no caller uses it**. Module triggers and the holiday endpoint omit `dlt_te_id`, and their variable order doesn't match the registry.
@@ -89,7 +89,7 @@ Response-shape drift in both clients: `SendResponse` expects `channel` and `targ
 ## Known gaps
 - **Security:**
   - Jinja2 renders template bodies and WhatsApp free-text with the unsandboxed `jinja2.Template`. The spec required `SandboxedEnvironment`. Anyone with `communications:create` can run server-side template injection.
-  - The worker interpolates `tenant_schema` straight into `SET search_path`, and 10 callers pass the raw `cschema` header.
+  - The task and every caller use `tenant_id` now; a message already in the broker from before this change carries a schema name and will not find its rows.
   - The spec's phone masking in the log list is not implemented.
 - **Push notifications (FCM/APNs), in-app notification centre, and deep links:** not built. No `expo-notifications`, no device-token storage. The exam `POST /exams/{id}/notify` (`service/exam/notification_service.py`) only counts recipients; it is a stub.
 - **Delivery status:** no provider webhooks, so `delivered` is never set. No read receipts, opt-out/unsubscribe, email attachments, scheduled sends (the spec'd `scheduled_at` and `retry_count` columns don't exist), manual resend, cost estimate, multi-language templates, or teacher restricted to own class/section.

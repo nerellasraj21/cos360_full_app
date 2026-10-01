@@ -474,7 +474,8 @@ async def upload_staff_photo(staff_id: UUID, file: UploadFile, db: AsyncSession)
     if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
         raise HTTPException(status_code=400, detail="Only jpg, png, webp files are allowed")
 
-    save_dir = os.path.join("media", "staff", "photos")
+    tenant_id = db.info["tenant_id"]
+    save_dir = os.path.join("media", tenant_id, "staff", "photos")
     os.makedirs(save_dir, exist_ok=True)
 
     filename = f"{staff_id}{ext}"
@@ -488,12 +489,13 @@ async def upload_staff_photo(staff_id: UUID, file: UploadFile, db: AsyncSession)
         f.write(contents)
 
     # Delete old photo file if different
-    if staff.photo and staff.photo != f"/media/staff/photos/{filename}":
+    photo_url = f"/media/{tenant_id}/staff/photos/{filename}"
+    if staff.photo and staff.photo != photo_url:
         old_path = staff.photo.lstrip("/")
         if os.path.exists(old_path):
             os.remove(old_path)
 
-    staff.photo = f"/media/staff/photos/{filename}"
+    staff.photo = photo_url
     await db.flush()
 
     result = await db.execute(

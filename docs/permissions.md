@@ -127,7 +127,7 @@ Other facts:
    - Admin gets every action.
    - Grant both `read` and `list`.
    - Student and Parent get `*_own` or `*_related`, including the `list_` variants.
-   - Pattern: `backend/scripts/seed_expense_permissions.py`. Scripts must set `search_path` or schema-qualify, and should be idempotent (`WHERE NOT EXISTS` / `ON CONFLICT`).
+   - Add the pairs to `ROLE_PERMISSIONS` in `app/service/tenant/permission_catalog.py`, add the resource to the plan's `plan_resource_access`, and run `POST /auth/seed/all-role-permissions` per tenant. It inserts only missing rows, so revoked permissions stay revoked.
 4. **Defaults for future tenants:** add the rows to `_ROLE_PERMISSIONS` in `backend/app/api/v1/auth/seed_endpoints.py`.
 5. **Menu (only if there is a new page):** add a row to tenant `menus` with the right `parent_id`, `level` and `display_order`, plus `role_menu_permissions` (`can_view`) for each role. Pattern: `scripts/seed_expense_menu_test_tenant.py`. If Student or Parent should see it, also add the URL to `_STUDENT_PARENT_MENU_URLS`.
 6. **Web:**
@@ -145,15 +145,15 @@ Other facts:
   - Users on a non-canonical casing miss the seeded grants, the first-login flow and `entity_id`.
   - `POST /admin/role-mgmt/` rejects case-insensitive duplicates, but scripts and raw SQL do not.
 - **Templates don't match real resources.** `GET /admin/role-mgmt/templates/` and `apply-template` use coarse names (`fee_management`, `student_management`) that no endpoint checks. Applying a template grants nothing useful.
-- **The default seed is incomplete.** `_ROLE_PERMISSIONS` (`POST /auth/seed/all-role-permissions`) gives Admin no `student_admissions:list` and none of `fee_collection`, `fee_concessions`, `fee_old`, `transport_pricing`, `timetable_management`, `staff_attendance`, `school_settings`, `sections`, `communications`, `issuable_certificates`, `expense_reports` or any `*:send_sms`. That is why onboarding copies `resource_permissions` from `test_tenant_schema`; extend the seed when you add a resource.
+- **The default seed is incomplete.** `ROLE_PERMISSIONS` in `app/service/tenant/permission_catalog.py` (applied by provisioning and `POST /auth/seed/all-role-permissions`) gives Admin no `student_admissions:list` and none of `fee_collection`, `fee_concessions`, `fee_old`, `transport_pricing`, `timetable_management`, `staff_attendance`, `school_settings`, `sections`, `communications`, `issuable_certificates`, `expense_reports` or any `*:send_sms`. That is why onboarding copies `resource_permissions` from `test_tenant_schema`; extend the seed when you add a resource.
 - **Plan assignment is destructive.** `PUT /super_admin/system/tenants/{id}/plan` deletes all tenant `menus` and Admin's menu grants, then recreates them flat, which loses `parent_id`.
 - **Missing checks:**
   - `GET /admin/role-mgmt/roles/` has its permission check commented out (any authenticated user).
   - `/admin/role-mgmt/test/` requires no authentication at all.
   - `/admin/role-mgmt/debug-roles/` has no permission check and prints the request headers, including `Authorization`, to stdout.
-- **No tenant binding.** The backend never compares the JWT's `client_name` with the request tenant, and the role is taken by name from the token.
+- **Tenant binding.** The JWT carries `tenant_id`, and the request tenant must match it (a mismatch is 403). The role is still taken by name from the token.
 - **Unauthenticated privileged endpoints mounted in every environment:**
-  - `POST /auth/seed/all-role-permissions` and `/auth/seed/permission-data`, `/auth/test-setup/create-test-users`, `/auth/fix-permissions/*`, `POST /super_admin/setup/initialize`.
+  - `/auth/seed/permission-data` and the other `/auth/seed/*` data seeders, and `POST /super_admin/setup/initialize`. `POST /auth/seed/all-role-permissions` now requires an Admin.
 
   Gate these behind `ENVIRONMENT` or remove them.
 - **Tenant admins can escalate.** An Admin with `role_management:update` can grant any role, including their own, any `resource:action`.

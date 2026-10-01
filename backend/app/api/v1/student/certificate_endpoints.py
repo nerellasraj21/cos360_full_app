@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.tenant_session import get_tenant_db
+from app.db.tenant_session import get_tenant_db, get_tenant_id_from_request
 from app.models.masters.admission_model import Admission
 from app.models.masters.class_model import Class
 from app.models.masters.sections_model import Section
@@ -70,7 +70,7 @@ async def create_new_certificate(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     user_id = UUID(current_user.get("sub"))
-    tenant_schema = request.headers.get("cschema", "little_bunny")
+    tenant_id = get_tenant_id_from_request(request)
 
     # Permission check
     await check_role_plan_permission_with_error(
@@ -84,7 +84,7 @@ async def create_new_certificate(
         issue_date=issue_date or date.today(),
         remarks=remarks,
         file=file,
-        tenant_schema=tenant_schema,
+        tenant_id=tenant_id,
         actor_id=user_id,
         actor_role=role,
     )
@@ -252,7 +252,7 @@ async def create_received_document_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     user_id = UUID(current_user.get("sub"))
-    tenant_schema = request.headers.get("cschema", "little_bunny")
+    tenant_id = get_tenant_id_from_request(request)
 
     if role != "Admin":
         raise HTTPException(
@@ -270,7 +270,7 @@ async def create_received_document_endpoint(
         certificate_type_id=certificate_type_id,
         remarks=remarks,
         file=file,
-        tenant_schema=tenant_schema,
+        tenant_id=tenant_id,
         actor_id=user_id,
         actor_role=role,
     )
@@ -301,7 +301,7 @@ async def create_issued_certificate_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     user_id = UUID(current_user.get("sub"))
-    tenant_schema = request.headers.get("cschema", "little_bunny")
+    tenant_id = get_tenant_id_from_request(request)
 
     if role != "Admin":
         raise HTTPException(
@@ -320,7 +320,7 @@ async def create_issued_certificate_endpoint(
         issue_date=issue_date,
         remarks=remarks,
         file=file,
-        tenant_schema=tenant_schema,
+        tenant_id=tenant_id,
         actor_id=user_id,
         actor_role=role,
     )
@@ -742,7 +742,7 @@ async def update_certificate_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     user_id = UUID(current_user.get("sub"))
-    tenant_schema = request.headers.get("cschema", "little_bunny")
+    tenant_id = get_tenant_id_from_request(request)
 
     # Permission check
     await check_role_plan_permission_with_error(
@@ -756,7 +756,7 @@ async def update_certificate_endpoint(
         issue_date=issue_date,
         remarks=remarks,
         file=file,
-        tenant_schema=tenant_schema,
+        tenant_id=tenant_id,
         actor_id=user_id,
         actor_role=role,
     )
@@ -783,7 +783,7 @@ async def delete_certificate_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     user_id = UUID(current_user.get("sub"))
-    tenant_schema = request.headers.get("cschema", "little_bunny")
+    tenant_id = get_tenant_id_from_request(request)
 
     # Permission check
     await check_role_plan_permission_with_error(
@@ -793,7 +793,7 @@ async def delete_certificate_endpoint(
     await delete_certificate(
         db=db,
         certificate_id=certificate_id,
-        tenant_schema=tenant_schema,
+        tenant_id=tenant_id,
         actor_id=user_id,
         actor_role=role,
     )
@@ -826,7 +826,7 @@ async def download_certificate_endpoint(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     user_id = UUID(current_user.get("sub"))
-    tenant_schema = request.headers.get("cschema", "little_bunny")
+    tenant_id = get_tenant_id_from_request(request)
 
     # Permission check
     read_action = "read_own" if role == "Student" else "read"
@@ -839,7 +839,7 @@ async def download_certificate_endpoint(
         certificate_id=certificate_id,
         role=role,
         user_id=user_id,
-        tenant_schema=tenant_schema,
+        tenant_id=tenant_id,
     )
 
     return CertificateDownloadResponse(

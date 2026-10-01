@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Upl
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.tenant_session import get_tenant_db
+from app.db.tenant_session import get_tenant_db, get_tenant_id_from_request
 from app.schemas.common.pagination_schema import PaginatedResponse
 from app.schemas.student.admission_schema import (
     StudentAdmissionCreate,
@@ -521,7 +521,7 @@ async def send_admission_confirmation(
     await db.commit()
 
     if queue_ids:
-        send_notification_batch.delay(queue_ids, "sms", request.headers.get("cschema", "public"))
+        send_notification_batch.delay(queue_ids, "sms", get_tenant_id_from_request(request))
 
     return {
         "status": "queued",

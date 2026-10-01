@@ -9,7 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.tenant_session import TenantService, get_tenant_db
+from app.db.tenant_session import get_tenant_db, get_tenant_id_from_request
 from app.schemas.reports.attendance_report_schemas import (
     StaffAttendanceFilter,
     StaffAttendanceSummary,
@@ -56,8 +56,7 @@ async def get_student_attendance_report(
 
         # Get user info
         user_id_str = current_user.get("sub")
-        client_name = getattr(request.state, "client_name", None)
-        tenant_id = await TenantService.get_tenant_schema(client_name)
+        tenant_id = get_tenant_id_from_request(request)
 
         # Convert user_id to UUID
         from uuid import UUID as UUIDImport
@@ -128,8 +127,7 @@ async def get_student_attendance_stats(
 
         # Get user info
         user_id_str = current_user.get("sub")
-        client_name = getattr(request.state, "client_name", None)
-        tenant_id = await TenantService.get_tenant_schema(client_name)
+        tenant_id = get_tenant_id_from_request(request)
 
         # Convert user_id to UUID
         from uuid import UUID as UUIDImport
@@ -194,8 +192,7 @@ async def get_staff_attendance_report(
 
         # Get user info
         user_id_str = current_user.get("sub")
-        client_name = getattr(request.state, "client_name", None)
-        tenant_id = await TenantService.get_tenant_schema(client_name)
+        tenant_id = get_tenant_id_from_request(request)
 
         # Convert user_id to UUID
         from uuid import UUID as UUIDImport
@@ -264,8 +261,7 @@ async def get_staff_attendance_stats(
 
         # Get user info
         user_id_str = current_user.get("sub")
-        client_name = getattr(request.state, "client_name", None)
-        tenant_id = await TenantService.get_tenant_schema(client_name)
+        tenant_id = get_tenant_id_from_request(request)
 
         # Convert user_id to UUID
         from uuid import UUID as UUIDImport
@@ -314,8 +310,7 @@ async def export_attendance_report(
 
         # Get user info
         user_id_str = current_user.get("sub")
-        client_name = getattr(request.state, "client_name", None)
-        tenant_id = await TenantService.get_tenant_schema(client_name)
+        tenant_id = get_tenant_id_from_request(request)
 
         # Convert user_id to UUID
         from uuid import UUID as UUIDImport

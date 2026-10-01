@@ -50,10 +50,6 @@ async def get_public_db():
     PublicSessionLocal = async_sessionmaker(bind=public_engine, expire_on_commit=False)
 
     async with PublicSessionLocal() as session:
-        # Explicitly set search_path to public schema
-        from sqlalchemy import text
-
-        await session.execute(text("SET search_path TO public"))
         try:
             yield session
         finally:

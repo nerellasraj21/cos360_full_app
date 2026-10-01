@@ -5,8 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy import func, select, text
 
-from app.db.session import get_public_db
-from app.db.tenant_session import TenantService
+from app.db.tenant_session import PublicAsyncSessionLocal, TenantService
 from app.models.public.tenant_model import Tenant
 from app.schemas.public.super_admin_schema import SystemHealthCheck
 from app.service.super_admin.super_admin_service import SuperAdminService
@@ -32,7 +31,7 @@ async def get_system_health(current_super_admin: dict = Depends(get_current_supe
 
     **Super Admin Only**: Complete system overview
     """
-    async with get_public_db() as db:
+    async with PublicAsyncSessionLocal() as db:
         return await SuperAdminService.get_system_health(db)
 
 
@@ -57,7 +56,7 @@ async def get_all_tenants(
     **Returns**: Complete tenant information for system management
     """
     try:
-        async with get_public_db() as db:
+        async with PublicAsyncSessionLocal() as db:
             # Build query with optional filters
             query = select(Tenant)
 
@@ -93,7 +92,6 @@ async def get_all_tenants(
                     {
                         "id": tenant.id,
                         "client_name": tenant.client_name,
-                        "schema_name": tenant.schema_name,
                         "is_active": tenant.is_active,
                         "created_at": tenant.created_at,
                         "updated_at": tenant.updated_at,
@@ -144,7 +142,7 @@ async def create_tenant(
         admin_password=admin.password if admin else None,
     )
 
-    async with get_public_db() as db:
+    async with PublicAsyncSessionLocal() as db:
         await SuperAdminService.create_audit_log(
             db=db,
             super_admin_id=UUID(current_super_admin["sub"]),
@@ -179,7 +177,7 @@ async def activate_tenant(
     - System-wide tenant management
     """
     try:
-        async with get_public_db() as db:
+        async with PublicAsyncSessionLocal() as db:
             # Get tenant
             result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
             tenant = result.scalar_one_or_none()
@@ -205,7 +203,7 @@ async def activate_tenant(
                 action="TOGGLE_TENANT_STATUS",
                 resource="tenant",
                 resource_id=str(tenant.id),
-                tenant_id=tenant.schema_name,
+                tenant_id=str(tenant.id),
                 details={"old_status": old_status, "new_status": tenant.is_active, "client_name": tenant.client_name},
                 ip_address=request.client.host if request.client else None,
             )
@@ -215,7 +213,6 @@ async def activate_tenant(
                 "tenant": {
                     "id": tenant.id,
                     "client_name": tenant.client_name,
-                    "schema_name": tenant.schema_name,
                     "is_active": tenant.is_active,
                     "updated_at": tenant.updated_at,
                 },
@@ -247,7 +244,7 @@ async def assign_plan_to_tenant(
     result = await TenantProvisioningService.change_plan(tenant_id, plan_id)
     await TenantService.clear_cache()
 
-    async with get_public_db() as db:
+    async with PublicAsyncSessionLocal() as db:
         await SuperAdminService.create_audit_log(
             db=db,
             super_admin_id=UUID(current_super_admin["sub"]),
@@ -274,7 +271,7 @@ async def get_usage_statistics(request: Request, current_super_admin: dict = Dep
     - Performance insights
     """
     try:
-        async with get_public_db() as db:
+        async with PublicAsyncSessionLocal() as db:
             # Get basic tenant statistics
             tenant_stats = await db.execute(text("""
                 SELECT 

@@ -304,7 +304,7 @@ flowchart TD
 
 - **Decision**: Route-type, trip-type, route and vehicle dropdowns are cached in memory for 5 minutes with @cache_dropdown (app/tools/cache_utils.py).
 - **Why**: Not a deliberate design choice; the cache decorator was added without a recorded need.
-- **Tradeoff**: Invalidation only affects the current worker, so others can serve stale data for up to 5 minutes; the cache key includes the tenant schema only when db is passed positionally.
+- **Tradeoff**: Invalidation only affects the current worker, so others can serve stale data for up to 5 minutes; the cache key includes the tenant id only when db is passed positionally.
 - Shapes: `endpoint:GET /masters/route-types/dropdown`, `endpoint:GET /masters/routes/dropdown`, `endpoint:GET /masters/trip-types/dropdown`, `endpoint:GET /masters/vehicles/dropdown`
 
 ### transport/fee-stored-on-assignment

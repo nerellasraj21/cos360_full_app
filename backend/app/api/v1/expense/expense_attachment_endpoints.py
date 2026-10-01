@@ -3,13 +3,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.tenant_session import get_public_db, get_tenant_db
+from app.db.tenant_session import get_tenant_db, get_tenant_id_from_request
 from app.middleware.rate_limit_middleware import rate_limit_api, rate_limit_create
-from app.middleware.tenant_middleware import get_client_name_from_request
-from app.models.public.tenant_model import Tenant
 from app.schemas.expense.expense_attachment_schema import (
     ExpenseAttachmentCreate,
     ExpenseAttachmentRead,
@@ -44,14 +41,7 @@ async def upload_attachment_endpoint(
     await check_role_plan_permission_with_error(db, request, role, "expense_attachments", "create")
 
     # Get org_id from tenant
-    client_name = get_client_name_from_request(request)
-    async for public_db in get_public_db():
-        result = await public_db.execute(select(Tenant.id).where(Tenant.client_name == client_name))
-        tenant = result.scalar_one_or_none()
-        if not tenant:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
-        org_id = tenant
-        break
+    org_id = UUID(get_tenant_id_from_request(request))
 
     # Validate file
     if not file.filename:

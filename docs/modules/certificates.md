@@ -26,7 +26,7 @@ There are **two independent subsystems**. They share no tables.
   - Max 10 MB. Allowed extensions: `.pdf .jpg .jpeg .png .docx`. PDFs must start with `%PDF`. Filenames containing `..`, `/` or `\` are rejected.
   - A MIME type that doesn't match the extension is only logged. The original filename is discarded.
 - **Replace or delete:** the old file moves to `media/stale/<key>` and a `stale_file_registry` row gets `expires_at = now + 10 days` (`STALE_FILE_TTL_DAYS`). The DB row itself is hard-deleted. Celery beat `cleanup_stale_files` runs daily at 02:00 UTC and removes expired stale files for every active tenant.
-- **Audit:** every upload, update, delete and download writes a `file_audit_log` row (`actor_id`, `actor_role`, `student_id`, `certificate_id`, `action`, `s3_key`, `tenant_schema`). No endpoint reads it.
+- **Audit:** every upload, update, delete and download writes a `file_audit_log` row (`actor_id`, `actor_role`, `student_id`, `certificate_id`, `action`, `s3_key`, `tenant_schema`, which now holds the tenant id). No endpoint reads it.
 - **Download:** `GET /certificates/{id}/download` returns `{presigned_url, expires_in_seconds: 900, certificate_id}`.
   - `presigned_url` is really the relative path `/media/<key>`. It never expires and is publicly readable.
   - Who may download: Admin, Staff and Teacher can download any certificate. A Student can download only their own. A Parent should be limited to their children, but that check is broken (see gotcha 3).
@@ -82,7 +82,7 @@ Dead code: mobile `src/api/certificates.ts` (it is not imported, and it calls ro
 11. **Generated certificates are admin-only to see.** They are not in `/students/documents/all`, `/certificates/my` or the parent views; only the admin generator reads `/issuable-certificates/issued/`.
 12. **Signature columns are never written.** `issued_by_name` and `issuer_signature_path` exist on `student_certificates`, and `_upload_signature` (PNG/JPG, max 2 MB) exists, but no endpoint accepts them.
 13. **No ownership check on `GET /certificates/{id}`.** A Student passes with `read_own`, but ownership is never checked, so any certificate's metadata can be read by id. Staff and Teacher can read everything.
-14. **Tables were created by script in some tenants.** Before relying on these tables, confirm that each tenant schema has them (Alembic `m1n2o3p4q5r6` or `setup_issuable_certificates.py`) and has the `issuable_certificates` grants. `seed_issuable_cert_permissions.py` targets only `test_tenant_schema`: Admin gets all actions, Staff create/read/list, Teacher read/list.
+14. **New tenants get no certificate templates.** The tables exist in the baseline migration, but provisioning seeds no `issuable_certificate_templates` rows, and the old seed scripts (`seed_cert_templates_direct.py`, `seed_issuable_cert_permissions.py`) target per-tenant schemas.
 
 ## Web / mobile parity
 | Area | Web | Mobile |

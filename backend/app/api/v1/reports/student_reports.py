@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.tenant_session import get_tenant_db
+from app.db.tenant_session import get_tenant_db, get_tenant_id_from_request
 from app.schemas.reports.report_schemas import ExportRequest, ReportResponse, StudentSummaryFilter
 from app.service.reports.student_report_service import StudentReportService
 from app.tools.simple_permissions import (
@@ -42,7 +42,7 @@ async def get_student_summary(
 
         # Get user info from current_user
         user_id = current_user.get("sub")
-        tenant_id = getattr(request.state, "schema_name", None)
+        tenant_id = get_tenant_id_from_request(request)
 
         # Create filters object
         filters = StudentSummaryFilter(
@@ -92,7 +92,7 @@ async def get_student_details(
 
         # Get user info from current_user
         user_id = current_user.get("sub")
-        tenant_id = getattr(request.state, "schema_name", None)
+        tenant_id = get_tenant_id_from_request(request)
 
         # Create service and get data
         service = StudentReportService(db, user_id, tenant_id)
@@ -125,7 +125,7 @@ async def export_student_report(
 
         # Get user info from current_user
         user_id_str = current_user.get("sub")
-        tenant_id = getattr(request.state, "schema_name", None)
+        tenant_id = get_tenant_id_from_request(request)
 
         # Convert user_id to UUID
         from uuid import UUID

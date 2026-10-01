@@ -41,7 +41,7 @@ async def _log_audit(
     certificate_id: UUID | None,
     action: str,
     s3_key: str | None,
-    tenant_schema: str,
+    tenant_id: str,
 ) -> None:
     """
     Log file action to audit log.
@@ -54,7 +54,7 @@ async def _log_audit(
         certificate_id: Certificate UUID (nullable)
         action: Action type (upload, update, delete, download)
         s3_key: S3 key affected (nullable)
-        tenant_schema: Tenant schema name
+        tenant_id: Tenant id
     """
     audit_entry = FileAuditLog(
         actor_id=actor_id,
@@ -63,7 +63,7 @@ async def _log_audit(
         certificate_id=certificate_id,
         action=action,
         s3_key=s3_key,
-        tenant_schema=tenant_schema,
+        tenant_schema=tenant_id,
         created_at=datetime.utcnow(),
     )
     db.add(audit_entry)
@@ -81,7 +81,7 @@ async def create_certificate(
     issue_date: date,
     remarks: str | None,
     file: UploadFile,
-    tenant_schema: str,
+    tenant_id: str,
     actor_id: UUID,
     actor_role: str,
 ) -> CertificateRead:
@@ -95,7 +95,7 @@ async def create_certificate(
         issue_date: Issue date
         remarks: Optional remarks
         file: Uploaded file
-        tenant_schema: Tenant schema name
+        tenant_id: Tenant id
         actor_id: User ID performing action
         actor_role: User role
 
@@ -128,7 +128,7 @@ async def create_certificate(
 
         # 3. Upload file to S3 (all validation done in FileManager)
         s3_key = await file_manager.upload_file(
-            tenant_schema, "certificates", str(student_id), file
+            tenant_id, "certificates", str(student_id), file
         )
 
         # 4. Create certificate record
@@ -161,7 +161,7 @@ async def create_certificate(
             cert.id,
             "upload",
             s3_key,
-            tenant_schema,
+            tenant_id,
         )
 
         await db.commit()
@@ -251,7 +251,7 @@ async def update_certificate(
     issue_date: date | None,
     remarks: str | None,
     file: UploadFile | None,
-    tenant_schema: str,
+    tenant_id: str,
     actor_id: UUID,
     actor_role: str,
 ) -> CertificateRead:
@@ -267,7 +267,7 @@ async def update_certificate(
         issue_date: New issue date (optional)
         remarks: New remarks (optional)
         file: New file (optional)
-        tenant_schema: Tenant schema name
+        tenant_id: Tenant id
         actor_id: User ID performing action
         actor_role: User role
 
@@ -296,16 +296,16 @@ async def update_certificate(
 
             # Upload new file
             new_s3_key = await file_manager.upload_file(
-                tenant_schema, "certificates", str(cert.student_id), file
+                tenant_id, "certificates", str(cert.student_id), file
             )
 
             # Move old file to stale
-            stale_key = await file_manager.move_to_stale(old_key, tenant_schema)
+            stale_key = await file_manager.move_to_stale(old_key, tenant_id)
 
             # Register stale file for cleanup
             stale_entry = StaleFileRegistry(
                 s3_key=stale_key,
-                tenant_schema=tenant_schema,
+                tenant_schema=tenant_id,
                 expires_at=datetime.utcnow() + __import__("datetime").timedelta(
                     days=10
                 ),
@@ -346,7 +346,7 @@ async def update_certificate(
             certificate_id,
             "update",
             cert_updated.file_path,
-            tenant_schema,
+            tenant_id,
         )
 
         await db.commit()
@@ -381,7 +381,7 @@ async def update_certificate(
 async def delete_certificate(
     db: AsyncSession,
     certificate_id: UUID,
-    tenant_schema: str,
+    tenant_id: str,
     actor_id: UUID,
     actor_role: str,
 ) -> dict:
@@ -391,7 +391,7 @@ async def delete_certificate(
     Args:
         db: Database session
         certificate_id: Certificate UUID
-        tenant_schema: Tenant schema name
+        tenant_id: Tenant id
         actor_id: User ID performing action
         actor_role: User role
 
@@ -418,12 +418,12 @@ async def delete_certificate(
 
         # 2. Move file to stale
         if old_key:
-            stale_key = await file_manager.move_to_stale(old_key, tenant_schema)
+            stale_key = await file_manager.move_to_stale(old_key, tenant_id)
 
             # Register for cleanup
             stale_entry = StaleFileRegistry(
                 s3_key=stale_key,
-                tenant_schema=tenant_schema,
+                tenant_schema=tenant_id,
                 expires_at=datetime.utcnow() + __import__("datetime").timedelta(
                     days=10
                 ),
@@ -440,7 +440,7 @@ async def delete_certificate(
             certificate_id,
             "delete",
             old_key,
-            tenant_schema,
+            tenant_id,
         )
 
         # 4. Delete record
@@ -468,7 +468,7 @@ async def download_certificate(
     certificate_id: UUID,
     role: str,
     user_id: UUID,
-    tenant_schema: str,
+    tenant_id: str,
 ) -> dict:
     """
     Generate presigned URL for certificate download with RBAC check.
@@ -478,7 +478,7 @@ async def download_certificate(
         certificate_id: Certificate UUID
         role: User role
         user_id: User UUID
-        tenant_schema: Tenant schema name
+        tenant_id: Tenant id
 
     Returns:
         Dict with presigned_url and expires_in_seconds
@@ -555,7 +555,7 @@ async def download_certificate(
             certificate_id,
             "download",
             cert.file_path,
-            tenant_schema,
+            tenant_id,
         )
 
         await db.commit()
@@ -670,7 +670,7 @@ async def list_certificates(
 
 
 async def _upload_signature(
-    tenant_schema: str,
+    tenant_id: str,
     student_id: UUID,
     signature_file: UploadFile,
 ) -> str:
@@ -705,7 +705,7 @@ async def _upload_signature(
         )
 
     file_key = await file_manager.upload_bytes(
-        tenant_schema,
+        tenant_id,
         "signatures",
         str(student_id),
         data,
@@ -723,7 +723,7 @@ async def create_received_document(
     certificate_type_id: UUID,
     remarks: str | None,
     file: UploadFile,
-    tenant_schema: str,
+    tenant_id: str,
     actor_id: UUID,
     actor_role: str,
 ) -> CertificateRead:
@@ -755,7 +755,7 @@ async def create_received_document(
 
         # 3. Upload document to S3
         s3_key = await file_manager.upload_file(
-            tenant_schema, "received_docs", str(student_id), file
+            tenant_id, "received_docs", str(student_id), file
         )
 
         # 4. Create DB record
@@ -779,7 +779,7 @@ async def create_received_document(
         cert_with_type = result.scalar_one()
 
         # 6. Audit log
-        await _log_audit(db, actor_id, actor_role, student_id, cert.id, "upload", s3_key, tenant_schema)
+        await _log_audit(db, actor_id, actor_role, student_id, cert.id, "upload", s3_key, tenant_id)
 
         await db.commit()
         log.info(f"Received document created: {cert.id} for student {student_id}")
@@ -816,7 +816,7 @@ async def create_issued_certificate(
     issue_date: date,
     remarks: str | None,
     file: UploadFile,
-    tenant_schema: str,
+    tenant_id: str,
     actor_id: UUID,
     actor_role: str,
 ) -> CertificateRead:
@@ -850,7 +850,7 @@ async def create_issued_certificate(
 
         # 3. Upload document to S3
         s3_key = await file_manager.upload_file(
-            tenant_schema, "issued_certs", str(student_id), file
+            tenant_id, "issued_certs", str(student_id), file
         )
 
         # 4. Create DB record
@@ -875,7 +875,7 @@ async def create_issued_certificate(
         cert_with_type = result.scalar_one()
 
         # 7. Audit log
-        await _log_audit(db, actor_id, actor_role, student_id, cert.id, "upload", s3_key, tenant_schema)
+        await _log_audit(db, actor_id, actor_role, student_id, cert.id, "upload", s3_key, tenant_id)
 
         await db.commit()
         log.info(f"Issued certificate created: {cert.id} for student {student_id}")

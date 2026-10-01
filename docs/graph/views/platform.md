@@ -43,20 +43,21 @@ graph LR
   n23[/"scoped-denial-returns-404"/]
   n24[/"shared-schema-rls"/]
   n24 -.->|shapes| n0
-  n25[/"tasks-receive-tenant-schema"/]
-  n26[/"tenant-cache-hits-only"/]
-  n27[/"tenant-default-name-pinning"/]
-  n28[/"tenant-from-token"/]
-  n28 -.->|shapes| n4
-  n29[/"tenant-models-via-search-path"/]
-  n30[/"tenant-scoped-uniques"/]
-  n30 -.->|shapes| n0
-  n31[/"token-lifetimes"/]
-  n31 -.->|shapes| n5
-  n32[/"uuid-primary-keys"/]
-  n32 -.->|shapes| n1
-  n33[/"varchar-over-postgres-enums"/]
+  n25[/"tasks-receive-tenant-id"/]
+  n26[/"tasks-receive-tenant-schema"/]
+  n27[/"tenant-cache-hits-only"/]
+  n28[/"tenant-default-name-pinning"/]
+  n29[/"tenant-from-token"/]
+  n29 -.->|shapes| n4
+  n30[/"tenant-models-via-search-path"/]
+  n31[/"tenant-scoped-uniques"/]
+  n31 -.->|shapes| n0
+  n32[/"token-lifetimes"/]
+  n32 -.->|shapes| n5
+  n33[/"uuid-primary-keys"/]
   n33 -.->|shapes| n1
+  n34[/"varchar-over-postgres-enums"/]
+  n34 -.->|shapes| n1
 ```
 
 ## Flows
@@ -66,7 +67,7 @@ graph LR
 - Trigger: A feature that touches the API, following the root CLAUDE.md typical feature flow.
 
 1. Backend model in app/models/<module>/, inheriting BaseOrg for tenant tables or BasePublic for public tables, registered in the module __init__.py `service:app/db/base.py`
-2. Alembic revision, schema-aware and idempotent, applied to cos360_master and then every tenant schema before code that uses the new column is deployed.
+2. Alembic revision applied once with alembic upgrade head before code that uses the new column is deployed; a new tenant table also calls enable_tenant_rls.
 3. Pydantic schemas in app/schemas/<module>/ (Base, Create, Update, Read, Dropdown), which are the API contract.
 4. Service in app/service/<module>/ holding the queries, rules and transaction with flush -> select -> commit on the tenant session `service:app/db/tenant_session.py`
 5. Endpoint in app/api/v1/<module>/ on an APIRouter with a prefix, included in main_router.py, starting with the token and permission check and calling one service function `service:app/api/v1/main_router.py` `service:app/tools/simple_permissions.py`
@@ -78,7 +79,7 @@ graph LR
 ```mermaid
 flowchart TD
   s1["1. Backend model in app/models/<module>/, inheriting BaseOrg for tenan...<br/>service:app/db/base.py"]
-  s2["2. Alembic revision, schema-aware and idempotent, applied to cos360_ma..."]
+  s2["2. Alembic revision applied once with alembic upgrade head before code..."]
   s1 --> s2
   s3["3. Pydantic schemas in app/schemas/<module>/ (Base, Create, Update, Re..."]
   s2 --> s3
@@ -104,7 +105,7 @@ Shaped by: [platform/alembic-per-schema](#platformalembic-per-schema), [platform
 
 1. The backend endpoint calls check_role_plan_permission_with_error, or check_user_resource_access when students or parents need _own or _related access, with the same resource string used everywhere `service:app/tools/simple_permissions.py` `service:app/tools/enhanced_permissions.py`
 2. Plan layer: add (resource_name, actions) to public.plan_resource_access for every active plan, following backend/scripts/seed_communication_permissions.py; not checked at runtime but keeps the plan catalog and super-admin screens truthful `table:public.plans`
-3. Role layer, per tenant schema: insert resource_permissions rows per role (Admin every action, both read and list, Student and Parent the _own or _related variants) with an idempotent script like backend/scripts/seed_expense_permissions.py `table:resource_permissions` `table:roles`
+3. Role layer: add the (resource, action) pairs per role to ROLE_PERMISSIONS in app/service/tenant/permission_catalog.py (Admin every action, both read and list, Student and Parent the _own or _related variants), then run POST /auth/seed/all-role-permissions for each tenant `table:resource_permissions` `table:roles`
 4. Defaults for future tenants: add the rows to _ROLE_PERMISSIONS in seed_endpoints.py `service:app/api/v1/auth/seed_endpoints.py` `endpoint:POST /auth/seed/all-role-permissions`
 5. Only for a new page: add a tenant menus row (parent_id, level, display_order) and role_menu_permissions can_view per role, and for Student or Parent add the URL to _STUDENT_PARENT_MENU_URLS `table:menus` `table:role_menu_permissions`
 6. Web: add the key to the permission constants, gate buttons and pages with usePermission or PermissionGuard, and update both Teacher and Staff matrices if those roles are capped `web:src/constants/permissions.ts` `web:src/hooks/usePermission.ts` `web:src/components/PermissionGuard.tsx` `web:src/lib/teacherPermissionMatrix.ts` `web:src/lib/staffPermissionMatrix.ts`
@@ -118,7 +119,7 @@ flowchart TD
   s1["1. The backend endpoint calls check_role_plan_permission_with_error, o...<br/>service:app/tools/simple_permissions.py<br/>service:app/tools/enhanced_permissions.py"]
   s2["2. Plan layer: add (resource_name, actions) to public.plan_resource_ac...<br/>table:public.plans"]
   s1 --> s2
-  s3["3. Role layer, per tenant schema: insert resource_permissions rows per...<br/>table:resource_permissions<br/>table:roles"]
+  s3["3. Role layer: add the (resource, action) pairs per role to ROLE_PERMI...<br/>table:resource_permissions<br/>table:roles"]
   s2 --> s3
   s4["4. Defaults for future tenants: add the rows to _ROLE_PERMISSIONS in s...<br/>service:app/api/v1/auth/seed_endpoints.py<br/>endpoint:POST /auth/seed/all-role-permissions"]
   s3 --> s4
@@ -312,7 +313,7 @@ flowchart TD
 
 - **Decision**: Auth uses stateless HS256 JWTs signed with JWT_SECRET_KEY: login issues an access and a refresh token, first login may issue a 15 minute change_password token, and a token_type claim tells them apart; each verifier rejects the other types.
 - **Why**: A distinct token type means a refresh or first-login token can never be used as an access token (docs/modules/auth.md).
-- Note: Tenant tokens carry sub, username, role name, client_name, academic_year_id and academic_year_title; no permissions and no schema name, so access is looked up per request.
+- Note: Tenant tokens carry sub, username, role name, tenant_id, client_name, academic_year_id and academic_year_title; no permissions, so access is looked up per request.
 - Note: Logout stores token hashes in public.token_blacklist and get_current_user_token checks it on every request, one extra query per call.
 - Shapes: `endpoint:POST /auth/logout`, `endpoint:POST /auth/refresh`, `service:app/tools/jwt_utils.py`, `service:app/tools/simple_permissions.py`
 
@@ -364,7 +365,7 @@ flowchart TD
 
 - **Decision**: Only the role layer is checked at runtime. check_role_plan_permission_with_error ignores the plan despite its name; the plan layer applies only when grants are seeded or copied into a tenant.
 - **Why**: Each check costs one query, and each tenant can customise its roles.
-- **Why**: Plan validation is meant to happen at onboarding, when plan grants are copied into the tenant's resource_permissions, so each runtime check is one tenant-schema query and each tenant can customise its roles (simple_permissions.py docstring, docs/modules/tenants-and-admin.md).
+- **Why**: Plan validation is meant to happen at onboarding, when plan grants are copied into the tenant's resource_permissions, so each runtime check is one query on the tenant's rows and each tenant can customise its roles (simple_permissions.py docstring, docs/modules/tenants-and-admin.md).
 - **Tradeoff**: Nothing enforces the plan later: a tenant admin can grant resources outside the plan, and seeding only plan_resource_access changes nothing for existing tenants.
 - Note: Plan-aware checks in MultiTenantPermissionService, PlanService and AccessValidationService exist but live endpoints do not use them.
 - Shapes: `concept:platform/plan`, `feature:tenants-and-admin/plan-management`, `feature:tenants-and-admin/resource-rollout`, `flow:platform/permission-check`, `flow:tenants-and-admin/add-resource-for-tenants`, `flow:tenants-and-admin/onboard-tenant`, `service:app/service/auth/permission_service.py`, `service:app/tools/simple_permissions.py`, `table:public.plan_resource_access`, `table:resource_permissions`
@@ -398,12 +399,23 @@ flowchart TD
 - Shapes: `concept:platform/tenant`, `module:platform`, `service:app/db/base.py`, `service:app/db/rls.py`, `service:app/db/tenant_session.py`
 - Supersedes: `decision:platform/alembic-per-schema`, `decision:platform/schema-per-tenant`, `decision:platform/tenant-models-via-search-path`
 
-### platform/tasks-receive-tenant-schema (active)
+### platform/tasks-receive-tenant-id (active)
+
+- **Decision**: Celery tasks take the tenant id (UUID string) as an explicit argument. Each task opens task_tenant_session, which owns its engine and sets app.tenant_id, and cross-tenant jobs list active tenants with task_platform_session and open one tenant session each.
+- **Why**: Tasks have no request context, and each asyncio.run needs its own engine because asyncpg connections belong to one event loop.
+- **Alternatives**: Passing the cschema header or a schema name, which the previous design did and which only worked when the client name equalled the schema name.
+- **Since**: 2026-10
+- Note: Call sites pass get_tenant_id_from_request(request), the tenant id the request session already used.
+- Shapes: `concept:platform/cschema`, `job:app/tasks/communication/send_tasks.py`, `service:app/tasks/tenant_context.py`
+- Supersedes: `decision:platform/tasks-receive-tenant-schema`
+
+### platform/tasks-receive-tenant-schema (superseded)
 
 - **Decision**: Celery tasks take the tenant as an explicit argument and each run opens its own engine with asyncio.run and sets search_path itself.
 - **Why**: Tasks have no request context, so they cannot use TenantMiddleware or get_tenant_db (docs/architecture.md).
 - Note: Most call sites pass request.headers.get(cschema), the raw client_name header, not a resolved schema_name; the communication send endpoint resolves the schema through TenantService first.
 - Shapes: `concept:platform/cschema`, `job:app/tasks/communication/send_tasks.py`
+- Superseded by: `decision:platform/tasks-receive-tenant-id`
 
 ### platform/tenant-cache-hits-only (superseded)
 
