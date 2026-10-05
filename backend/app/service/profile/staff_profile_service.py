@@ -55,7 +55,7 @@ class StaffProfileService:
         # Get designation name
         designation = None
         if staff.designation_obj:
-            designation = staff.designation_obj.name
+            designation = staff.designation_obj.title
 
         # Get employee ID (assuming it's stored in some field, need to check model)
         employee_id = None  # TODO: Map to correct field if exists

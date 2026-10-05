@@ -20,7 +20,7 @@ PLACEHOLDER_DATE_OF_BIRTH = date(1900, 1, 1)
 
 class StudentBase(BaseModel):
     first_name: str
-    last_name: str
+    last_name: str = ""
     date_of_birth: date | None = None
     gender: str | None = None
     is_primary: str | None = "not_primary"
@@ -35,6 +35,13 @@ class StudentBase(BaseModel):
     mother_tongue: str | None = "Telugu"
     identification_marks: str | None = None
     primary_phone: str | None = None
+
+    @field_validator("last_name", mode="before")
+    @classmethod
+    def default_last_name(cls, v):
+        if v is None:
+            return ""
+        return v.strip() if isinstance(v, str) else v
 
     @field_validator("date_of_birth", mode="before")
     @classmethod
@@ -59,6 +66,7 @@ class StudentBase(BaseModel):
 
 
 class StudentCreate(StudentBase):
+    date_of_birth: date | None = PLACEHOLDER_DATE_OF_BIRTH
     father: ParentCreate
     mother: ParentCreate
     guardian: ParentCreate | None = None
@@ -69,6 +77,14 @@ class StudentCreate(StudentBase):
             raise ValueError("father.name is required")
         if not self.father.phone:
             raise ValueError("father.phone is required")
+        guardian = self.guardian
+        if guardian and not (guardian.email and str(guardian.email).strip()):
+            named = (guardian.name or "").strip() not in ("", "Guardian")
+            detailed = any(
+                getattr(guardian, field) for field in ("phone", "occupation", "aadhar_number", "gender", "salary_range")
+            )
+            if named or detailed:
+                raise ValueError("guardian.email is required when a guardian is provided")
         return self
 
 

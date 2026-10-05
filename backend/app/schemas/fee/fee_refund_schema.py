@@ -21,10 +21,10 @@ class FeeRefundBase(BaseModel):
 
 
 class FeeRefundCreate(FeeRefundBase):
-    student_id: UUID
-    student_admission_num: str
-    academic_year_id: UUID
-    requested_by_user_id: UUID
+    student_id: UUID | None = None
+    student_admission_num: str | None = None
+    academic_year_id: UUID | None = None
+    requested_by_user_id: UUID | None = None
 
 
 class FeeRefundUpdate(BaseModel):
@@ -79,8 +79,8 @@ class FeeRefundApproval(BaseModel):
 
     refund_id: UUID
     action: Literal["approve", "reject"]
-    approval_remarks: str
-    approved_by_user_id: UUID
+    approval_remarks: str | None = None
+    approved_by_user_id: UUID | None = None
 
 
 class FeeRefundProcessing(BaseModel):
@@ -90,7 +90,7 @@ class FeeRefundProcessing(BaseModel):
     refund_method: Literal["cash", "bank_transfer", "cheque"]
     refund_reference: str | None = None
     processing_remarks: str | None = None
-    processed_by_user_id: UUID
+    processed_by_user_id: UUID | None = None
 
 
 class FeeRefundMonthly(BaseModel):

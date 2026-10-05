@@ -63,14 +63,19 @@ async def get_class(request: Request, class_id: UUID, db: AsyncSession = Depends
 
 # Read All Classes with Sections
 @router.get("/read_all", response_model=list[ClassRead])
-async def get_classes_with_sections(request: Request, db: AsyncSession = Depends(get_tenant_db)):
+async def get_classes_with_sections(
+    request: Request,
+    academic_year_id: UUID | None = None,
+    active_only: bool = False,
+    db: AsyncSession = Depends(get_tenant_db),
+):
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
 
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, "classes", "list")
 
-    return await get_all_classes_with_sections(db)
+    return await get_all_classes_with_sections(db, academic_year_id, active_only)
 
 
 # Update Class and Replace Sections

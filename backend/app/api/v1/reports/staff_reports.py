@@ -69,6 +69,8 @@ async def get_staff_summary(
             data=data, total_count=total_count, page=page, page_size=page_size, total_pages=total_pages
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in staff summary report: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")

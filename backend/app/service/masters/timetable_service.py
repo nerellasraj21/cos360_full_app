@@ -1,8 +1,10 @@
+import logging
 from collections import defaultdict
 from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -29,6 +31,9 @@ from app.schemas.masters.timetable_schema import (
     TimetableSubjectOptionUpdate,
 )
 
+logger = logging.getLogger(__name__)
+
+
 
 async def add_timetable_slot(slot: TimetableSlotCreate, db: AsyncSession):
     try:
@@ -46,7 +51,8 @@ async def add_timetable_slot(slot: TimetableSlotCreate, db: AsyncSession):
         return new_slot
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error creating timetable slot: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error creating timetable slot")
 
 
 async def get__all_timetable_slots(db: AsyncSession):
@@ -54,7 +60,8 @@ async def get__all_timetable_slots(db: AsyncSession):
         result = await db.execute(select(TimetableSlot))
         return result.scalars().all()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching slots: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error fetching slots")
 
 
 async def get_timetable_slot_by_id(slot_id: UUID, db: AsyncSession):
@@ -65,7 +72,8 @@ async def get_timetable_slot_by_id(slot_id: UUID, db: AsyncSession):
             raise HTTPException(status_code=404, detail="Timetable slot not found")
         return slot
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching slot: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error fetching slot")
 
 
 async def update_all_details_timetable_slot(slot_id: UUID, slot_data: TimetableSlotUpdate, db: AsyncSession):
@@ -93,7 +101,8 @@ async def update_all_details_timetable_slot(slot_id: UUID, slot_data: TimetableS
         return slot
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error updating slot: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error updating slot")
 
 
 async def update_partial_details_timetable_slot(slot_id: UUID, slot_data: TimetableSlotPartialUpdate, db: AsyncSession):
@@ -121,7 +130,8 @@ async def update_partial_details_timetable_slot(slot_id: UUID, slot_data: Timeta
         return slot
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error patching slot: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error patching slot")
 
 
 async def delete_timetable_slot_by_id(slot_id: UUID, db: AsyncSession):
@@ -135,7 +145,8 @@ async def delete_timetable_slot_by_id(slot_id: UUID, db: AsyncSession):
         return {"detail": "Slot deleted"}
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error deleting slot: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error deleting slot")
 
 
 async def add_subject_option(option: TimetableSubjectOptionCreate, db: AsyncSession):
@@ -147,7 +158,8 @@ async def add_subject_option(option: TimetableSubjectOptionCreate, db: AsyncSess
         return new_option
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error creating subject option: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error creating subject option")
 
 
 async def get__all_subject_options(db: AsyncSession):
@@ -155,7 +167,8 @@ async def get__all_subject_options(db: AsyncSession):
         result = await db.execute(select(TimetableSubjectOption))
         return result.scalars().all()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching subject options: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error fetching subject options")
 
 
 async def get_subject_option_by_id(option_id: UUID, db: AsyncSession):
@@ -166,7 +179,8 @@ async def get_subject_option_by_id(option_id: UUID, db: AsyncSession):
             raise HTTPException(status_code=404, detail="Subject option not found")
         return option
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching subject option: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error fetching subject option")
 
 
 async def update_all_details_subject_option(
@@ -184,7 +198,8 @@ async def update_all_details_subject_option(
         return option
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error updating subject option: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error updating subject option")
 
 
 async def delete_subject_option_by_id(option_id: UUID, db: AsyncSession):
@@ -198,7 +213,8 @@ async def delete_subject_option_by_id(option_id: UUID, db: AsyncSession):
         return {"detail": "Subject option deleted"}
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error deleting subject option: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error deleting subject option")
 
 
 async def add_full_timetable(data: FullTimetableCreate, db: AsyncSession):
@@ -359,6 +375,10 @@ async def create_frontend_timetable(data: FrontendTimetableCreate, db: AsyncSess
     Transform frontend payload to database structure and create timetable
     """
     try:
+        section_exists = (await db.execute(select(Section.id).where(Section.id == data.section_id))).first()
+        if not section_exists:
+            raise HTTPException(status_code=404, detail="Section not found")
+
         # Create the main timetable record
         new_timetable = Timetable(section_id=data.section_id)
         db.add(new_timetable)
@@ -372,8 +392,11 @@ async def create_frontend_timetable(data: FrontendTimetableCreate, db: AsyncSess
             # Parse time strings to time objects
             from datetime import datetime
 
-            from_time = datetime.strptime(slot_data.time.from_time, "%H:%M").time()
-            to_time = datetime.strptime(slot_data.time.to, "%H:%M").time()
+            try:
+                from_time = datetime.strptime(slot_data.time.from_time, "%H:%M").time()
+                to_time = datetime.strptime(slot_data.time.to, "%H:%M").time()
+            except ValueError:
+                raise HTTPException(status_code=422, detail="Invalid time, use HH:MM")
 
             # Create SlotTime record
             slot_time = SlotTime(
@@ -429,9 +452,19 @@ async def create_frontend_timetable(data: FrontendTimetableCreate, db: AsyncSess
             created_slot_times=created_slot_times,
         )
 
+    except HTTPException:
+        await db.rollback()
+        raise
+    except IntegrityError as e:
+        await db.rollback()
+        sqlstate = getattr(e.orig, "sqlstate", None) or getattr(e.orig, "pgcode", None)
+        if sqlstate == "23503":
+            raise HTTPException(status_code=400, detail="Subject or section not found")
+        raise HTTPException(status_code=409, detail="A timetable already exists for this section")
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error creating timetable from frontend data: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error creating timetable from frontend data")
 
 
 async def get_frontend_timetable_by_section(section_id: UUID, db: AsyncSession) -> FrontendTimetableRead:
@@ -486,7 +519,8 @@ async def get_frontend_timetable_by_section(section_id: UUID, db: AsyncSession) 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving frontend timetable: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error retrieving frontend timetable")
 
 
 def transform_slots_to_frontend_format(slots: list) -> FrontendTimetableSlot:
@@ -571,8 +605,11 @@ async def update_frontend_timetable(
             if time_key not in slot_time_cache:
                 from datetime import datetime
 
-                from_time = datetime.strptime(slot_data.time.from_time, "%H:%M").time()
-                to_time = datetime.strptime(slot_data.time.to, "%H:%M").time()
+                try:
+                    from_time = datetime.strptime(slot_data.time.from_time, "%H:%M").time()
+                    to_time = datetime.strptime(slot_data.time.to, "%H:%M").time()
+                except ValueError:
+                    raise HTTPException(status_code=422, detail="Invalid time, use HH:MM")
 
                 # Create new slot time
                 slot_time = SlotTime(
@@ -635,7 +672,8 @@ async def update_frontend_timetable(
         raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error updating timetable: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error updating timetable")
 
 
 async def delete_frontend_timetable(section_id: UUID, db: AsyncSession):
@@ -684,4 +722,5 @@ async def delete_frontend_timetable(section_id: UUID, db: AsyncSession):
         raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error deleting timetable: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error deleting timetable")

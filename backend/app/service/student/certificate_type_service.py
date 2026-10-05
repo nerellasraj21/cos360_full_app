@@ -41,15 +41,20 @@ async def create_certificate_type(db: AsyncSession, certificate_type_data: Certi
         )
 
         db.add(new_certificate_type)
+        await db.flush()
+        created = (
+            await db.execute(select(CertificateType).where(CertificateType.id == new_certificate_type.id))
+        ).scalar_one()
         await db.commit()
-        await db.refresh(new_certificate_type)
 
         # Invalidate cache
         invalidate_cache("certificate_types_dropdown")
 
-        log.info(f"Certificate type created successfully: {new_certificate_type.id}")
-        return new_certificate_type
+        log.info(f"Certificate type created successfully: {created.id}")
+        return created
 
+    except HTTPException:
+        raise
     except IntegrityError as e:
         await db.rollback()
         log.error(f"Database integrity error creating certificate type: {str(e)}")
@@ -58,7 +63,7 @@ async def create_certificate_type(db: AsyncSession, certificate_type_data: Certi
         await db.rollback()
         log.error(f"Error creating certificate type: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error creating certificate type: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error creating certificate type"
         )
 
 
@@ -81,7 +86,7 @@ async def get_certificate_type_by_id(db: AsyncSession, certificate_type_id: UUID
     except Exception as e:
         log.error(f"Error fetching certificate type {certificate_type_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching certificate type: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching certificate type"
         )
 
 
@@ -105,7 +110,7 @@ async def get_all_certificate_types(db: AsyncSession, skip: int = 0, limit: int 
     except Exception as e:
         log.error(f"Error fetching certificate types: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching certificate types: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching certificate types"
         )
 
 
@@ -121,7 +126,7 @@ async def get_certificate_types_dropdown(db: AsyncSession):
         log.error(f"Error fetching certificate types dropdown: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching certificate types dropdown: {str(e)}",
+            detail="Error fetching certificate types dropdown",
         )
 
 
@@ -140,7 +145,7 @@ async def search_certificate_types(db: AsyncSession, q: str = "", limit: int = 1
         log.error(f"Error searching certificate types: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error searching certificate types: {str(e)}",
+            detail="Error searching certificate types",
         )
 
 
@@ -161,14 +166,17 @@ async def update_certificate_type(
         for field, value in update_data.items():
             setattr(certificate_type, field, value)
 
+        await db.flush()
+        updated = (
+            await db.execute(select(CertificateType).where(CertificateType.id == certificate_type_id))
+        ).scalar_one()
         await db.commit()
-        await db.refresh(certificate_type)
 
         # Invalidate cache
         invalidate_cache("certificate_types_dropdown")
 
         log.info(f"Certificate type updated successfully: {certificate_type_id}")
-        return certificate_type
+        return updated
 
     except HTTPException:
         raise
@@ -180,7 +188,7 @@ async def update_certificate_type(
         await db.rollback()
         log.error(f"Error updating certificate type {certificate_type_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error updating certificate type: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error updating certificate type"
         )
 
 
@@ -221,5 +229,5 @@ async def delete_certificate_type(db: AsyncSession, certificate_type_id: UUID):
         await db.rollback()
         log.error(f"Error deleting certificate type {certificate_type_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error deleting certificate type: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error deleting certificate type"
         )

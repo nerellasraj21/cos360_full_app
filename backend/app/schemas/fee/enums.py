@@ -37,11 +37,10 @@ class RefundStatus(StrEnum):
 class RefundReason(StrEnum):
     """Refund reason options"""
 
-    ADJUSTMENT = "adjustment"
-    WITHDRAWAL = "withdrawal"
+    FEE_ADJUSTMENT = "fee_adjustment"
+    STUDENT_WITHDRAWAL = "student_withdrawal"
     EXCESS_PAYMENT = "excess_payment"
-    DUPLICATE_PAYMENT = "duplicate_payment"
-    ERROR_CORRECTION = "error_correction"
+    OTHER = "other"
 
 
 class CategoryStatus(StrEnum):

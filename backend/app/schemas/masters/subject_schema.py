@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.masters.subject_category_schema import SubjectCategoryOut
 
@@ -14,13 +14,14 @@ class SubjectBase(BaseModel):
 
 
 class SubjectCreate(SubjectBase):
-    pass
+    name: str = Field(min_length=1, max_length=50)
+    short_code: str | None = Field(default=None, max_length=10)
 
 
 class SubjectUpdate(BaseModel):
-    name: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=50)
     category_id: UUID | None = None
-    short_code: str | None = None
+    short_code: str | None = Field(default=None, max_length=10)
     is_active: bool | None = None
     academic_year_id: UUID | None = None
 

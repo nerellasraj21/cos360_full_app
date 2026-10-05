@@ -25,6 +25,7 @@ from app.models.masters.sections_model import Section
 from app.models.masters.staff_model import Staff
 from app.models.student.student_model import Student
 from app.schemas.fee import FeeReceiptRead, ReceiptContent, ReceiptItemDetail
+from app.service.fee.fee_locks import lock_receipt_numbering
 
 log = log.getLogger("fee.receipt_service")
 
@@ -35,33 +36,25 @@ class FeeReceiptService:
     @staticmethod
     async def generate_receipt_number(db: AsyncSession) -> str:
         """Generate unique receipt number: REC-YYMM-XXXX, sequential per tenant per month."""
+        await lock_receipt_numbering(db)
+
         now = datetime.now()
         prefix = f"REC-{now.strftime('%y%m')}-"
 
-        # Get the highest sequence for this month's prefix
-        result = await db.execute(
-            select(FeeReceipt.receipt_number)
-            .where(FeeReceipt.receipt_number.like(f"{prefix}%"))
-            .order_by(FeeReceipt.receipt_number.desc())
-            .limit(1)
-        )
-        last_number = result.scalar_one_or_none()
+        result = await db.execute(select(FeeReceipt.receipt_number).where(FeeReceipt.receipt_number.like(f"{prefix}%")))
+        seq = 0
+        for existing in result.scalars().all():
+            suffix = existing[len(prefix) :]
+            if suffix.isdigit():
+                seq = max(seq, int(suffix))
+        seq += 1
 
-        if last_number:
-            seq = int(last_number.split("-")[-1]) + 1
-        else:
-            seq = 1
-
-        receipt_number = f"{prefix}{seq:04d}"
-
-        # Safety: uniqueness check
-        dup_result = await db.execute(
-            select(FeeReceipt.id).where(FeeReceipt.receipt_number == receipt_number)
-        )
-        if dup_result.scalar_one_or_none():
-            receipt_number = f"{prefix}{seq + 1:04d}"
-
-        return receipt_number
+        while True:
+            receipt_number = f"{prefix}{seq:04d}"
+            dup_result = await db.execute(select(FeeReceipt.id).where(FeeReceipt.receipt_number == receipt_number))
+            if not dup_result.scalar_one_or_none():
+                return receipt_number
+            seq += 1
 
     @staticmethod
     def _json_default(obj):
@@ -198,7 +191,7 @@ class FeeReceiptService:
             log.error(f"Error getting receipt content: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Receipt content error: {str(e)}",
+                detail="Receipt content error",
             )
 
     @staticmethod
@@ -482,6 +475,8 @@ class FeeReceiptService:
                 "verification_date": datetime.now(),
             }
 
+        except HTTPException:
+            raise
         except Exception as e:
             log.error(f"Error verifying receipt integrity: {str(e)}")
             raise HTTPException(

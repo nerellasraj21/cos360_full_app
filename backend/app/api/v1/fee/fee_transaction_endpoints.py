@@ -326,14 +326,4 @@ async def get_fee_transaction_by_number(
     # Permission check
     await check_role_plan_permission_with_error(db, request, role, "fee_transactions", "read")
 
-    # Search by transaction number (assuming we add this method to service)
-    transactions = await FeeTransactionService.search_transactions(db=db, limit=1, offset=0)
-
-    # Filter by transaction number in Python (or add to service)
-    for transaction in transactions:
-        if transaction.transaction_number == transaction_number:
-            return transaction
-
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction with number {transaction_number} not found"
-    )
+    return await FeeTransactionService.get_transaction_by_number(db, transaction_number, request)

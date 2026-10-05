@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import TIMESTAMP, Boolean, Column, ForeignKey, Integer, func
+from sqlalchemy import TIMESTAMP, Boolean, Column, ForeignKey, Index, Integer, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -9,6 +9,27 @@ from app.db.base import BaseOrg
 
 class ClassSubjectMap(BaseOrg):
     __tablename__ = "class_subject_mappings"
+    __table_args__ = (
+        Index(
+            "uq_class_subject_mappings_section",
+            "tenant_id",
+            "class_id",
+            "section_id",
+            "subject_id",
+            "academic_year_id",
+            unique=True,
+            postgresql_where=text("section_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_class_subject_mappings_class_wide",
+            "tenant_id",
+            "class_id",
+            "subject_id",
+            "academic_year_id",
+            unique=True,
+            postgresql_where=text("section_id IS NULL"),
+        ),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False, index=True)
     class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"), nullable=False)

@@ -179,6 +179,7 @@ class FeePaymentRequest(BaseModel):
     send_sms: bool = True
     print_duplicate: bool = False
     remarks: Optional[str] = None
+    idempotency_key: Optional[str] = Field(None, min_length=1, max_length=64)
 
     @model_validator(mode="after")
     def validate_fee_items(self):

@@ -28,6 +28,12 @@ class ExpenseTransactionService(BaseExpenseService):
     def __init__(self, db: AsyncSession):
         super().__init__(db)
 
+    @staticmethod
+    def _compute_requires_approval(amount: Decimal, payment_method: str, override: bool | None) -> bool:
+        if override is not None:
+            return override
+        return amount > Decimal("1000.00") or payment_method.lower() in ["check", "wire_transfer"]
+
     async def _check_active_department(self, department_id: UUID) -> None:
         department = await self.check_record_exists(ExpenseDepartment, department_id, "Expense department not found")
         if not department.is_active:
@@ -67,10 +73,8 @@ class ExpenseTransactionService(BaseExpenseService):
             )
 
         # Determine if approval is required
-        requires_approval = (
-            transaction_data.requires_approval_override
-            or transaction_data.amount > Decimal("1000.00")
-            or transaction_data.payment_method.lower() in ["check", "wire_transfer"]
+        requires_approval = self._compute_requires_approval(
+            transaction_data.amount, transaction_data.payment_method, transaction_data.requires_approval_override
         )
 
         # Create the transaction
@@ -218,6 +222,13 @@ class ExpenseTransactionService(BaseExpenseService):
             await self._check_active_department(update_data["department_id"])
         for field, value in update_data.items():
             setattr(db_transaction, field, value)
+
+        if db_transaction.status == "pending" and {"amount", "payment_method", "requires_approval_override"} & set(
+            update_data
+        ):
+            db_transaction.requires_approval = self._compute_requires_approval(
+                db_transaction.amount, db_transaction.payment_method, db_transaction.requires_approval_override
+            )
 
         await self.db.flush()
 

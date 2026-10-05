@@ -118,4 +118,4 @@ async def get_route_types_dropdown(db: AsyncSession, active_only: bool = True):
         return [{"id": rt.id, "type_name": rt.type_name} for rt in route_types]
     except Exception as e:
         log.error(f"Error fetching route types dropdown: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Fetching route types dropdown failed: {str(e)}")
+        raise HTTPException(status_code=400, detail="Fetching route types dropdown failed")

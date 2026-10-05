@@ -113,7 +113,7 @@ class FileManager:
             log.error(f"Error uploading file: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error uploading file: {str(e)}",
+                detail="Error uploading file",
             )
 
     async def upload_bytes(
@@ -140,7 +140,7 @@ class FileManager:
             log.error(f"Error saving bytes to disk: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error uploading file: {str(e)}",
+                detail="Error uploading file",
             )
 
     async def move_to_stale(self, file_key: str, tenant_id: str) -> str:
@@ -159,7 +159,7 @@ class FileManager:
             log.error(f"Error moving file to stale: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error moving file: {str(e)}",
+                detail="Error moving file",
             )
 
     async def generate_presigned_url(self, file_key: str, expires_in: int = 900) -> str:

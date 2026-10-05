@@ -102,12 +102,6 @@ async def delete_frontend_timetable_endpoint(
     return await delete_frontend_timetable(section_id, db)
 
 
-@router.get("/test")
-async def test_endpoint():
-    """Simple test endpoint"""
-    return {"message": "Test endpoint working"}
-
-
 # @router.get("/slots", response_model=List[TimetableSlotOut])
 # async def get_timetable_slots(db: AsyncSession = Depends(get_tenant_db)):
 #     return await get__all_timetable_slots(db)

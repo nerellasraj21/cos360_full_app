@@ -2,9 +2,12 @@ from datetime import date
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, TypeAdapter, field_validator
 
 from app.schemas.student.student_schema import StudentCreate, StudentOut
+
+SALARY_RANGES = ("below_1l", "1l_3l", "3l_5l", "5l_10l", "above_10l")
+_email_adapter = TypeAdapter(EmailStr)
 
 
 class StudentAdmissionBase(BaseModel):
@@ -127,3 +130,37 @@ class StudentAdmissionUpdate(BaseModel):
     guardian_salary_range: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator(
+        "aadhar_number",
+        "apaar_number",
+        "father_aadhar_number",
+        "mother_aadhar_number",
+        "guardian_aadhar_number",
+    )
+    @classmethod
+    def validate_twelve_digits(cls, v):
+        if v and (not v.isdigit() or len(v) != 12):
+            raise ValueError("Must be a 12-digit number")
+        return v
+
+    @field_validator("primary_phone")
+    @classmethod
+    def validate_primary_phone(cls, v):
+        if v and (not v.isdigit() or len(v) != 10):
+            raise ValueError("Must be a 10-digit number")
+        return v
+
+    @field_validator("father_email", "mother_email", "guardian_email")
+    @classmethod
+    def validate_parent_email(cls, v):
+        if v and v.strip():
+            _email_adapter.validate_python(v.strip())
+        return v
+
+    @field_validator("father_salary_range", "mother_salary_range", "guardian_salary_range")
+    @classmethod
+    def validate_salary_range(cls, v):
+        if v and v not in SALARY_RANGES:
+            raise ValueError(f"Must be one of: {', '.join(SALARY_RANGES)}")
+        return v

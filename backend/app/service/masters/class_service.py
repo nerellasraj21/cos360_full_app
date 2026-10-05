@@ -1,8 +1,10 @@
+import logging
 import logging as log
 from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy import and_, delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -14,11 +16,23 @@ from app.schemas.masters.class_schema import ClassCreate, ClassUpdate
 from app.schemas.masters.sections_schema import ClassSectionInfo
 from app.tools.cache_utils import cache_dropdown, invalidate_cache
 
+logger = logging.getLogger(__name__)
+
+
 log = log.getLogger("masters.class_service")
 
 
 async def create_class_with_sections(db: AsyncSession, class_data: ClassCreate):
     try:
+        duplicate = await db.execute(
+            select(ClassModel.id)
+            .where(ClassModel.name == class_data.name, ClassModel.academic_year_id == class_data.academic_year_id)
+            .limit(1)
+        )
+        if duplicate.scalars().first():
+            raise HTTPException(
+                status_code=400, detail=f"Class '{class_data.name}' already exists for this academic year"
+            )
         db_class = ClassModel(
             name=class_data.name,
             description=class_data.description,
@@ -46,9 +60,13 @@ async def create_class_with_sections(db: AsyncSession, class_data: ClassCreate):
         invalidate_cache("dropdown", "sections")
 
         return db_class
+    except HTTPException:
+        await db.rollback()
+        raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=f"Error creating class with sections: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=400, detail="Error creating class with sections")
 
 
 async def get_class_with_sections(db: AsyncSession, class_id: UUID):
@@ -64,21 +82,25 @@ async def get_class_with_sections(db: AsyncSession, class_id: UUID):
         sections = allResults.unique().scalars().all()
         db_class.sections = sections
         return db_class
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error fetching class with sections: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=400, detail="Error fetching class with sections")
 
 
-async def get_all_classes_with_sections(db: AsyncSession, academic_year_id: UUID = None):
+async def get_all_classes_with_sections(db: AsyncSession, academic_year_id: UUID = None, active_only: bool = False):
     try:
-        # classes = db.query(ClassModel).all()
-        stmt = select(ClassModel)
+        stmt = select(ClassModel).order_by(ClassModel.name)
         if academic_year_id:
             stmt = stmt.where(ClassModel.academic_year_id == academic_year_id)
+        if active_only:
+            stmt = stmt.where(ClassModel.is_active)
         result = await db.execute(stmt)
         classes = result.unique().scalars().all()
 
         if not classes:
-            raise HTTPException(status_code=404, detail="No classes found in the given academic year")
+            return []
         # Fetch sections for each class
         for db_class in classes:
             # sections = db.query(SectionModel).filter(SectionModel.class_id == db_class.id).all()
@@ -86,8 +108,11 @@ async def get_all_classes_with_sections(db: AsyncSession, academic_year_id: UUID
             sections = sectionsresult.unique().scalars().all()
             db_class.sections = sections
         return classes
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error fetching classes with sections: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=400, detail="Error fetching classes with sections")
 
 
 async def update_class_with_sections(db: AsyncSession, class_id: UUID, class_data: ClassUpdate):
@@ -98,8 +123,19 @@ async def update_class_with_sections(db: AsyncSession, class_id: UUID, class_dat
         if not existing_class:
             raise HTTPException(status_code=404, detail="Class not found")
 
-        # Update class fields
-        for key, value in class_data.dict(exclude_unset=True, exclude={"sections"}).items():
+        class_fields = class_data.model_dump(exclude_unset=True, exclude={"sections"})
+        new_name = class_fields.get("name", existing_class.name)
+        new_year = class_fields.get("academic_year_id", existing_class.academic_year_id)
+        if "name" in class_fields or "academic_year_id" in class_fields:
+            duplicate = await db.execute(
+                select(ClassModel.id)
+                .where(ClassModel.name == new_name, ClassModel.academic_year_id == new_year, ClassModel.id != class_id)
+                .limit(1)
+            )
+            if duplicate.scalars().first():
+                raise HTTPException(status_code=400, detail=f"Class '{new_name}' already exists for this academic year")
+
+        for key, value in class_fields.items():
             setattr(existing_class, key, value)
 
         # Handle sections update
@@ -122,8 +158,13 @@ async def update_class_with_sections(db: AsyncSession, class_id: UUID, class_dat
         invalidate_cache("dropdown", "sections")
 
         return {"message": "Class and sections updated successfully"}
+    except HTTPException:
+        await db.rollback()
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error fetching classes with sections: {str(e)}")
+        await db.rollback()
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=400, detail="Error updating class with sections")
 
 
 async def delete_class_with_sections(db: AsyncSession, class_id: UUID):
@@ -245,7 +286,8 @@ async def delete_class_with_sections(db: AsyncSession, class_id: UUID):
         raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=f"Error deleting class with sections: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=400, detail="Error deleting class with sections")
 
 
 async def get_class_section_list(db: AsyncSession) -> list[ClassSectionInfo]:
@@ -337,7 +379,7 @@ async def get_classes_dropdown(db: AsyncSession, active_only: bool = True):
         return [{"id": cls.id, "name": cls.name} for cls in classes]
     except Exception as e:
         log.error(f"Error fetching classes dropdown: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Fetching classes dropdown failed: {str(e)}")
+        raise HTTPException(status_code=400, detail="Fetching classes dropdown failed")
 
 
 @cache_dropdown(ttl=300)  # Cache for 5 minutes
@@ -355,7 +397,7 @@ async def get_sections_by_class_id(db: AsyncSession, class_id: UUID):
         return [{"id": sec.id, "name": sec.name} for sec in sections]
     except Exception as e:
         log.error(f"Error fetching sections by class ID: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Fetching sections by class ID failed: {str(e)}")
+        raise HTTPException(status_code=400, detail="Fetching sections by class ID failed")
 
 
 async def update_section(db: AsyncSession, section_id: UUID, section_data: dict):
@@ -376,12 +418,19 @@ async def update_section(db: AsyncSession, section_id: UUID, section_data: dict)
         updated_section = result.scalar_one()
 
         await db.commit()
+        invalidate_cache("dropdown", "sections")
         return updated_section
 
+    except HTTPException:
+        await db.rollback()
+        raise
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="A section with this name already exists in the class")
     except Exception as e:
         await db.rollback()
         log.error(f"Error updating section: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error updating section: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error updating section")
 
 
 async def add_sections_to_class(db: AsyncSession, class_id: UUID, sections: list[dict]):
@@ -414,7 +463,7 @@ async def add_sections_to_class(db: AsyncSession, class_id: UUID, sections: list
     except Exception as e:
         await db.rollback()
         log.error(f"Error adding sections to class: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Error adding sections: {str(e)}")
+        raise HTTPException(status_code=400, detail="Error adding sections")
 
 
 async def delete_section(db: AsyncSession, section_id: UUID):
@@ -427,6 +476,7 @@ async def delete_section(db: AsyncSession, section_id: UUID):
 
         await db.execute(delete(SectionModel).where(SectionModel.id == section_id))
         await db.commit()
+        invalidate_cache("dropdown", "sections")
 
         return {"message": "Section deleted successfully"}
 
@@ -441,7 +491,7 @@ async def delete_section(db: AsyncSession, section_id: UUID):
                 status_code=400,
                 detail="Cannot delete this section because it is referenced by other records (admissions, fee mappings, timetable, etc.). Deactivate it instead."
             )
-        raise HTTPException(status_code=500, detail=f"Error deleting section: {error_msg}")
+        raise HTTPException(status_code=500, detail="Error deleting section")
 
 
 async def get_section_by_id(db: AsyncSession, section_id: UUID):
@@ -456,6 +506,8 @@ async def get_section_by_id(db: AsyncSession, section_id: UUID):
 
         return section
 
+    except HTTPException:
+        raise
     except Exception as e:
         log.error(f"Error retrieving section: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error retrieving section: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error retrieving section")

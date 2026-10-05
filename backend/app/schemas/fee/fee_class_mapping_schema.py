@@ -32,10 +32,10 @@ class FeeClassMappingCreate(FeeClassMappingBase):
 
 
 class FeeClassMappingUpdate(BaseModel):
-    class_id: int | None = None
+    class_id: UUID | None = None
     fee_type_id: UUID | None = None
     total_fee: Decimal | None = None
-    academic_year_id: int | None = None
+    academic_year_id: UUID | None = None
     all_by_default: bool | None = None
 
     @field_validator("total_fee")

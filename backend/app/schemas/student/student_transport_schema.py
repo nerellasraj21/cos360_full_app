@@ -1,27 +1,26 @@
 from datetime import datetime, time
 from decimal import Decimal
-from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, Field, confloat
+from pydantic import BaseModel, Field
 
 
 class StudentTransportBase(BaseModel):
     student_id: UUID
     trip_id: UUID
     stop_id: UUID
-    fee_per_term: Annotated[float, confloat(gt=0)] = Field(..., description="Fee must be positive")
+    fee_per_term: float = Field(..., gt=0, description="Fee must be positive")
     pricing_id: UUID | None = None
 
 
 class StudentTransportCreate(StudentTransportBase):
-    fee_per_term: float | None = None  # auto-filled from stop.fees if not provided
+    fee_per_term: float | None = Field(None, gt=0, description="Fee must be positive; filled from stop.fees if omitted")
 
 
 class StudentTransportUpdate(BaseModel):
     trip_id: UUID | None = None
     stop_id: UUID | None = None
-    fee_per_term: Annotated[float, confloat(gt=0)] | None = None
+    fee_per_term: float | None = Field(None, gt=0)
     pricing_id: UUID | None = None
 
 
@@ -82,6 +81,7 @@ class PricingInfo(BaseModel):
 
 class StudentTransportOut(StudentTransportBase):
     id: UUID
+    fee_per_term: float
     created_at: datetime
     updated_at: datetime
     trip: TripInfo | None = None

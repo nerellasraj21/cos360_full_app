@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class FeeTransactionItemBase(BaseModel):
@@ -85,6 +85,7 @@ class FeeTransactionBase(BaseModel):
 
 class FeeTransactionCreate(FeeTransactionBase):
     transaction_items: list[FeeTransactionItemCreate]
+    idempotency_key: str | None = Field(None, min_length=1, max_length=64)
 
     @field_validator("transaction_items")
     @classmethod

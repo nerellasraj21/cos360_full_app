@@ -69,7 +69,7 @@ async def create_state(db: AsyncSession, state_data: StateCreate):
     except Exception as e:
         await db.rollback()
         log.error(f"Error creating state: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error creating state: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error creating state")
 
 
 async def get_state_by_id(db: AsyncSession, state_id: UUID):
@@ -87,7 +87,7 @@ async def get_state_by_id(db: AsyncSession, state_id: UUID):
         raise
     except Exception as e:
         log.error(f"Error fetching state {state_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching state: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching state")
 
 
 async def get_all_states(db: AsyncSession, active_only: bool = False, skip: int = 0, limit: int = 100):
@@ -113,7 +113,7 @@ async def get_all_states(db: AsyncSession, active_only: bool = False, skip: int 
     except Exception as e:
         log.error(f"Error fetching states: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching states: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching states"
         )
 
 
@@ -132,7 +132,7 @@ async def get_states_dropdown(db: AsyncSession, active_only: bool = True):
     except Exception as e:
         log.error(f"Error fetching states dropdown: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching states dropdown: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching states dropdown"
         )
 
 
@@ -170,7 +170,7 @@ async def update_state(db: AsyncSession, state_id: UUID, state_update: StateUpda
     except Exception as e:
         await db.rollback()
         log.error(f"Error updating state {state_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error updating state: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error updating state")
 
 
 async def delete_state(db: AsyncSession, state_id: UUID):
@@ -204,7 +204,7 @@ async def delete_state(db: AsyncSession, state_id: UUID):
     except Exception as e:
         await db.rollback()
         log.error(f"Error deleting state {state_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error deleting state: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error deleting state")
 
 
 # ===== DISTRICT CRUD OPERATIONS =====
@@ -240,7 +240,7 @@ async def create_district(db: AsyncSession, district_data: DistrictCreate):
         await db.rollback()
         log.error(f"Error creating district: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error creating district: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error creating district"
         )
 
 
@@ -262,7 +262,7 @@ async def get_district_by_id(db: AsyncSession, district_id: UUID):
     except Exception as e:
         log.error(f"Error fetching district {district_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching district: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching district"
         )
 
 
@@ -285,7 +285,7 @@ async def get_districts_by_state(db: AsyncSession, state_id: UUID, active_only: 
     except Exception as e:
         log.error(f"Error fetching districts for state {state_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching districts: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching districts"
         )
 
 
@@ -304,7 +304,7 @@ async def get_districts_dropdown(db: AsyncSession, state_id: UUID, active_only: 
     except Exception as e:
         log.error(f"Error fetching districts dropdown for state {state_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching districts dropdown: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching districts dropdown"
         )
 
 
@@ -343,7 +343,7 @@ async def update_district(db: AsyncSession, district_id: UUID, district_update: 
         await db.rollback()
         log.error(f"Error updating district {district_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error updating district: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error updating district"
         )
 
 
@@ -381,7 +381,7 @@ async def delete_district(db: AsyncSession, district_id: UUID):
         await db.rollback()
         log.error(f"Error deleting district {district_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error deleting district: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error deleting district"
         )
 
 
@@ -418,7 +418,7 @@ async def create_mandal(db: AsyncSession, mandal_data: MandalCreate):
         await db.rollback()
         log.error(f"Error creating mandal: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error creating mandal: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error creating mandal"
         )
 
 
@@ -438,7 +438,7 @@ async def get_mandal_by_id(db: AsyncSession, mandal_id: UUID):
     except Exception as e:
         log.error(f"Error fetching mandal {mandal_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching mandal: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching mandal"
         )
 
 
@@ -461,7 +461,7 @@ async def get_mandals_by_district(db: AsyncSession, district_id: UUID, active_on
     except Exception as e:
         log.error(f"Error fetching mandals for district {district_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching mandals: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching mandals"
         )
 
 
@@ -480,7 +480,7 @@ async def get_mandals_dropdown(db: AsyncSession, district_id: UUID, active_only:
     except Exception as e:
         log.error(f"Error fetching mandals dropdown for district {district_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching mandals dropdown: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching mandals dropdown"
         )
 
 
@@ -519,7 +519,7 @@ async def update_mandal(db: AsyncSession, mandal_id: UUID, mandal_update: Mandal
         await db.rollback()
         log.error(f"Error updating mandal {mandal_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error updating mandal: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error updating mandal"
         )
 
 
@@ -547,5 +547,5 @@ async def delete_mandal(db: AsyncSession, mandal_id: UUID):
         await db.rollback()
         log.error(f"Error deleting mandal {mandal_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error deleting mandal: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error deleting mandal"
         )

@@ -14,6 +14,7 @@ from app.models.student.issuable_certificate_model import (
     GeneratedCertificate,
     IssuableCertificateTemplate,
 )
+from app.models.student.student_model import Student
 from app.schemas.student.issuable_certificate_schema import (
     GenerateCertificateRequest,
     GeneratedCertificateRead,
@@ -159,6 +160,19 @@ async def generate_certificate(
             detail="Template not found"
         )
 
+    if str(template.is_active).lower() != "true":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Template is inactive"
+        )
+
+    student_exists = await db.execute(select(Student.id).where(Student.id == request_data.student_id))
+    if student_exists.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Student not found"
+        )
+
     # Create generated certificate record
     certificate = GeneratedCertificate(
         id=uuid.uuid4(),
@@ -171,10 +185,14 @@ async def generate_certificate(
     )
 
     db.add(certificate)
+    await db.flush()
+    saved = (
+        await db.execute(select(GeneratedCertificate).where(GeneratedCertificate.id == certificate.id))
+    ).scalar_one()
+    result = GeneratedCertificateRead.from_orm(saved)
     await db.commit()
-    await db.refresh(certificate)
 
-    return GeneratedCertificateRead.from_orm(certificate)
+    return result
 
 
 async def get_issued_certificates_by_student(

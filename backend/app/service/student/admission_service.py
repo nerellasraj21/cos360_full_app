@@ -3,7 +3,7 @@ import logging
 from uuid import UUID
 
 from fastapi import HTTPException, Request
-from sqlalchemy import String, and_, extract, func, or_
+from sqlalchemy import String, and_, delete, extract, func, or_
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -11,10 +11,24 @@ from sqlalchemy.orm import selectinload
 
 from app.models.auth.role_model import Role
 from app.models.auth.user_model import User
+from app.models.exam.student_marks_model import StudentMark
+from app.models.exam.student_result_model import StudentExamResult, StudentSubjectResult
+from app.models.fee.fee_concession_model import FeeConcession
+from app.models.fee.fee_old_model import FeeOld
+from app.models.fee.fee_student_map_term_amount_model import FeeStudentMapTermAmount
+from app.models.fee.fee_student_mapping_model import FeeStudentMapping
+from app.models.fee.fee_transaction_model import FeeTransaction
 from app.models.masters.admission_model import Admission
+from app.models.masters.attendance_model import StudentAttendance
 from app.models.masters.parent_model import Parent
 from app.models.masters.student_parent_association_model import StudentParentLink
+from app.models.masters.transport.student_trip_model import StudentTrip
+from app.models.student.issuable_certificate_model import GeneratedCertificate
+from app.models.student.student_certificate_model import CertificateIssue
+from app.models.student.student_document_model import StudentDocument
+from app.models.student.student_homework_model import StudentHomework
 from app.models.student.student_model import Student
+from app.models.student.student_transport_model import StudentTransportAssignment
 from app.schemas.student.admission_schema import StudentAdmissionCreate, StudentAdmissionUpdate
 from app.schemas.student.student_schema import PLACEHOLDER_DATE_OF_BIRTH
 from app.tools.database_error_mapper import map_database_error
@@ -1260,6 +1274,7 @@ async def get_all_admissions(db: AsyncSession, skip: int = 0, limit: int = 10):
         if admission.student and admission.student.parent_links:
             father = None
             mother = None
+            guardian = None
 
             for link in admission.student.parent_links:
                 if link.parent and link.parent.relation_to_student:
@@ -1304,6 +1319,7 @@ async def get_all_admissions_with_context(
     class_id: UUID | None = None,
     section_id: UUID | None = None,
     as_of_date: date | None = None,
+    active_only: bool = False,
 ):
     """
     Get admissions with user-specific filtering applied
@@ -1317,6 +1333,7 @@ async def get_all_admissions_with_context(
         section_id: Optional filter by section ID
         as_of_date: Optional filter excluding students whose admission_date is after this date
             (e.g. for building an attendance roster for a past date)
+        active_only: When true, exclude students whose user account is inactive
 
     Returns:
         Dict with filtered admissions, count, and pagination info
@@ -1337,6 +1354,8 @@ async def get_all_admissions_with_context(
         filtered_count_stmt = filtered_count_stmt.where(Admission.current_section_id == section_id)
     if as_of_date:
         filtered_count_stmt = filtered_count_stmt.where(Admission.admission_date <= as_of_date)
+    if active_only:
+        filtered_count_stmt = filtered_count_stmt.where(Admission.student.has(Student.user.has(is_active=True)))
 
     count_result = await db.execute(filtered_count_stmt)
     total_count = count_result.scalar() or 0
@@ -1356,6 +1375,8 @@ async def get_all_admissions_with_context(
         filtered_stmt = filtered_stmt.where(Admission.current_section_id == section_id)
     if as_of_date:
         filtered_stmt = filtered_stmt.where(Admission.admission_date <= as_of_date)
+    if active_only:
+        filtered_stmt = filtered_stmt.where(Admission.student.has(Student.user.has(is_active=True)))
 
     # Apply pagination and ordering
     stmt = filtered_stmt.offset(skip).limit(limit).order_by(Admission.admission_date.desc())
@@ -1404,55 +1425,117 @@ async def get_all_admissions_with_context(
 
 
 async def delete_admission(admission_id: UUID, db: AsyncSession):
-    """Delete admission and related student data"""
-    # Get admission with relationships
-    stmt = select(Admission).options(selectinload(Admission.student)).where(Admission.id == admission_id)
-    result = await db.execute(stmt)
-    admission = result.scalar_one_or_none()
+    """Delete an admission and the student data that depends on it"""
+    admission = (
+        await db.execute(select(Admission).options(selectinload(Admission.student)).where(Admission.id == admission_id))
+    ).scalar_one_or_none()
 
     if not admission:
         raise HTTPException(status_code=404, detail="Admission not found")
 
     student = admission.student
+    student_id = admission.student_id
 
-    # Delete parent links
-    parent_links_stmt = select(StudentParentLink).where(StudentParentLink.student_id == student.id)
-    parent_links_result = await db.execute(parent_links_stmt)
-    parent_links = parent_links_result.scalars().all()
+    try:
+        other_admissions = (
+            await db.execute(
+                select(func.count(Admission.id)).where(Admission.student_id == student_id, Admission.id != admission.id)
+            )
+        ).scalar() or 0
+        if other_admissions:
+            raise HTTPException(status_code=409, detail="Student has other admissions and cannot be deleted")
 
-    for link in parent_links:
-        await db.delete(link)
+        blocking_models = (
+            (FeeTransaction, "fee payments"),
+            (FeeConcession, "fee concessions"),
+            (FeeOld, "previous fee dues"),
+            (StudentMark, "exam marks"),
+            (StudentExamResult, "exam results"),
+            (StudentSubjectResult, "exam results"),
+            (StudentHomework, "homework records"),
+        )
+        for model, label in blocking_models:
+            used = (await db.execute(select(func.count()).select_from(model).where(model.student_id == student_id))).scalar()
+            if used:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Admission cannot be deleted because the student has {label}. Deactivate the student instead.",
+                )
 
-    # Delete parents (if they exist)
-    for link in parent_links:
-        parent_stmt = select(Parent).where(Parent.id == link.parent_id)
-        parent_result = await db.execute(parent_stmt)
-        parent = parent_result.scalar_one_or_none()
-        if parent:
-            # Delete parent user
-            if parent.user_id:
-                user_stmt = select(User).where(User.id == parent.user_id)
-                user_result = await db.execute(user_stmt)
-                user = user_result.scalar_one_or_none()
-                if user:
-                    await db.delete(user)
-            await db.delete(parent)
+        mapping_ids = select(FeeStudentMapping.id).where(FeeStudentMapping.student_id == student_id)
+        await db.execute(
+            delete(FeeStudentMapTermAmount)
+            .where(FeeStudentMapTermAmount.fee_student_map_id.in_(mapping_ids))
+            .execution_options(synchronize_session=False)
+        )
+        for model in (
+            FeeStudentMapping,
+            StudentAttendance,
+            StudentDocument,
+            CertificateIssue,
+            StudentTransportAssignment,
+            StudentTrip,
+        ):
+            await db.execute(delete(model).where(model.student_id == student_id).execution_options(synchronize_session=False))
+        await db.execute(
+            delete(GeneratedCertificate)
+            .where(GeneratedCertificate.student_id == student_id)
+            .execution_options(synchronize_session=False)
+        )
 
-    # Delete student user
-    if student.user_id:
-        user_stmt = select(User).where(User.id == student.user_id)
-        user_result = await db.execute(user_stmt)
-        user = user_result.scalar_one_or_none()
-        if user:
-            await db.delete(user)
+        parent_ids = (
+            (await db.execute(select(StudentParentLink.parent_id).where(StudentParentLink.student_id == student_id)))
+            .scalars()
+            .all()
+        )
+        await db.execute(
+            delete(StudentParentLink)
+            .where(StudentParentLink.student_id == student_id)
+            .execution_options(synchronize_session=False)
+        )
+        await db.flush()
 
-    # Delete student
-    await db.delete(student)
+        orphan_parent_ids = []
+        for parent_id in set(parent_ids):
+            if parent_id is None:
+                continue
+            still_linked = (
+                await db.execute(select(func.count(StudentParentLink.id)).where(StudentParentLink.parent_id == parent_id))
+            ).scalar()
+            if not still_linked:
+                orphan_parent_ids.append(parent_id)
 
-    # Delete admission
-    await db.delete(admission)
+        await db.execute(delete(Admission).where(Admission.id == admission.id).execution_options(synchronize_session=False))
+        await db.execute(delete(Student).where(Student.id == student_id).execution_options(synchronize_session=False))
+        await db.flush()
 
-    await db.commit()
+        user_ids = [student.user_id] if student and student.user_id else []
+        if orphan_parent_ids:
+            parent_rows = (
+                await db.execute(select(Parent.id, Parent.user_id).where(Parent.id.in_(orphan_parent_ids)))
+            ).all()
+            await db.execute(
+                delete(Parent).where(Parent.id.in_(orphan_parent_ids)).execution_options(synchronize_session=False)
+            )
+            user_ids.extend(user_id for _, user_id in parent_rows if user_id)
+        await db.flush()
+        if user_ids:
+            await db.execute(delete(User).where(User.id.in_(user_ids)).execution_options(synchronize_session=False))
+
+        await db.commit()
+    except HTTPException:
+        await db.rollback()
+        raise
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Admission cannot be deleted because other records still reference the student. Deactivate the student instead.",
+        )
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error deleting admission {admission_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not delete admission")
 
     return {"message": "Admission and related data deleted successfully"}
 

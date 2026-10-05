@@ -1,5 +1,5 @@
 import logging
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import text
@@ -88,7 +88,7 @@ async def get_all_plans(
     except Exception as e:
         logger.error(f"Error getting plans: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to retrieve plans: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve plans"
         )
 
 
@@ -135,11 +135,11 @@ async def create_plan(
             # Create plan
             result = await db.execute(
                 text("""
-                INSERT INTO public.plans (name, description, is_active) 
-                VALUES (:name, :description, :is_active)
+                INSERT INTO public.plans (id, name, description, is_active)
+                VALUES (:id, :name, :description, :is_active)
                 RETURNING id, name, description, is_active
             """),
-                {"name": name, "description": description, "is_active": is_active},
+                {"id": uuid4(), "name": name, "description": description, "is_active": is_active},
             )
 
             new_plan = result.fetchone()
@@ -171,7 +171,7 @@ async def create_plan(
     except Exception as e:
         logger.error(f"Error creating plan: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create plan: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create plan"
         )
 
 
@@ -255,7 +255,7 @@ async def get_single_plan(
     except Exception as e:
         logger.error(f"Error getting plan {plan_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to retrieve plan: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve plan"
         )
 
 
@@ -359,7 +359,7 @@ async def update_plan(
     except Exception as e:
         logger.error(f"Error updating plan: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update plan: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update plan"
         )
 
 
@@ -432,7 +432,7 @@ async def get_plan_resources(
     except Exception as e:
         logger.error(f"Error getting plan resources: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to retrieve plan resources: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve plan resources"
         )
 
 
@@ -553,7 +553,7 @@ async def add_plan_resource(
     except Exception as e:
         logger.error(f"Error adding plan resource: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to add resource to plan: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to add resource to plan"
         )
 
 
@@ -682,5 +682,5 @@ async def remove_plan_resource(
     except Exception as e:
         logger.error(f"Error removing plan resource: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to remove resource from plan: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to remove resource from plan"
         )

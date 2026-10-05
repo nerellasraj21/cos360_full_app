@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # Pagination defaults
     PAGE_SIZE: int = 20
 
+    # Rate limiting (disable only for automated test environments)
+    RATE_LIMIT_ENABLED: bool = True
+
     # Logging
     LOG_LEVEL: str = "INFO"
 

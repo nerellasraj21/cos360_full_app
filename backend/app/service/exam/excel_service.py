@@ -1,3 +1,4 @@
+import logging
 from io import BytesIO
 from uuid import UUID
 
@@ -9,6 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.exam.exam_subject_config_model import ExamSubjectConfig
+
+logger = logging.getLogger(__name__)
+
 
 
 async def generate_excel_template(
@@ -164,7 +168,8 @@ async def parse_excel_upload(
         wb = openpyxl.load_workbook(BytesIO(file_bytes))
         ws = wb.active
     except Exception as e:
-        raise HTTPException(400, detail=f"Invalid Excel file: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(400, detail="Invalid Excel file")
 
     marks = []
     errors = []

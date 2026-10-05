@@ -35,7 +35,7 @@ async def add_exam_date(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     await check_role_plan_permission_with_error(db, request, role, "exams", "update")
-    user_id = uuid.UUID(current_user.get("id"))
+    user_id = uuid.UUID(current_user.get("sub"))
     result = await create_exam_date(db, payload, created_by=user_id)
     await db.commit()
     await db.refresh(result)
@@ -52,7 +52,7 @@ async def bulk_add_exam_dates(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     await check_role_plan_permission_with_error(db, request, role, "exams", "update")
-    user_id = uuid.UUID(current_user.get("id"))
+    user_id = uuid.UUID(current_user.get("sub"))
     results = await bulk_create_exam_dates(db, payload, created_by=user_id)
     await db.commit()
     return results
@@ -68,7 +68,7 @@ async def add_exam_dates_multi_section(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     await check_role_plan_permission_with_error(db, request, role, "exams", "update")
-    user_id = uuid.UUID(current_user.get("id"))
+    user_id = uuid.UUID(current_user.get("sub"))
     results = await create_exam_dates_for_multi_section(db, payload, created_by=user_id)
     await db.commit()
     return results

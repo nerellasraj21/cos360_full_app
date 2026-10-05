@@ -147,7 +147,7 @@ async def create_fee_type(db: AsyncSession, fee_type_data: FeeTypeCreate):
         else:
             log.error(f"Integrity error creating fee type: {str(e)}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Integrity error creating fee type: {str(e)}"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Integrity error creating fee type"
             )
     except Exception as e:
         await db.rollback()
@@ -225,13 +225,13 @@ async def get_all_fee_types(db: AsyncSession, limit: int = 50, offset: int = 0):
 
 
 @cache_dropdown(ttl=300)  # Cache for 5 minutes
-async def get_fee_types_dropdown(db: AsyncSession, fee_category_id: str | None = None):
+async def get_fee_types_dropdown(db: AsyncSession, fee_category_id: UUID | str | None = None):
     """Get fee types for dropdown (id + type_name only) - Cached"""
     try:
         query = select(FeeTypeModel)
 
         if fee_category_id:
-            fee_category_uuid = UUID(fee_category_id)
+            fee_category_uuid = fee_category_id if isinstance(fee_category_id, UUID) else UUID(fee_category_id)
             query = query.where(FeeTypeModel.fee_category_id == fee_category_uuid)
 
         result = await db.execute(query)

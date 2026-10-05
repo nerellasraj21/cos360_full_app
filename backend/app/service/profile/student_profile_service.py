@@ -10,6 +10,7 @@ from app.models.masters.sections_model import Section
 from app.models.student.student_model import Student
 from app.schemas.profile.student_profile_schema import StudentProfileOut, StudentProfileUpdate
 from app.service.profile.profile_audit_service import ProfileAuditService
+from app.service.student.attendance_percentage import attendance_percentage_from_statuses
 
 
 class StudentProfileService:
@@ -78,11 +79,7 @@ class StudentProfileService:
                     section_name = section_obj.name
 
         # Calculate attendance percentage
-        attendance_percentage = None
-        total_attendance = len(student.attendances)
-        if total_attendance > 0:
-            present_count = sum(1 for att in student.attendances if att.status == "Present")
-            attendance_percentage = round((present_count / total_attendance) * 100, 2)
+        attendance_percentage = attendance_percentage_from_statuses(att.status for att in student.attendances)
 
         # Count certificates and documents
         total_certificates = len(student.certificates)

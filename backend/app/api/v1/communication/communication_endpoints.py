@@ -11,6 +11,7 @@ Permissions:
   GET  /logs              → communications:list
   GET  /logs/{id}         → communications:read
 """
+from datetime import datetime, timedelta
 import uuid
 from typing import List, Optional
 from uuid import UUID
@@ -23,6 +24,7 @@ from app.db.tenant_session import get_tenant_db, get_tenant_id_from_request
 from app.middleware.rate_limit_middleware import rate_limit_api
 from app.models.communication.communication_model import NotificationLog
 from app.schemas.communication.communication_schema import (
+    ChannelEnum,
     LogListResponse,
     LogRead,
     SendRequest,
@@ -67,7 +69,7 @@ async def create_template_endpoint(
 @router.get("/templates", response_model=List[TemplateRead])
 async def list_templates_endpoint(
     request: Request,
-    channel: Optional[str] = Query(None, description="Filter by channel: sms, whatsapp, email"),
+    channel: Optional[ChannelEnum] = Query(None, description="Filter by channel: sms, whatsapp, email"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     db: AsyncSession = Depends(get_tenant_db),
 ):
@@ -75,7 +77,7 @@ async def list_templates_endpoint(
     role = current_user.get("role")
     await check_role_plan_permission_with_error(db, request, role, "communications", "list")
 
-    return await list_templates(db, channel=channel, is_active=is_active)
+    return await list_templates(db, channel=channel.value if channel else None, is_active=is_active)
 
 
 @router.get("/templates/{template_id}", response_model=TemplateRead)
@@ -204,17 +206,20 @@ async def send_notification_endpoint(
     except (ValueError, AttributeError):
         triggered_by = uuid.uuid4()
 
-    queued_count = await queue_and_dispatch(
-        db=db,
-        template_id=data.template_id,
-        target_type=data.target_type,
-        target_ref=data.target_ref,
-        user_vars=data.variables,
-        triggered_by=triggered_by,
-        tenant_id=get_tenant_id_from_request(request),
-        channel=data.channel.value if data.channel else None,
-        message=data.message,
-    )
+    try:
+        queued_count = await queue_and_dispatch(
+            db=db,
+            template_id=data.template_id,
+            target_type=data.target_type,
+            target_ref=data.target_ref,
+            user_vars=data.variables,
+            triggered_by=triggered_by,
+            tenant_id=get_tenant_id_from_request(request),
+            channel=data.channel.value if data.channel else None,
+            message=data.message,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     return SendResponse(queued_count=queued_count)
 
 
@@ -246,9 +251,19 @@ async def list_logs_endpoint(
     if target_type:
         query = query.where(NotificationLog.target_type == target_type)
     if date_from:
-        query = query.where(NotificationLog.created_at >= date_from)
+        try:
+            query = query.where(NotificationLog.created_at >= datetime.fromisoformat(date_from).replace(tzinfo=None))
+        except ValueError:
+            raise HTTPException(status_code=422, detail="date_from must be an ISO date or datetime")
     if date_to:
-        query = query.where(NotificationLog.created_at <= date_to)
+        try:
+            upper = datetime.fromisoformat(date_to).replace(tzinfo=None)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="date_to must be an ISO date or datetime")
+        if len(date_to) <= 10:
+            query = query.where(NotificationLog.created_at < upper + timedelta(days=1))
+        else:
+            query = query.where(NotificationLog.created_at <= upper)
 
     # Count total
     count_query = select(func.count()).select_from(query.subquery())

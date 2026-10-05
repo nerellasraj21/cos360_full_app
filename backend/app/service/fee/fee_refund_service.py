@@ -44,8 +44,9 @@ class FeeRefundService:
     ) -> FeeTransaction:
         """Validate that refund is eligible and amount is valid"""
 
-        # Get transaction
-        result = await db.execute(select(FeeTransaction).where(FeeTransaction.id == transaction_id))
+        result = await db.execute(
+            select(FeeTransaction).where(FeeTransaction.id == transaction_id).with_for_update()
+        )
         transaction = result.scalar_one_or_none()
 
         if not transaction:
@@ -58,21 +59,26 @@ class FeeRefundService:
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Can only refund completed transactions"
             )
 
-        # Check existing refunds for this transaction
         existing_refunds_result = await db.execute(
             select(FeeRefund).where(
-                and_(FeeRefund.fee_transaction_id == transaction_id, FeeRefund.status.in_(["approved", "processed"]))
+                and_(
+                    FeeRefund.fee_transaction_id == transaction_id,
+                    FeeRefund.status.in_(["pending", "approved", "processed"]),
+                )
             )
         )
         existing_refunds = existing_refunds_result.scalars().all()
 
-        total_refunded = sum(refund.refund_amount for refund in existing_refunds)
+        total_refunded = sum((refund.refund_amount for refund in existing_refunds), Decimal("0.00"))
         available_for_refund = transaction.total_amount - total_refunded
 
         if refund_amount > available_for_refund:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Refund amount {refund_amount} exceeds available amount {available_for_refund}",
+                detail=(
+                    f"Refund amount {refund_amount} exceeds available amount {max(available_for_refund, Decimal('0.00'))} "
+                    f"(transaction {transaction.total_amount}, already requested or refunded {total_refunded})"
+                ),
             )
 
         return transaction
@@ -86,16 +92,30 @@ class FeeRefundService:
                 db, refund_data.fee_transaction_id, refund_data.refund_amount
             )
 
-            # Generate refund number
+            mismatches = [
+                name
+                for name, sent, actual in (
+                    ("student_id", refund_data.student_id, transaction.student_id),
+                    ("student_admission_num", refund_data.student_admission_num, transaction.student_admission_num),
+                    ("academic_year_id", refund_data.academic_year_id, transaction.academic_year_id),
+                )
+                if sent is not None and sent != actual
+            ]
+            if mismatches:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"{', '.join(mismatches)} does not match the referenced fee transaction",
+                )
+
             refund_number = await FeeRefundService.generate_refund_number(db)
 
             # Create refund request
             db_refund = FeeRefund(
                 refund_number=refund_number,
                 fee_transaction_id=refund_data.fee_transaction_id,
-                student_id=refund_data.student_id,
-                student_admission_num=refund_data.student_admission_num,
-                academic_year_id=refund_data.academic_year_id,
+                student_id=transaction.student_id,
+                student_admission_num=transaction.student_admission_num,
+                academic_year_id=transaction.academic_year_id,
                 refund_amount=refund_data.refund_amount,
                 refund_reason=refund_data.refund_reason,
                 detailed_reason=refund_data.detailed_reason,

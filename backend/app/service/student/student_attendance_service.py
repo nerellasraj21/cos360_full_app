@@ -576,6 +576,13 @@ async def update_attendance_by_date(
             if not student_id or not new_status:
                 continue
 
+            try:
+                student_id = UUID(str(student_id))
+            except ValueError:
+                raise create_validation_error(
+                    message=f"Invalid student_id '{student_id}'", field="student_id", request=request
+                )
+
             # Skip students who hadn't joined yet as of this attendance date
             admission_date = await get_student_admission_date(student_id, db)
             if admission_date and attendance_date < admission_date:

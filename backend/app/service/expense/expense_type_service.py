@@ -140,14 +140,13 @@ class ExpenseTypeService(BaseExpenseService):
             if not category.is_active:
                 raise self.build_error_response("INACTIVE_CATEGORY", "Cannot move expense type to inactive category")
 
-        # Check name uniqueness if name or category is being changed
-        if type_data.name and (
-            type_data.name != expense_type.name
-            or (type_data.category_id and type_data.category_id != expense_type.category_id)
-        ):
+        name_changed = type_data.name is not None and type_data.name != expense_type.name
+        category_changed = type_data.category_id is not None and type_data.category_id != expense_type.category_id
+        if name_changed or category_changed:
+            name_to_check = type_data.name if type_data.name is not None else expense_type.name
             category_id_to_check = type_data.category_id or expense_type.category_id
             query = select(func.count(ExpenseType.id)).where(
-                ExpenseType.name == type_data.name,
+                ExpenseType.name == name_to_check,
                 ExpenseType.category_id == category_id_to_check,
                 ExpenseType.id != type_id,
             )
@@ -155,7 +154,7 @@ class ExpenseTypeService(BaseExpenseService):
 
             if result.scalar() > 0:
                 raise self.build_error_response(
-                    "DUPLICATE_TYPE_NAME", f"Expense type '{type_data.name}' already exists in this category"
+                    "DUPLICATE_TYPE_NAME", f"Expense type '{name_to_check}' already exists in this category"
                 )
 
         # Update fields

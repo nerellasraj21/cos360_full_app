@@ -242,14 +242,24 @@ def create_not_found_error(
     )
 
 
-def create_business_rule_error(message: str, rule: str | None = None, request: Request | None = None) -> HTTPException:
+def create_business_rule_error(
+    message: str,
+    rule: str | None = None,
+    request: Request | None = None,
+    details: dict[str, Any] | None = None,
+    status_code: int = 422,
+) -> HTTPException:
     """Create a business rule violation error response"""
-    details = {}
+    merged = dict(details or {})
     if rule:
-        details["rule"] = rule
+        merged["rule"] = rule
 
     return create_error_response(
-        error_code=ErrorCategory.BUSINESS_RULE_ERROR, message=message, status_code=422, details=details, request=request
+        error_code=ErrorCategory.BUSINESS_RULE_ERROR,
+        message=message,
+        status_code=status_code,
+        details=merged,
+        request=request,
     )
 
 

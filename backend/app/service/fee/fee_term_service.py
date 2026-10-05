@@ -100,7 +100,7 @@ async def get_fee_term_with_dates(db: AsyncSession, fee_term_id: UUID):
         log.error(f"Error getting fee term with dates: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred while retrieving fee term: {str(e)}",
+            detail="An error occurred while retrieving fee term",
         )
 
 
@@ -293,7 +293,7 @@ async def get_fee_terms_dropdown(db: AsyncSession):
     except Exception as e:
         log.error(f"Error fetching fee terms dropdown: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching fee terms dropdown: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching fee terms dropdown"
         )
 
 
@@ -321,5 +321,5 @@ async def get_fee_term_dates_only(db: AsyncSession, fee_term_id: UUID):
     except Exception as e:
         log.error(f"Error fetching fee term dates: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching fee term dates: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching fee term dates"
         )

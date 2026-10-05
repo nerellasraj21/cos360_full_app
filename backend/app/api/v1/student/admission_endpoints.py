@@ -242,6 +242,7 @@ async def list_admissions(
     as_of_date: date | None = Query(
         None, description="Exclude students who joined after this date (e.g. for a past attendance date)"
     ),
+    active_only: bool = Query(False, description="Only students whose account is active"),
 ):
     """List student admissions with user-specific filtering - All authenticated users"""
 
@@ -249,10 +250,12 @@ async def list_admissions(
     user_context = await check_user_resource_access(db, request, "student_admissions", "list")
 
     # Use user-context aware service method
-    return await get_all_admissions_with_context(db, user_context, skip, limit, class_id, section_id, as_of_date)
+    return await get_all_admissions_with_context(
+        db, user_context, skip, limit, class_id, section_id, as_of_date, active_only
+    )
 
 
-@router.delete("/{admission_id}", status_code=status.HTTP_200_OK, response_model=StudentAdmissionResponse)
+@router.delete("/{admission_id}", status_code=status.HTTP_200_OK, response_model=dict[str, str])
 async def delete_student_admission(admission_id: UUID, request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """Delete student admission and related data - Admin only"""
     current_user = await get_current_user_token(request)

@@ -1,4 +1,5 @@
 # app/api/v1/exam/exam_endpoints.py
+import logging
 import uuid
 
 from pydantic import BaseModel
@@ -35,6 +36,9 @@ from app.service.exam.exam_subject_config_service import (
 from app.service.exam.result_service import unlock_exam
 from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
 
+logger = logging.getLogger(__name__)
+
+
 router = APIRouter(prefix="/exams", tags=["Exams"])
 
 
@@ -62,7 +66,8 @@ async def create_exam(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"An exam named '{payload.exam.exam_name}' already exists for this academic year.",
             )
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e.orig))
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="The request conflicts with existing data")
     return result
 
 

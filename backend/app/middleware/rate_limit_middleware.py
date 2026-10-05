@@ -30,12 +30,17 @@ try:
         key_func=get_remote_address,
         storage_uri=settings.REDIS_URL,
         default_limits=["1000 per hour"],  # Global default limit
+        enabled=settings.RATE_LIMIT_ENABLED,
     )
     logger.info("Rate limiter initialized with Redis backend")
 
 except Exception as e:
     # Fall back to in-memory rate limiting for development
-    limiter = Limiter(key_func=get_remote_address, default_limits=["1000 per hour"])  # Global default limit
+    limiter = Limiter(
+        key_func=get_remote_address,
+        default_limits=["1000 per hour"],  # Global default limit
+        enabled=settings.RATE_LIMIT_ENABLED,
+    )
     logger.warning(f"Redis not available ({e}), using in-memory rate limiting")
 
 

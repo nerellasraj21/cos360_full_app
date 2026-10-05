@@ -3,7 +3,7 @@ import re
 
 from fastapi import HTTPException, Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
 from app.config import settings
 
@@ -54,10 +54,12 @@ class TenantMiddleware(BaseHTTPMiddleware):
 
         except HTTPException as e:
             logger.warning(f"Tenant validation failed: {e.detail} | URL: {request.url}")
-            raise
+            return JSONResponse(status_code=e.status_code, content={"detail": e.detail}, headers=e.headers)
         except Exception as e:
             logger.error(f"Unexpected tenant middleware error: {str(e)} | URL: {request.url}")
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Tenant detection error")
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"detail": "Tenant detection error"}
+            )
 
     def _should_bypass_tenant_validation(self, request: Request) -> bool:
         """

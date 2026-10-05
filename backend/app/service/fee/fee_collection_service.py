@@ -42,6 +42,7 @@ from app.schemas.fee.fee_collection_schema import (
     TermDueItem,
     TermsDueResponse,
 )
+from app.service.fee.fee_locks import idempotent_transaction_number, lock_student_payments
 from app.service.fee.fee_receipt_service import FeeReceiptService
 
 log = log.getLogger("fee.collection_service")
@@ -255,7 +256,7 @@ async def get_fee_summary(
                 )
             )
         )
-        paid_amount = Decimal(str(paid_result.scalar_one() or 0))
+        paid_amount = Decimal(str(paid_result.scalar_one() or 0)).quantize(Decimal("0.01"))
 
         due_amount = fee_after_concession - paid_amount
         if due_amount < 0:
@@ -802,7 +803,7 @@ async def process_fee_payment(
         log.error(f"Fee payment failed: {type(e).__name__}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Payment failed: {type(e).__name__}: {str(e)}",
+            detail="Payment failed",
         )
 
 
@@ -814,6 +815,17 @@ async def _process_fee_payment_inner(
     import secrets
 
     collected_by_user_id = UUID(current_user.get("sub"))
+
+    await lock_student_payments(db, data.student_id)
+
+    idempotent_number = (
+        idempotent_transaction_number(data.student_id, data.idempotency_key) if data.idempotency_key else None
+    )
+    if idempotent_number:
+        replay = await _replay_payment(db, idempotent_number)
+        if replay is not None:
+            await db.commit()
+            return replay
 
     # ── Load fee mappings ────────────────────────────────────────────────
     mappings_result = await db.execute(
@@ -1045,8 +1057,12 @@ async def _process_fee_payment_inner(
     actual_total += old_total
 
     # ── Create FeeTransaction ────────────────────────────────────────────
-    timestamp = datetime.now().strftime("%Y%m%d")
-    txn_number = f"TXN{timestamp}{secrets.token_hex(4).upper()}"
+    if idempotent_number:
+        txn_number = idempotent_number
+    else:
+        from app.service.fee.fee_transaction_service import FeeTransactionService
+
+        txn_number = await FeeTransactionService.generate_transaction_number(db)
 
     is_cheque = data.payment_method in ("cheque", "dd")
     txn = FeeTransaction(
@@ -1142,6 +1158,40 @@ async def _process_fee_payment_inner(
         payment_method=data.payment_method,
         sms_status=sms_status,
         items_paid=items_paid,
+    )
+
+
+async def _replay_payment(db: AsyncSession, transaction_number: str) -> FeePaymentResponse | None:
+    txn = (
+        await db.execute(select(FeeTransaction).where(FeeTransaction.transaction_number == transaction_number).limit(1))
+    ).scalars().first()
+    if txn is None:
+        return None
+
+    rows = (
+        await db.execute(
+            select(FeeTransactionItem.fee_type_id, FeeType.type_name, func.sum(FeeTransactionItem.amount_paid))
+            .join(FeeType, FeeType.id == FeeTransactionItem.fee_type_id)
+            .where(FeeTransactionItem.fee_transaction_id == txn.id)
+            .group_by(FeeTransactionItem.fee_type_id, FeeType.type_name)
+        )
+    ).all()
+    receipt = (
+        await db.execute(select(FeeReceipt).where(FeeReceipt.fee_transaction_id == txn.id).limit(1))
+    ).scalars().first()
+
+    return FeePaymentResponse(
+        transaction_id=txn.id,
+        transaction_number=txn.transaction_number,
+        receipt_id=receipt.id if receipt else txn.id,
+        receipt_number=receipt.receipt_number if receipt else "",
+        amount_paid=txn.total_amount,
+        payment_method=txn.payment_method,
+        sms_status="skipped",
+        items_paid=[
+            FeePaymentItemPaid(fee_type_id=fee_type_id, fee_type_name=name, amount_paid=amount)
+            for fee_type_id, name, amount in rows
+        ],
     )
 
 

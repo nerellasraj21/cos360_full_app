@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import desc, func, literal_column, or_, select
+from sqlalchemy import Date, cast, desc, func, literal_column, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -59,8 +59,13 @@ class ExpenseReportingService(BaseExpenseService):
         category_query = self._apply_filters_to_query(category_query, filters, user_department_id, user_role)
 
         # Get total for percentage calculation
-        total_query = select(func.sum(ExpenseTransaction.amount)).select_from(
-            self._apply_filters_to_query(select(ExpenseTransaction), filters, user_department_id, user_role).subquery()
+        total_query = self._apply_filters_to_query(
+            select(func.sum(ExpenseTransaction.amount))
+            .select_from(ExpenseTransaction)
+            .join(ExpenseType, ExpenseTransaction.expense_type_id == ExpenseType.id),
+            filters,
+            user_department_id,
+            user_role,
         )
 
         # Execute queries
@@ -123,8 +128,13 @@ class ExpenseReportingService(BaseExpenseService):
         type_query = self._apply_filters_to_query(type_query, filters, user_department_id, user_role)
 
         # Get total amount
-        total_query = select(func.sum(ExpenseTransaction.amount)).select_from(
-            self._apply_filters_to_query(select(ExpenseTransaction), filters, user_department_id, user_role).subquery()
+        total_query = self._apply_filters_to_query(
+            select(func.sum(ExpenseTransaction.amount))
+            .select_from(ExpenseTransaction)
+            .join(ExpenseType, ExpenseTransaction.expense_type_id == ExpenseType.id),
+            filters,
+            user_department_id,
+            user_role,
         )
 
         # Execute queries
@@ -163,7 +173,7 @@ class ExpenseReportingService(BaseExpenseService):
         """Generate time-based trend report"""
 
         # Build monthly trend query
-        month = func.date_trunc(literal_column("'month'"), ExpenseTransaction.transaction_date)
+        month = cast(func.date_trunc(literal_column("'month'"), ExpenseTransaction.transaction_date), Date)
         trend_query = (
             select(
                 month.label("month"),

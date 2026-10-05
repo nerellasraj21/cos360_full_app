@@ -190,7 +190,7 @@ async def validate_academic_year_exists(db: AsyncSession, academic_year_id: UUID
 
 
 async def check_mapping_unique(
-    db: AsyncSession, class_id: UUID, fee_type_id: UUID, academic_year_id: UUID, exclude_id: UUID | None = None
+    db: AsyncSession, class_id: UUID, fee_type_id: UUID, academic_year_id: UUID, exclude_id: UUID | str | None = None
 ):
     """Check if mapping is unique for class, fee type, and academic year"""
     try:
@@ -203,7 +203,7 @@ async def check_mapping_unique(
         )
 
         if exclude_id:
-            exclude_uuid = UUID(exclude_id)
+            exclude_uuid = exclude_id if isinstance(exclude_id, UUID) else UUID(exclude_id)
             query = query.where(FeeClassMappingModel.id != exclude_uuid)
 
         result = await db.execute(query)
@@ -300,7 +300,7 @@ async def create_fee_class_mapping(db: AsyncSession, mapping_data: FeeClassMappi
         log.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred while creating fee class mapping: {str(e)}",
+            detail="An error occurred while creating fee class mapping",
         )
 
 
@@ -352,7 +352,7 @@ async def get_fee_class_mapping_by_id(db: AsyncSession, mapping_id: UUID):
 async def get_all_fee_class_mappings(
     db: AsyncSession,
     class_id: int | None = None,
-    fee_type_id: str | None = None,
+    fee_type_id: UUID | str | None = None,
     all_by_default: bool | None = None,
     limit: int = 50,
     offset: int = 0,
@@ -372,7 +372,7 @@ async def get_all_fee_class_mappings(
 
         if fee_type_id is not None:
             try:
-                fee_type_uuid = UUID(fee_type_id)
+                fee_type_uuid = fee_type_id if isinstance(fee_type_id, UUID) else UUID(fee_type_id)
                 query = query.where(FeeClassMappingModel.fee_type_id == fee_type_uuid)
             except ValueError:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid fee type ID format")
@@ -450,7 +450,7 @@ async def update_fee_class_mapping(db: AsyncSession, mapping_id: UUID, mapping_d
         ):
 
             new_class_id = mapping_data.class_id or db_mapping.class_id
-            new_fee_type_id = mapping_data.fee_type_id or str(db_mapping.fee_type_id)
+            new_fee_type_id = mapping_data.fee_type_id or db_mapping.fee_type_id
             new_academic_year_id = mapping_data.academic_year_id or db_mapping.academic_year_id
 
             await check_mapping_unique(db, new_class_id, new_fee_type_id, new_academic_year_id, exclude_id=mapping_id)
@@ -462,7 +462,7 @@ async def update_fee_class_mapping(db: AsyncSession, mapping_id: UUID, mapping_d
         if mapping_data.class_id is not None:
             db_mapping.class_id = mapping_data.class_id
         if mapping_data.fee_type_id is not None:
-            db_mapping.fee_type_id = UUID(mapping_data.fee_type_id)
+            db_mapping.fee_type_id = mapping_data.fee_type_id
         if mapping_data.total_fee is not None:
             db_mapping.total_fee = mapping_data.total_fee
         if mapping_data.academic_year_id is not None:

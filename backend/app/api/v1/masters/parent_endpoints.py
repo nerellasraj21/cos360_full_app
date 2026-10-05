@@ -34,7 +34,8 @@ async def create_parent_profile(
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, "parent_management", "create")
 
-    return await create_parent(parent_data, db)
+    created = await create_parent(parent_data, db)
+    return ParentOut.from_orm_with_students(created)
 
 
 @router.get("/search", response_model=ParentListResponse)

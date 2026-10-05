@@ -123,7 +123,8 @@ async def get_active(
     role = current_user.get("role")
     await check_role_plan_permission_with_error(db, request, role, "academic_years", "read")
 
-    return await academic_year_service.get_all_academic_years(db, skip=0, limit=100, active_only=True)
+    page = await academic_year_service.get_all_academic_years(db, skip=0, limit=100, active_only=True)
+    return page["items"]
 
 
 @router.get("/{academic_year_id}", response_model=AcademicYearRead)

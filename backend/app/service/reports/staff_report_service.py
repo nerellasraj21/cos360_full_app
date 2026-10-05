@@ -67,7 +67,7 @@ class StaffReportService(BaseReportService):
                     "email": row.email,
                     "phone": row.phone,
                     "address": row.address,
-                    "gender": row.gender,
+                    "gender": getattr(row.gender, "value", row.gender),
                     "is_active": row.is_active,
                     "academic_year": "N/A",
                 }
@@ -116,7 +116,7 @@ class StaffReportService(BaseReportService):
             "phone": row.phone,
             "address": row.address,
             "date_of_birth": row.date_of_birth.isoformat() if row.date_of_birth else None,
-            "gender": row.gender,
+            "gender": getattr(row.gender, "value", row.gender),
             "qualification": row.qualification,
             "experience_years": row.experience_years,
             "joining_date": row.joining_date.isoformat() if row.joining_date else None,

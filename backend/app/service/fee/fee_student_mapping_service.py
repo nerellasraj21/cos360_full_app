@@ -8,6 +8,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.fee.fee_class_map_term_amount_model import FeeClassMappingTermAmount
+from app.models.fee.fee_class_mapping_model import FeeClassMapping
 from app.models.fee.fee_student_map_term_amount_model import FeeStudentMapTermAmount as FeeStudentMapTermAmountModel
 from app.models.fee.fee_student_mapping_model import FeeStudentMapping as FeeStudentMappingModel
 from app.models.fee.fee_term_dates_model import FeeTermDates
@@ -157,7 +159,28 @@ async def create_term_amounts(db: AsyncSession, fee_student_mapping_id: UUID, to
             detail=f"Data inconsistency: Fee term has {fee_term.number_of_terms} terms but {len(term_dates)} dates",
         )
 
-    # Calculate amount per term (equal split by default)
+    class_amounts = {}
+    student_mapping = (
+        await db.execute(select(FeeStudentMappingModel).where(FeeStudentMappingModel.id == fee_student_mapping_id))
+    ).scalar_one_or_none()
+    if student_mapping:
+        rows = (
+            await db.execute(
+                select(FeeClassMappingTermAmount.term_date_id, FeeClassMappingTermAmount.term_amount)
+                .join(FeeClassMapping, FeeClassMapping.id == FeeClassMappingTermAmount.fee_class_mapping_id)
+                .where(
+                    FeeClassMapping.class_id == student_mapping.class_id,
+                    FeeClassMapping.fee_type_id == fee_type_id,
+                    FeeClassMapping.academic_year_id == student_mapping.academic_year_id,
+                )
+            )
+        ).all()
+        class_amounts = {row.term_date_id: Decimal(str(row.term_amount)) for row in rows}
+    use_class_amounts = (
+        {td.id for td in term_dates} == set(class_amounts) and sum(class_amounts.values(), Decimal("0")) == total_fee
+    )
+
+    # Calculate amount per term (equal split unless the class mapping defines per-term amounts)
     amount_per_term = total_fee / len(term_dates)
 
     # CRITICAL FIX: Create term amounts for EACH TERM DATE
@@ -170,7 +193,7 @@ async def create_term_amounts(db: AsyncSession, fee_student_mapping_id: UUID, to
             fee_student_map_id=fee_student_mapping_id,
             term_id=term_date.term_id,  # ✅ FIXED: Extract from FeeTermDates (NOT NULL constraint)
             term_date_id=term_date.id,  # ✅ The specific term date
-            term_amount=amount_per_term,
+            term_amount=class_amounts[term_date.id] if use_class_amounts else amount_per_term,
         )
         db.add(term_amount)
         term_amounts.append(term_amount)

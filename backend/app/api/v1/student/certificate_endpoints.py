@@ -37,6 +37,7 @@ from app.service.student.student_certificate_service import (
     update_certificate,
 )
 from app.tools.enhanced_permissions import check_user_resource_access
+from app.tools.ownership import ensure_student_access
 from app.tools.simple_permissions import (
     check_role_plan_permission_with_error,
     get_current_user_token,
@@ -219,6 +220,8 @@ async def list_child_certificates(
         )
         if not result.scalar_one_or_none():
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not the parent of this student")
+    elif role == "Student":
+        await ensure_student_access(db, role, user_id, student_id, "You can only view your own certificates")
 
     return await list_certificates(
         db=db,
@@ -495,6 +498,8 @@ async def list_child_received_documents(
         )
         if not result.scalar_one_or_none():
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not the parent of this student")
+    elif role == "Student":
+        await ensure_student_access(db, role, user_id, student_id, "You can only view your own certificates")
 
     return await list_certificates(
         db=db,
@@ -708,13 +713,17 @@ async def get_certificate_details(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
 
-    # Permission check
-    read_action = "read_own" if role == "Student" else "read"
+    read_action = {"Student": "read_own", "Parent": "read_related"}.get(role, "read")
     await check_role_plan_permission_with_error(
         db, request, role, "student_certificates", read_action
     )
 
-    return await get_certificate_by_id(db=db, certificate_id=certificate_id)
+    certificate = await get_certificate_by_id(db=db, certificate_id=certificate_id)
+    if role in ("Student", "Parent"):
+        await ensure_student_access(
+            db, role, UUID(current_user.get("sub")), certificate.student_id, "You do not have permission to view this certificate"
+        )
+    return certificate
 
 
 # ============================================================================
@@ -828,8 +837,7 @@ async def download_certificate_endpoint(
     user_id = UUID(current_user.get("sub"))
     tenant_id = get_tenant_id_from_request(request)
 
-    # Permission check
-    read_action = "read_own" if role == "Student" else "read"
+    read_action = {"Student": "read_own", "Parent": "read_related"}.get(role, "read")
     await check_role_plan_permission_with_error(
         db, request, role, "student_certificates", read_action
     )

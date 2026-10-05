@@ -179,7 +179,8 @@ async def parse_and_bulk_create_staff_enrollments(file_bytes: bytes, db: AsyncSe
     try:
         wb = openpyxl.load_workbook(BytesIO(file_bytes), data_only=True)
     except Exception as e:
-        raise HTTPException(400, detail=f"Invalid Excel file: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(400, detail="Invalid Excel file")
 
     ws = wb[SHEET_NAME] if SHEET_NAME in wb.sheetnames else wb.active
 

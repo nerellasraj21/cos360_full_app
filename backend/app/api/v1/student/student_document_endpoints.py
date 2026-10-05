@@ -13,6 +13,7 @@ from app.service.student.student_document_service import (
     update_document_file,
     upload_document,
 )
+from app.tools.ownership import ensure_student_access
 from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
 
 router = APIRouter(prefix="/students/documents", tags=["Student/Student Documents"])
@@ -52,6 +53,7 @@ async def get_documents(student_id: UUID, request: Request, db: AsyncSession = D
 
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, "student_documents", "list")
+    await ensure_student_access(db, role, UUID(current_user.get("sub")), student_id)
 
     return await get_documents_by_student(student_id, db, request)
 
@@ -64,6 +66,7 @@ async def get_all_documents(student_id: UUID, request: Request, db: AsyncSession
     role = current_user.get("role")
 
     await check_role_plan_permission_with_error(db, request, role, "student_documents", "list")
+    await ensure_student_access(db, role, UUID(current_user.get("sub")), student_id)
 
     return await get_all_documents_for_student(student_id, db, request)
 
@@ -78,7 +81,9 @@ async def get_document(document_id: UUID, request: Request, db: AsyncSession = D
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, "student_documents", "read")
 
-    return await get_document_by_id(document_id, db, request)
+    document = await get_document_by_id(document_id, db, request)
+    await ensure_student_access(db, role, UUID(current_user.get("sub")), document.student_id)
+    return document
 
 
 # Update document

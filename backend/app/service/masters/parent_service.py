@@ -1,26 +1,76 @@
+import logging
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
+from app.models.auth.role_model import Role
+from app.models.auth.user_model import User
 from app.models.masters.parent_model import Parent
 from app.models.masters.student_parent_association_model import StudentParentLink
 from app.schemas.masters.parent_schema import ParentCreate, ParentUpdate
+from app.tools.password_util import hash_password
+
+logger = logging.getLogger(__name__)
 
 
 async def create_parent(parent_data: ParentCreate, db: AsyncSession) -> Parent:
+    email = (parent_data.email or "").strip() or None
+    phone = (parent_data.phone or "").strip() or None
+    username = email or phone
+    if not username:
+        raise HTTPException(status_code=400, detail="Either email or phone is required to create a parent")
+
+    role_result = await db.execute(select(Role).where(Role.name == "Parent"))
+    parent_role = role_result.scalars().first()
+    if not parent_role:
+        raise HTTPException(status_code=404, detail="Role 'Parent' not found")
+
+    conditions = [User.username == username]
+    if email:
+        conditions.append(User.email == email)
+    existing = await db.execute(select(User.id).where(or_(*conditions)).limit(1))
+    if existing.scalars().first():
+        raise HTTPException(status_code=409, detail="A user with this email or phone already exists")
+
     try:
-        new_parent = Parent(**parent_data.dict())
+        new_user = User(
+            username=username,
+            email=email,
+            password_hash=hash_password("parent@123"),
+            is_active=True,
+            is_first_login=True,
+            role_id=parent_role.id,
+        )
+        db.add(new_user)
+        await db.flush()
+
+        payload = parent_data.model_dump()
+        payload["email"] = email
+        payload["phone"] = phone
+        new_parent = Parent(**payload, user_id=new_user.id)
         db.add(new_parent)
+        await db.flush()
+
+        result = await db.execute(
+            select(Parent)
+            .options(selectinload(Parent.student_links).selectinload(StudentParentLink.student))
+            .where(Parent.id == new_parent.id)
+        )
+        created = result.scalar_one()
         await db.commit()
-        await db.refresh(new_parent)
-        return new_parent
+        return created
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="A user with this email or phone already exists")
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error creating parent: {str(e)}")
+        logger.error("Error creating parent: %s", e)
+        raise HTTPException(status_code=500, detail="Could not create parent")
 
 
 async def get_parent_by_id(parent_id: UUID, db: AsyncSession) -> Parent:
@@ -86,11 +136,11 @@ async def search_parents(
     stmt = select(Parent).options(selectinload(Parent.student_links).selectinload(StudentParentLink.student))
 
     if filters:
-        stmt = stmt.where(or_(*filters))
+        stmt = stmt.where(and_(*filters))
 
     count_stmt = select(func.count(Parent.id))
     if filters:
-        count_stmt = count_stmt.where(or_(*filters))
+        count_stmt = count_stmt.where(and_(*filters))
 
     count_result = await db.execute(count_stmt)
     total_count = count_result.scalar()
@@ -123,7 +173,8 @@ async def update_parent(parent_id: UUID, parent_data: ParentUpdate, db: AsyncSes
         return result.scalar_one()
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error updating parent: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error updating parent")
 
 
 async def delete_parent(parent_id: UUID, db: AsyncSession):
@@ -137,4 +188,5 @@ async def delete_parent(parent_id: UUID, db: AsyncSession):
         return {"detail": "Parent deleted successfully"}
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error deleting parent: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error deleting parent")

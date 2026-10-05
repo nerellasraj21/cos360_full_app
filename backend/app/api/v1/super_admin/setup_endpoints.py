@@ -1,9 +1,13 @@
+import logging
 import bcrypt
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import text
 
 from app.config import settings
 from app.db.session import get_public_db
+
+logger = logging.getLogger(__name__)
+
 
 router = APIRouter(prefix="/super_admin/setup", tags=["Super Admin/Setup"])
 
@@ -174,9 +178,10 @@ async def initialize_super_admin_system():
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Unhandled error: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to initialize Super Admin system: {str(e)}",
+            detail="Failed to initialize Super Admin system",
         )
 
 
@@ -215,6 +220,7 @@ async def check_super_admin_status():
             }
 
     except Exception as e:
+        logger.error("Unhandled error: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to check Super Admin status: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to check Super Admin status"
         )

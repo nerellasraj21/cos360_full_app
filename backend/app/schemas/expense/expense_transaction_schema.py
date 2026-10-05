@@ -38,6 +38,7 @@ class ExpenseTransactionUpdate(BaseModel):
     vendor_name: str | None = Field(None, max_length=200, description="Vendor name")
     department_id: UUID | None = Field(None, description="Department ID for scoping")
     academic_year_id: UUID | None = Field(None, description="Academic year for year-wise tracking")
+    requires_approval_override: bool | None = Field(None, description="Override approval requirement")
 
 
 class ExpenseTransactionApproval(BaseModel):

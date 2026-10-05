@@ -1,7 +1,7 @@
 # app/api/v1/exam/audit_endpoints.py
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db
@@ -23,5 +23,7 @@ async def get_exam_audit_log(
     """Get paginated audit log for an exam (Admin only)."""
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
+    if role in ("Student", "Parent"):
+        raise HTTPException(status_code=403, detail="Not allowed for this role")
     await check_role_plan_permission_with_error(db, request, role, "exams", "read")
     return await get_audit_log(db, exam_id, page=page, page_size=page_size)

@@ -109,7 +109,7 @@ async def get_all_tenants(
     except Exception as e:
         logger.error(f"Error getting tenants: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to retrieve tenants: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve tenants"
         )
 
 
@@ -223,7 +223,7 @@ async def activate_tenant(
     except Exception as e:
         logger.error(f"Error toggling tenant status: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update tenant status: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update tenant status"
         )
 
 
@@ -320,5 +320,5 @@ async def get_usage_statistics(request: Request, current_super_admin: dict = Dep
     except Exception as e:
         logger.error(f"Error getting usage statistics: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to retrieve usage statistics: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve usage statistics"
         )

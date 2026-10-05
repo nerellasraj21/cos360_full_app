@@ -98,7 +98,8 @@ async def get_categories(request: Request, db: AsyncSession = Depends(get_tenant
     # Import here to avoid circular import
     from app.service.masters.subject_category_service import get_all_subject_categories
 
-    return await get_all_subject_categories(db)
+    result = await get_all_subject_categories(db, skip=0, limit=1000)
+    return result["items"]
 
 
 @router.get("/by-academic-year/{year_id}", response_model=list[SubjectRead])
@@ -110,7 +111,8 @@ async def get_by_academic_year(request: Request, year_id: UUID, db: AsyncSession
     # Multi-layer permission check: Role + Plan validation
     await check_role_plan_permission_with_error(db, request, role, "subjects", "list")
 
-    return await get_all_subjects(db, skip=0, limit=1000, active_only=True, academic_year_id=year_id)
+    result = await get_all_subjects(db, skip=0, limit=1000, active_only=True, academic_year_id=year_id)
+    return result["items"]
 
 
 @router.get("/{subject_id}", response_model=SubjectRead)

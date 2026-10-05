@@ -9,7 +9,7 @@ class CertificateUploadRequest(BaseModel):
     student_id: UUID
     certificate_type_id: UUID
     issue_date: date = Field(default_factory=date.today)
-    remarks: str | None = Field(None, max_length=500)
+    remarks: str | None = Field(None, max_length=255)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -18,7 +18,7 @@ class ReceivedDocumentUploadRequest(BaseModel):
     """Request model for uploading a received document (Category 1 — Admin only)"""
     student_id: UUID
     certificate_type_id: UUID
-    remarks: str | None = Field(None, max_length=500)
+    remarks: str | None = Field(None, max_length=255)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -28,7 +28,7 @@ class IssuedCertificateCreateRequest(BaseModel):
     student_id: UUID
     certificate_type_id: UUID
     issue_date: date
-    remarks: str | None = Field(None, max_length=500)
+    remarks: str | None = Field(None, max_length=255)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -64,7 +64,7 @@ class CertificateUpdateRequest(BaseModel):
     """Request model for updating certificate metadata (PATCH)"""
     certificate_type_id: UUID | None = None
     issue_date: date | None = None
-    remarks: str | None = Field(None, max_length=500)
+    remarks: str | None = Field(None, max_length=255)
 
     model_config = ConfigDict(from_attributes=True)
 

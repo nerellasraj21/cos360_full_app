@@ -24,138 +24,6 @@ router = APIRouter(prefix="/admin/role-mgmt", tags=["Tenant Admin/Role Managemen
 logger = logging.getLogger("tenant_admin.permissions")
 
 
-@router.get("/test/")
-async def test_admin_endpoint(request: Request, db: AsyncSession = Depends(get_tenant_db)):
-    """Test endpoint to confirm admin router is working and show current schema"""
-    try:
-        # Get current schema
-        schema_result = await db.execute(text("SELECT current_schema()"))
-        current_schema = schema_result.scalar()
-
-        # Get client name from request
-        client_name = getattr(request.state, "client_name", "unknown")
-
-        # Test if roles table has the correct columns
-        columns_result = await db.execute(text("""
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_name = 'roles'
-            AND table_schema = current_schema()
-            ORDER BY column_name
-        """))
-        columns = [row[0] for row in columns_result.fetchall()]
-
-        return {
-            "message": "Admin endpoint works!",
-            "path": "/api/v1/admin/permissions/test/",
-            "client_name": client_name,
-            "current_schema": current_schema,
-            "roles_table_columns": columns,
-        }
-    except Exception as e:
-        return {
-            "message": "Admin endpoint works but DB error!",
-            "path": "/api/v1/admin/permissions/test/",
-            "error": str(e),
-        }
-
-
-@router.get("/debug-roles/")
-async def debug_get_tenant_roles(request: Request, db: AsyncSession = Depends(get_tenant_db)):
-    """
-    DEBUG VERSION: Tenant Admin: View all roles in tenant - WITH DETAILED DEBUGGING
-    """
-
-    print("\n" + "=" * 80)
-    print("DEBUG STEP 1: ENDPOINT ENTRY - debug_get_tenant_roles() called")
-    print(f"DEBUG Request URL: {request.url}")
-    print(f"DEBUG Request headers: {dict(request.headers)}")
-
-    try:
-        # Check client name from request state
-        client_name = getattr(request.state, "client_name", "NOT_SET")
-        print(f"DEBUG STEP 2: CLIENT NAME from request.state = '{client_name}'")
-
-        # Check current schema
-        schema_check = await db.execute(text("SELECT current_schema()"))
-        current_schema = schema_check.scalar()
-        print(f"DEBUG STEP 3: CURRENT DATABASE SCHEMA = '{current_schema}'")
-
-        # Check if roles table exists and its structure
-        table_check = await db.execute(text("""
-            SELECT column_name, data_type
-            FROM information_schema.columns
-            WHERE table_name = 'roles' AND table_schema = current_schema()
-            ORDER BY column_name
-        """))
-        columns = table_check.fetchall()
-        print(f"DEBUG STEP 4: ROLES TABLE COLUMNS IN '{current_schema}':")
-        if columns:
-            for col in columns:
-                print(f"DEBUG   - {col[0]}: {col[1]}")
-        else:
-            print(f"DEBUG   - NO ROLES TABLE FOUND IN SCHEMA '{current_schema}'")
-            return {"error": "No roles table found", "schema": current_schema}
-
-        print("DEBUG STEP 5: ATTEMPTING AUTHENTICATION...")
-        # Authentication and authorization
-        current_user = await get_current_user_token(request)
-        role = current_user.get("role")
-        print(f"DEBUG   - Authentication SUCCESS: user role = '{role}'")
-        print(f"DEBUG   - Full user data: {current_user}")
-
-        print("DEBUG STEP 6: PERMISSION CHECK DISABLED - PROCEEDING TO DATABASE QUERY")
-
-        print("DEBUG STEP 7: EXECUTING ROLES QUERY...")
-        print("DEBUG   Query: SELECT id, name, description, is_system_role, is_custom_role FROM roles ORDER BY name")
-
-        roles_result = await db.execute(text("""
-            SELECT id, name, description, is_system_role, is_custom_role
-            FROM roles
-            ORDER BY name
-        """))
-
-        roles = roles_result.fetchall()
-        print(f"DEBUG STEP 8: QUERY SUCCESS - Retrieved {len(roles)} roles")
-
-        role_data = []
-        for i, role_record in enumerate(roles):
-            print(f"DEBUG   Role {i+1}: {role_record[1]} (system: {role_record[3]}, custom: {role_record[4]})")
-
-            role_data.append(
-                {
-                    "id": str(role_record[0]),
-                    "name": role_record[1],
-                    "description": role_record[2],
-                    "is_system_role": role_record[3],
-                    "is_custom_role": role_record[4],
-                }
-            )
-
-        print("DEBUG STEP 9: BUILDING RESPONSE...")
-        response_data = {
-            "success": True,
-            "message": f"Retrieved {len(role_data)} roles for tenant",
-            "roles": role_data,
-            "debug_info": {
-                "client_name": client_name,
-                "current_schema": current_schema,
-                "total_roles": len(role_data),
-                "columns_found": [col[0] for col in columns],
-            },
-        }
-
-        print("DEBUG STEP 10: RETURNING RESPONSE")
-        print("=" * 80 + "\n")
-        return response_data
-
-    except Exception as e:
-        print(f"DEBUG ERROR at some step: {str(e)}")
-        print(f"DEBUG Error type: {type(e)}")
-        print("=" * 80 + "\n")
-        return {"error": str(e), "error_type": str(type(e))}
-
-
 @router.get("/roles/")
 async def get_tenant_roles(request: Request, db: AsyncSession = Depends(get_tenant_db)):
     """
@@ -171,15 +39,11 @@ async def get_tenant_roles(request: Request, db: AsyncSession = Depends(get_tena
     """
     # Authentication and authorization
     current_user = await get_current_user_token(request)
-    current_user.get("role")
+    role = current_user.get("role")
 
-    # Permission check - only Admin can manage roles
-    # TEMPORARILY DISABLED FOR DEBUGGING: await check_role_plan_permission_with_error(db, request, role, 'role_management', 'list')
+    await check_role_plan_permission_with_error(db, request, role, "role_management", "list")
 
     try:
-        # Get all roles in tenant schema - DEBUGGING: If you see this error it means this function WAS called
-        print("DEBUG: NEW ADMIN ENDPOINT get_tenant_roles() CALLED")
-        logger.error("DEBUG: NEW ADMIN ENDPOINT get_tenant_roles() CALLED")
         roles_result = await db.execute(text("""
             SELECT id, name, description, is_system_role, is_custom_role
             FROM roles
@@ -224,7 +88,7 @@ async def get_tenant_roles(request: Request, db: AsyncSession = Depends(get_tena
     except Exception as e:
         logger.error(f"Error getting tenant roles: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to retrieve roles: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve roles"
         )
 
 
@@ -305,7 +169,7 @@ async def get_role_permissions(role_id: UUID, request: Request, db: AsyncSession
     except Exception as e:
         logger.error(f"Error getting role permissions: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to retrieve role permissions: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve role permissions"
         )
 
 
@@ -420,7 +284,7 @@ async def update_role_permission(
         await db.rollback()
         logger.error(f"Error updating role permission: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update role permission: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update role permission"
         )
 
 
@@ -528,7 +392,7 @@ async def bulk_update_role_permissions(role_id: UUID, request: Request, db: Asyn
         logger.error(f"Error bulk updating role permissions: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to bulk update role permissions: {str(e)}",
+            detail="Failed to bulk update role permissions",
         )
 
 
@@ -699,7 +563,7 @@ async def create_role(
         await db.rollback()
         logger.error(f"Error creating role: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create role: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create role"
         )
 
 
@@ -850,7 +714,7 @@ async def update_role(
         await db.rollback()
         logger.error(f"Error updating role: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update role: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update role"
         )
 
 
@@ -996,7 +860,7 @@ async def delete_role(
         await db.rollback()
         logger.error(f"Error deleting role: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to delete role: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete role"
         )
 
 
@@ -1075,13 +939,14 @@ async def validate_role_deletion(
         permission_count = permission_count_result.scalar() or 0
 
         # Prepare role data
+        now = datetime.utcnow()
         role_data = RoleRead(
             id=role_record[0],
             name=role_record[1],
             description=role_record[2],
-            is_active=role_record[3],
-            created_at=role_record[4],
-            updated_at=role_record[5],
+            is_active=True,
+            created_at=now,
+            updated_at=now,
             permission_count=permission_count,
             user_count=user_count,
             is_system_role=role_name in system_roles,
@@ -1106,7 +971,7 @@ async def validate_role_deletion(
     except Exception as e:
         logger.error(f"Error validating role deletion: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to validate role deletion: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to validate role deletion"
         )
 
 
@@ -1230,5 +1095,5 @@ async def apply_permission_template(
         await db.rollback()
         logger.error(f"Error applying permission template: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to apply permission template: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to apply permission template"
         )

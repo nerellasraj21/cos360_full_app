@@ -136,6 +136,7 @@ class StaffEnrollmentUpdate(BaseModel):
 class StaffEnrollmentOut(StaffEnrollmentBase):
     id: UUID
     user_id: UUID
+    email: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     qualifications: List[StaffQualificationOut] = []

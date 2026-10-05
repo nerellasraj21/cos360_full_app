@@ -6,7 +6,8 @@ from datetime import datetime
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tenant_session import get_tenant_db, get_tenant_id_from_request
@@ -27,10 +28,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _parse_date_from(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="date_from must be an ISO date or datetime")
+
+
 def _parse_date_to(value: str | None) -> datetime | None:
     if not value:
         return None
-    parsed = datetime.fromisoformat(value)
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="date_to must be an ISO date or datetime")
     if len(value) == 10:
         return parsed.replace(hour=23, minute=59, second=59, microsecond=999999)
     return parsed
@@ -48,10 +61,10 @@ async def get_fee_collection_summary(
     date_to: str = None,
     class_id: UUID = None,
     section_id: UUID = None,
-    page: int = 1,
-    page_size: int = 100,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=1000),
     sort_by: str = None,
-    sort_order: str = "desc",
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -83,9 +96,7 @@ async def get_fee_collection_summary(
         service = FeeReportService(db, user_id, tenant_id)
 
         # Parse dates
-        from datetime import datetime
-
-        parsed_date_from = datetime.fromisoformat(date_from) if date_from else None
+        parsed_date_from = _parse_date_from(date_from)
         parsed_date_to = _parse_date_to(date_to)
 
         # Create filters
@@ -122,7 +133,7 @@ async def get_fee_collection_summary(
 
         logger.error(f"Error in fee collection summary: {str(e)}")
         logger.error(f"Full traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/collection-summary/stats", response_model=FeeCollectionSummary)
@@ -163,9 +174,7 @@ async def get_fee_collection_summary_stats(
         service = FeeReportService(db, user_id, tenant_id)
 
         # Parse dates
-        from datetime import datetime
-
-        parsed_date_from = datetime.fromisoformat(date_from) if date_from else None
+        parsed_date_from = _parse_date_from(date_from)
         parsed_date_to = _parse_date_to(date_to)
 
         # Create filters
@@ -205,10 +214,10 @@ async def get_pending_fees(
     days_overdue: int = None,
     amount_min: float = None,
     amount_max: float = None,
-    page: int = 1,
-    page_size: int = 100,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=1000),
     sort_by: str = None,
-    sort_order: str = "asc",
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -341,10 +350,10 @@ async def get_fee_structure(
     fee_category_id: UUID = None,
     fee_type_id: UUID = None,
     class_id: UUID = None,
-    page: int = 1,
-    page_size: int = 100,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=1000),
     sort_by: str = None,
-    sort_order: str = "asc",
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     db: AsyncSession = Depends(get_tenant_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -533,6 +542,8 @@ async def export_fee_report(
 
     except HTTPException:
         raise
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=e.errors(include_url=False, include_context=False, include_input=False))
     except Exception as e:
         logger.error(f"Error in fee report export: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")

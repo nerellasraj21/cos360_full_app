@@ -117,4 +117,4 @@ async def get_trip_types_dropdown(db: AsyncSession, active_only: bool = True):
         return [{"id": tt.id, "type_name": tt.type_name} for tt in trip_types]
     except Exception as e:
         log.error(f"Error fetching trip types dropdown: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Fetching trip types dropdown failed: {str(e)}")
+        raise HTTPException(status_code=400, detail="Fetching trip types dropdown failed")

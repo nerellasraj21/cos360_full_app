@@ -1,7 +1,13 @@
 from datetime import time
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+
+def _whole_number_fee(value):
+    if value is not None and value != int(value):
+        raise ValueError("fees must be a whole number")
+    return value
 
 
 class RouteStopBase(BaseModel):
@@ -16,7 +22,10 @@ class RouteStopBase(BaseModel):
 
 
 class RouteStopCreate(RouteStopBase):
-    pass
+    @field_validator("fees")
+    @classmethod
+    def fees_whole_number(cls, value):
+        return _whole_number_fee(value)
 
 
 class RouteStopUpdate(BaseModel):
@@ -30,6 +39,11 @@ class RouteStopUpdate(BaseModel):
     is_active: bool | None = None
 
     model_config = {"from_attributes": True}
+
+    @field_validator("fees")
+    @classmethod
+    def fees_whole_number(cls, value):
+        return _whole_number_fee(value)
 
 
 class RouteStopOut(RouteStopBase):

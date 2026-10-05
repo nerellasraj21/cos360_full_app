@@ -68,8 +68,8 @@ async def _check_overlap(
     if exclude_id:
         conditions.append(TransportPricing.id != exclude_id)
 
-    result = await db.execute(select(TransportPricing).where(and_(*conditions)))
-    return result.scalar_one_or_none()
+    result = await db.execute(select(TransportPricing).where(and_(*conditions)).limit(1))
+    return result.scalars().first()
 
 
 async def add_transport_pricing(data: TransportPricingCreate, db: AsyncSession):

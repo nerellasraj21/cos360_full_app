@@ -32,7 +32,7 @@ async def grant_mark_permission(
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
     await check_role_plan_permission_with_error(db, request, role, "exams", "update")
-    user_id = uuid.UUID(current_user.get("id"))
+    user_id = uuid.UUID(current_user.get("sub"))
     result = await grant_permission(db, str(exam_id), payload, granted_by=user_id)
     await db.commit()
     await db.refresh(result)

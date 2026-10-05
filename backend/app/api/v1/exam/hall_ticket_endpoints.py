@@ -35,6 +35,7 @@ from app.service.exam.hall_ticket_service import (
 )
 from app.tasks.exam.hall_ticket_pdf import generate_all_hall_tickets_zip, generate_hall_ticket_pdf
 from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
+from app.tools.ownership import ensure_student_access
 
 router = APIRouter(prefix="/exams", tags=["Hall Tickets"])
 
@@ -88,6 +89,8 @@ async def list_eligible_students(
     """List students who are eligible for a hall ticket."""
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
+    if role in ("Student", "Parent"):
+        raise HTTPException(status_code=403, detail="Not allowed for this role")
     await check_role_plan_permission_with_error(db, request, role, "exams", "read")
     return await get_eligible_students(db, exam_id)
 
@@ -101,6 +104,8 @@ async def list_ineligible_students(
     """List students who are NOT eligible for a hall ticket."""
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
+    if role in ("Student", "Parent"):
+        raise HTTPException(status_code=403, detail="Not allowed for this role")
     await check_role_plan_permission_with_error(db, request, role, "exams", "read")
     return await get_ineligible_students(db, exam_id)
 
@@ -180,6 +185,7 @@ async def download_hall_ticket(
     """Download a single student's hall ticket as PDF."""
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
+    await ensure_student_access(db, role, uuid.UUID(current_user.get("sub")), student_id)
     await check_role_plan_permission_with_error(db, request, role, "exams", "read")
 
     pdf_bytes = await generate_hall_ticket_pdf(db, exam_id, student_id)
@@ -199,6 +205,8 @@ async def download_all_hall_tickets(
     """Download all eligible hall tickets as a ZIP file."""
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
+    if role in ("Student", "Parent"):
+        raise HTTPException(status_code=403, detail="Not allowed for this role")
     await check_role_plan_permission_with_error(db, request, role, "exams", "read")
 
     zip_bytes = await generate_all_hall_tickets_zip(db, exam_id)

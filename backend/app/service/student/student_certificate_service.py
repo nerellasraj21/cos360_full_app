@@ -24,8 +24,19 @@ from app.models.student.student_certificate_model import (
 from app.models.student.student_model import Student
 from app.schemas.student.certificate_schema import CertificateRead
 from app.service.student.file_manager import file_manager
+from app.tools.ownership import is_parent_of_student
 
 log = logging.getLogger("student.certificate_service")
+
+REMARKS_MAX_LENGTH = 255
+
+
+def _check_remarks(remarks: str | None) -> None:
+    if remarks is not None and len(remarks) > REMARKS_MAX_LENGTH:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Remarks must be at most {REMARKS_MAX_LENGTH} characters",
+        )
 
 
 # ============================================================================
@@ -106,6 +117,8 @@ async def create_certificate(
         HTTPException: If validation or S3 upload fails
     """
     try:
+        _check_remarks(remarks)
+
         # 1. Validate student exists
         result = await db.execute(select(Student).where(Student.id == student_id))
         student = result.scalar_one_or_none()
@@ -190,7 +203,7 @@ async def create_certificate(
         log.error(f"Error creating certificate: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating certificate: {str(e)}",
+            detail="Error creating certificate",
         )
 
 
@@ -240,7 +253,7 @@ async def get_certificate_by_id(db: AsyncSession, certificate_id: UUID) -> Certi
         log.error(f"Error fetching certificate {certificate_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching certificate: {str(e)}",
+            detail="Error fetching certificate",
         )
 
 
@@ -278,6 +291,8 @@ async def update_certificate(
         HTTPException: If not found or update fails
     """
     try:
+        _check_remarks(remarks)
+
         # 1. Fetch certificate
         result = await db.execute(
             select(CertificateIssue).where(CertificateIssue.id == certificate_id)
@@ -289,6 +304,14 @@ async def update_certificate(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Certificate with id {certificate_id} not found",
             )
+
+        if certificate_type_id is not None:
+            type_exists = await db.execute(select(CertificateType.id).where(CertificateType.id == certificate_type_id))
+            if type_exists.scalar_one_or_none() is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Certificate type with id {certificate_type_id} not found",
+                )
 
         # 2. Handle file replacement if provided
         if file:
@@ -374,7 +397,7 @@ async def update_certificate(
         log.error(f"Error updating certificate {certificate_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating certificate: {str(e)}",
+            detail="Error updating certificate",
         )
 
 
@@ -459,7 +482,7 @@ async def delete_certificate(
         log.error(f"Error deleting certificate {certificate_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting certificate: {str(e)}",
+            detail="Error deleting certificate",
         )
 
 
@@ -522,17 +545,7 @@ async def download_certificate(
                 )
         elif role == "Parent":
             # Parent: Can download child's certificates
-            from app.models.masters.student_parent_association_model import StudentParentLink
-
-            result = await db.execute(
-                select(StudentParentLink)
-                .where(
-                    StudentParentLink.student_id == cert.student_id,
-                    StudentParentLink.parent_id == user_id,
-                )
-            )
-            parent_link = result.scalar_one_or_none()
-            if not parent_link:
+            if not await is_parent_of_student(db, user_id, cert.student_id):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="You do not have permission to download this certificate",
@@ -576,7 +589,7 @@ async def download_certificate(
         log.error(f"Error downloading certificate {certificate_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error generating download link: {str(e)}",
+            detail="Error generating download link",
         )
 
 
@@ -660,7 +673,7 @@ async def list_certificates(
         log.error(f"Error listing certificates: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error listing certificates: {str(e)}",
+            detail="Error listing certificates",
         )
 
 
@@ -733,6 +746,8 @@ async def create_received_document(
     S3 path: {tenant}/received_docs/{student_id}/{uuid}.{ext}
     """
     try:
+        _check_remarks(remarks)
+
         # 1. Validate student exists
         result = await db.execute(select(Student).where(Student.id == student_id))
         student = result.scalar_one_or_none()
@@ -805,7 +820,7 @@ async def create_received_document(
         log.error(f"Error creating received document: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating received document: {str(e)}",
+            detail="Error creating received document",
         )
 
 
@@ -828,6 +843,8 @@ async def create_issued_certificate(
       signature: {tenant}/signatures/{student_id}/{uuid}.{ext}  (optional, .png/.jpg/.jpeg max 2 MB)
     """
     try:
+        _check_remarks(remarks)
+
         # 1. Validate student
         result = await db.execute(select(Student).where(Student.id == student_id))
         student = result.scalar_one_or_none()
@@ -901,5 +918,5 @@ async def create_issued_certificate(
         log.error(f"Error creating issued certificate: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating issued certificate: {str(e)}",
+            detail="Error creating issued certificate",
         )

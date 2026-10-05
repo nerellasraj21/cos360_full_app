@@ -156,6 +156,8 @@ async def filter_student_attendance(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="You can only access your own attendance records"
         )
+    if user_context.role == "Parent" and student_id not in (user_context.allowed_entity_ids or []):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not the parent of this student")
 
     return await get_attendance_for_student(student_id, db, start_date, end_date, request)
 

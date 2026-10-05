@@ -62,7 +62,7 @@ async def create_caste(db: AsyncSession, caste_data: CasteCreate):
     except Exception as e:
         await db.rollback()
         log.error(f"Error creating caste: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error creating caste: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error creating caste")
 
 
 async def get_caste_by_id(db: AsyncSession, caste_id: UUID):
@@ -80,7 +80,7 @@ async def get_caste_by_id(db: AsyncSession, caste_id: UUID):
         raise
     except Exception as e:
         log.error(f"Error fetching caste {caste_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching caste: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching caste")
 
 
 async def get_all_castes(db: AsyncSession, active_only: bool = False, skip: int = 0, limit: int = 100):
@@ -107,7 +107,7 @@ async def get_all_castes(db: AsyncSession, active_only: bool = False, skip: int 
     except Exception as e:
         log.error(f"Error fetching castes: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching castes: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching castes"
         )
 
 
@@ -126,7 +126,7 @@ async def get_castes_dropdown(db: AsyncSession, active_only: bool = True):
     except Exception as e:
         log.error(f"Error fetching castes dropdown: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching castes dropdown: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching castes dropdown"
         )
 
 
@@ -168,7 +168,7 @@ async def update_caste(db: AsyncSession, caste_id: UUID, caste_update: CasteUpda
     except Exception as e:
         await db.rollback()
         log.error(f"Error updating caste {caste_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error updating caste: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error updating caste")
 
 
 async def delete_caste(db: AsyncSession, caste_id: UUID):
@@ -214,7 +214,7 @@ async def delete_caste(db: AsyncSession, caste_id: UUID):
     except Exception as e:
         await db.rollback()
         log.error(f"Error deleting caste {caste_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error deleting caste: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error deleting caste")
 
 
 # ===== SUB-CASTE CRUD OPERATIONS =====
@@ -250,7 +250,7 @@ async def create_sub_caste(db: AsyncSession, sub_caste_data: SubCasteCreate):
         await db.rollback()
         log.error(f"Error creating sub-caste: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error creating sub-caste: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error creating sub-caste"
         )
 
 
@@ -272,7 +272,7 @@ async def get_sub_caste_by_id(db: AsyncSession, sub_caste_id: UUID):
     except Exception as e:
         log.error(f"Error fetching sub-caste {sub_caste_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching sub-caste: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching sub-caste"
         )
 
 
@@ -295,7 +295,7 @@ async def get_sub_castes_by_caste(db: AsyncSession, caste_id: UUID, active_only:
     except Exception as e:
         log.error(f"Error fetching sub-castes for caste {caste_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching sub-castes: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching sub-castes"
         )
 
 
@@ -314,7 +314,7 @@ async def get_sub_castes_dropdown(db: AsyncSession, caste_id: UUID, active_only:
     except Exception as e:
         log.error(f"Error fetching sub-castes dropdown for caste {caste_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching sub-castes dropdown: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching sub-castes dropdown"
         )
 
 
@@ -353,7 +353,7 @@ async def update_sub_caste(db: AsyncSession, sub_caste_id: UUID, sub_caste_updat
         await db.rollback()
         log.error(f"Error updating sub-caste {sub_caste_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error updating sub-caste: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error updating sub-caste"
         )
 
 
@@ -393,5 +393,5 @@ async def delete_sub_caste(db: AsyncSession, sub_caste_id: UUID):
         await db.rollback()
         log.error(f"Error deleting sub-caste {sub_caste_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error deleting sub-caste: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error deleting sub-caste"
         )

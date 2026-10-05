@@ -37,7 +37,7 @@ async def create_subject_category(db: AsyncSession, data: SubjectCategoryCreate)
     except Exception as e:
         await db.rollback()
         log.error(f"Error creating subject category: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Subject category creation failed: {str(e)}")
+        raise HTTPException(status_code=400, detail="Subject category creation failed")
 
 
 async def get_all_subject_categories(db: AsyncSession, skip: int = 0, limit: int = 50):
@@ -67,7 +67,7 @@ async def get_all_subject_categories(db: AsyncSession, skip: int = 0, limit: int
         }
     except Exception as e:
         log.error(f"Error fetching subject categories: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Fetching subject categories failed: {str(e)}")
+        raise HTTPException(status_code=400, detail="Fetching subject categories failed")
 
 
 @cache_dropdown(ttl=300)  # Cache for 5 minutes
@@ -81,7 +81,7 @@ async def get_subject_categories_dropdown(db: AsyncSession):
         return [{"id": cat.id, "name": cat.name} for cat in categories]
     except Exception as e:
         log.error(f"Error fetching subject categories dropdown: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Fetching subject categories dropdown failed: {str(e)}")
+        raise HTTPException(status_code=400, detail="Fetching subject categories dropdown failed")
 
 
 async def check_subject_category_name_unique(db: AsyncSession, name: str, exclude_id: UUID | None = None):
@@ -118,7 +118,7 @@ async def get_subject_category_by_id(db: AsyncSession, category_id: UUID):
     except Exception as e:
         log.error(f"Error fetching subject category {category_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching subject category: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching subject category"
         )
 
 
@@ -156,7 +156,7 @@ async def update_subject_category(db: AsyncSession, category_id: UUID, category_
         await db.rollback()
         log.error(f"Error updating subject category {category_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error updating subject category: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error updating subject category"
         )
 
 
@@ -195,5 +195,5 @@ async def delete_subject_category(db: AsyncSession, category_id: UUID):
         await db.rollback()
         log.error(f"Error deleting subject category {category_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error deleting subject category: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error deleting subject category"
         )

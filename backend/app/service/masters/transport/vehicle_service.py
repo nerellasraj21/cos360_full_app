@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -6,6 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.masters.transport import Vehicle
 from app.schemas.masters.transport import VehicleCreate, VehicleUpdate
+
+logger = logging.getLogger(__name__)
+
 
 
 async def add_vehicle(data: VehicleCreate, db: AsyncSession):
@@ -90,7 +94,8 @@ async def get_vehicles_dropdown(db: AsyncSession, active_only: bool = True):
         result = await db.execute(query)
         return [{"id": vehicle.id, "name": vehicle.name} for vehicle in result]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving vehicles dropdown: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error retrieving vehicles dropdown")
 
 
 async def get_vehicle_routes(db: AsyncSession, vehicle_id: UUID):
@@ -110,7 +115,8 @@ async def get_vehicle_routes(db: AsyncSession, vehicle_id: UUID):
         result = await db.execute(query)
         return [{"id": route.id, "route_name": route.route_name} for route in result]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving vehicle routes: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error retrieving vehicle routes")
 
 
 async def get_vehicle_trips(db: AsyncSession, vehicle_id: UUID):
@@ -131,7 +137,8 @@ async def get_vehicle_trips(db: AsyncSession, vehicle_id: UUID):
             for trip in result
         ]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving vehicle trips: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error retrieving vehicle trips")
 
 
 async def get_vehicle_route_stops(db: AsyncSession, vehicle_id: UUID, route_id: UUID):
@@ -169,4 +176,5 @@ async def get_vehicle_route_stops(db: AsyncSession, vehicle_id: UUID, route_id: 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving route stops: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error retrieving route stops")

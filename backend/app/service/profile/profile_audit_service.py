@@ -104,6 +104,7 @@ class ProfileAuditService:
         actor_user_id: UUID,
         actor_role: str,
         actor_username: str,
+        profile_type: str = "security",
         request: Request | None = None,
         org_id: UUID | None = None,
         success: bool = True,
@@ -113,7 +114,7 @@ class ProfileAuditService:
             audit_log = ProfileAuditLog(
                 org_id=org_id or user_id,
                 user_id=user_id,
-                profile_type="security",
+                profile_type=profile_type,
                 action="password_change",
                 action_category="security",
                 field_name="password_hash",

@@ -10,6 +10,7 @@ from functools import wraps
 import hashlib
 import json
 import logging
+import re
 from typing import Any
 
 from cachetools import TTLCache
@@ -182,6 +183,10 @@ def invalidate_cache(cache_type: str = "all", pattern: str = None, tenant: str =
         tenant: Tenant id for tenant-specific invalidation
     """
     caches = {"dropdown": dropdown_cache, "query": query_cache, "tenant": tenant_cache}
+
+    if cache_type != "all" and cache_type not in caches:
+        pattern = pattern or re.sub(r"_[0-9a-fA-F-]{36}$", "", cache_type)
+        cache_type = "dropdown"
 
     if cache_type == "all":
         if tenant:

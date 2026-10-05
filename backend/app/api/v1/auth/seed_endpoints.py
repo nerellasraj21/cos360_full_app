@@ -216,7 +216,7 @@ async def seed_permission_data():
     except Exception as e:
         logger.error(f"Error seeding permission data: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to seed permission data: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to seed permission data"
         )
 
 
@@ -276,7 +276,7 @@ async def verify_permission_data():
     except Exception as e:
         logger.error(f"Error verifying permission data: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to verify permission data: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to verify permission data"
         )
 
 
@@ -356,7 +356,7 @@ async def seed_caste_data(request: Request, db: AsyncSession = Depends(get_tenan
         await db.rollback()
         logger.error(f"Error seeding caste data: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to seed caste data: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to seed caste data"
         )
 
 
@@ -502,5 +502,5 @@ async def seed_location_data():
     except Exception as e:
         logger.error(f"Error seeding location data: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to seed location data: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to seed location data"
         )

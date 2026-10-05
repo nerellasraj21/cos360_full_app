@@ -429,7 +429,7 @@ async def get_staff_list(
     return await get_staff_list_by_gender(gender, db)
 
 
-@router.get("/by-designation")
+@router.get("/by-designation", response_model=list[StaffOut])
 async def get_staff_by_designation(
     request: Request,
     designation_id: UUID | None = Query(None, description="Filter staff by designation"),

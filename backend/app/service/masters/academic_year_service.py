@@ -44,8 +44,9 @@ async def create_academic_year(db: AsyncSession, academic_year: AcademicYearCrea
 
         return created_year
     except Exception as e:
+        await db.rollback()
         log.error(f"Error creating academic year: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Academic Year creation failed: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Academic Year creation failed")
 
 
 async def get_academic_year_by_id(db: AsyncSession, academic_year_id: UUID):
@@ -89,7 +90,7 @@ async def get_all_academic_years(db: AsyncSession, skip: int = 0, limit: int = 1
         return result
     except Exception as e:
         log.error(f"Error fetching academic years: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Fetching academic years failed: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fetching academic years failed")
 
 
 async def update_academic_year(db: AsyncSession, academic_year_id: UUID, academic_year_update: AcademicYearUpdate):
@@ -100,10 +101,13 @@ async def update_academic_year(db: AsyncSession, academic_year_id: UUID, academi
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail=f"Academic Year with id {academic_year_id} not found"
             )
-        for var, value in academic_year_update.model_dump(exclude_unset=True).items():
+        update_data = academic_year_update.model_dump(exclude_unset=True)
+        new_start = update_data.get("start_date", db_academic_year.start_date)
+        new_end = update_data.get("end_date", db_academic_year.end_date)
+        if new_end < new_start:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="end_date cannot be before start_date")
+        for var, value in update_data.items():
             setattr(db_academic_year, var, value)
-
-        update_data = academic_year_update.dict(exclude_unset=True)
 
         # If trying to activate this academic year, deactivate others first
         if update_data.get("is_active"):
@@ -121,9 +125,13 @@ async def update_academic_year(db: AsyncSession, academic_year_id: UUID, academi
         invalidate_cache("dropdown", "academic_years")
 
         return updated_year
+    except HTTPException:
+        await db.rollback()
+        raise
     except Exception as e:
+        await db.rollback()
         log.error(f"Error updating academic year: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Academic Year update failed: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Academic Year update failed")
 
 
 async def deactivate_academic_year(db: AsyncSession, academic_year_id: UUID):
@@ -147,10 +155,14 @@ async def deactivate_academic_year(db: AsyncSession, academic_year_id: UUID):
         invalidate_cache("dropdown", "academic_years")
 
         return deactivated_year
+    except HTTPException:
+        await db.rollback()
+        raise
     except Exception as e:
+        await db.rollback()
         log.error(f"Error deactivating academic year: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Academic Year deactivation failed: {str(e)}"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Academic Year deactivation failed"
         )
 
 
@@ -249,7 +261,7 @@ async def delete_academic_year(db: AsyncSession, academic_year_id: UUID):
         raise
     except Exception as e:
         log.error(f"Error deleting academic year: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Academic Year deletion failed: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Academic Year deletion failed")
 
 
 @cache_dropdown(ttl=300)  # Cache for 5 minutes
@@ -267,5 +279,5 @@ async def get_academic_years_dropdown(db: AsyncSession, active_only: bool = True
     except Exception as e:
         log.error(f"Error fetching academic years dropdown: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Fetching academic years dropdown failed: {str(e)}"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Fetching academic years dropdown failed"
         )

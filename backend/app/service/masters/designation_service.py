@@ -1,3 +1,4 @@
+import logging
 import logging as log
 from uuid import UUID
 
@@ -9,6 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.masters.designations_model import Designation
 from app.schemas.masters.designation_schema import DesignationCreate, DesignationUpdate
 from app.tools.cache_utils import cache_dropdown, invalidate_cache
+
+logger = logging.getLogger(__name__)
+
 
 log = log.getLogger("masters.designation_service")
 
@@ -41,11 +45,13 @@ async def create_designation(db: AsyncSession, designation_data: DesignationCrea
         new_designation = Designation(title=designation_data.title)
 
         db.add(new_designation)
+        await db.flush()
+        created = await db.execute(select(Designation).where(Designation.id == new_designation.id))
+        new_designation = created.scalar_one()
         await db.commit()
-        await db.refresh(new_designation)
 
         # Invalidate cache
-        invalidate_cache("designations_dropdown")
+        invalidate_cache("dropdown", "designations_dropdown")
 
         log.info(f"Designation created successfully: {new_designation.id}")
 
@@ -58,6 +64,9 @@ async def create_designation(db: AsyncSession, designation_data: DesignationCrea
             staff_count=0,
         )
 
+    except HTTPException:
+        await db.rollback()
+        raise
     except IntegrityError as e:
         await db.rollback()
         log.error(f"Database integrity error creating designation: {str(e)}")
@@ -66,7 +75,7 @@ async def create_designation(db: AsyncSession, designation_data: DesignationCrea
         await db.rollback()
         log.error(f"Error creating designation: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error creating designation: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error creating designation"
         )
 
 
@@ -109,7 +118,7 @@ async def get_designation_by_id(db: AsyncSession, designation_id: UUID):
     except Exception as e:
         log.error(f"Error fetching designation {designation_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching designation: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching designation"
         )
 
 
@@ -158,7 +167,7 @@ async def get_all_designations(db: AsyncSession, skip: int = 0, limit: int = 100
     except Exception as e:
         log.error(f"Error fetching designations: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching designations: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching designations"
         )
 
 
@@ -173,7 +182,7 @@ async def get_designations_dropdown(db: AsyncSession):
     except Exception as e:
         log.error(f"Error fetching designations dropdown: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching designations dropdown: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching designations dropdown"
         )
 
 
@@ -203,16 +212,17 @@ async def update_designation(db: AsyncSession, designation_id: UUID, designation
         for field, value in update_data.items():
             setattr(designation, field, value)
 
-        await db.commit()
-        await db.refresh(designation)
+        await db.flush()
+        refreshed = await db.execute(select(Designation).where(Designation.id == designation_id))
+        designation = refreshed.scalar_one()
 
-        # Get staff count
         staff_count_query = select(func.count(Staff.id)).where(Staff.designation_id == designation_id)
         staff_count_result = await db.execute(staff_count_query)
         staff_count = staff_count_result.scalar() or 0
+        await db.commit()
 
         # Invalidate cache
-        invalidate_cache("designations_dropdown")
+        invalidate_cache("dropdown", "designations_dropdown")
 
         log.info(f"Designation updated successfully: {designation_id}")
 
@@ -226,6 +236,7 @@ async def update_designation(db: AsyncSession, designation_id: UUID, designation
         )
 
     except HTTPException:
+        await db.rollback()
         raise
     except IntegrityError as e:
         await db.rollback()
@@ -235,7 +246,7 @@ async def update_designation(db: AsyncSession, designation_id: UUID, designation
         await db.rollback()
         log.error(f"Error updating designation {designation_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error updating designation: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error updating designation"
         )
 
 
@@ -269,7 +280,7 @@ async def delete_designation(db: AsyncSession, designation_id: UUID):
         await db.commit()
 
         # Invalidate cache
-        invalidate_cache("designations_dropdown")
+        invalidate_cache("dropdown", "designations_dropdown")
 
         log.info(f"Designation deleted successfully: {designation_id}")
         return {"message": "Designation deleted successfully"}
@@ -280,7 +291,7 @@ async def delete_designation(db: AsyncSession, designation_id: UUID):
         await db.rollback()
         log.error(f"Error deleting designation {designation_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error deleting designation: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error deleting designation"
         )
 
 
@@ -291,4 +302,5 @@ async def get_all_designations_list(db: AsyncSession):
         result = await db.execute(select(Designation))
         return result.scalars().all()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving designations: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error retrieving designations")

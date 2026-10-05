@@ -94,6 +94,8 @@ async def get_export_history(
 
         return response_data
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in export history: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")

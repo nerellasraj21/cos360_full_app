@@ -1,3 +1,4 @@
+import logging
 import os
 import uuid as _uuid
 from datetime import date
@@ -18,6 +19,9 @@ from app.models.masters.staff_model import GenderEnum, Staff, StaffQualification
 from app.schemas.masters.staff_attendance_schema import StaffAttendanceCreate, StaffAttendanceOut, StaffAttendanceUpdate
 from app.schemas.masters.staff_schema import StaffEnrollmentCreate, StaffEnrollmentUpdate, StaffQualificationCreate, StaffQualificationUpdate
 from app.tools.password_util import hash_password
+
+logger = logging.getLogger(__name__)
+
 
 # -------------------- Staff Enrollment --------------------
 
@@ -97,7 +101,8 @@ async def create_staff_enrollment(data: StaffEnrollmentCreate, db: AsyncSession)
         return staff_out
     except SQLAlchemyError as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error creating staff enrollment: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error creating staff enrollment")
 
 
 async def get_all_staff_enrollments(db: AsyncSession):
@@ -156,7 +161,8 @@ async def update_staff_enrollment(staff_id: UUID, data: StaffEnrollmentUpdate, d
         await db.rollback()
         if isinstance(e, HTTPException):
             raise e
-        raise HTTPException(status_code=500, detail=f"Failed to update staff: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to update staff")
 
 
 async def delete_staff_enrollment(staff_id: UUID, db: AsyncSession):
@@ -190,7 +196,8 @@ async def create_staff_attendance(data: StaffAttendanceCreate, db: AsyncSession)
         return attendance_out
     except SQLAlchemyError as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error creating staff attendance: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error creating staff attendance")
 
 
 async def get_all_staff_attendance(
@@ -225,7 +232,8 @@ async def get_staff_attendance_by_id(attendance_id: UUID, db: AsyncSession):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving staff attendance: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error retrieving staff attendance")
 
 
 async def get_attendance_for_staff(
@@ -273,7 +281,8 @@ async def update_staff_attendance(attendance_id: UUID, data: StaffAttendanceUpda
         raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error updating staff attendance: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error updating staff attendance")
 
 
 async def delete_staff_attendance(attendance_id: UUID, db: AsyncSession):
@@ -298,7 +307,8 @@ async def get_staff_attendance_by_date(attendance_date: date, db: AsyncSession):
         result = await db.execute(stmt)
         return result.scalars().all()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving staff attendance by date: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error retrieving staff attendance by date")
 
 
 async def update_staff_attendance_by_date(
@@ -321,6 +331,11 @@ async def update_staff_attendance_by_date(
 
             if not staff_id or not new_status:
                 continue
+
+            try:
+                staff_id = UUID(str(staff_id))
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid staff_id '{staff_id}'")
 
             if new_status not in valid_statuses:
                 raise HTTPException(
@@ -372,7 +387,8 @@ async def update_staff_attendance_by_date(
         raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error updating staff attendance by date: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error updating staff attendance by date")
 
 
 async def get_staff_list_by_gender(gender: GenderEnum | None, db: AsyncSession):
@@ -380,7 +396,7 @@ async def get_staff_list_by_gender(gender: GenderEnum | None, db: AsyncSession):
         selectinload(Staff.designation_obj), selectinload(Staff.user), selectinload(Staff.qualifications)
     )
     if gender:
-        stmt = stmt.where(Staff.gender == gender)
+        stmt = stmt.where(Staff.gender == GenderEnum(getattr(gender, "value", gender)))
     result = await db.execute(stmt)
     return result.scalars().all()
 
@@ -461,7 +477,8 @@ async def get_all_designations_list(db: AsyncSession):
         result = await db.execute(select(Designation))
         return result.scalars().all()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving designations: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error retrieving designations")
 
 
 async def upload_staff_photo(staff_id: UUID, file: UploadFile, db: AsyncSession):
@@ -547,4 +564,5 @@ async def get_all_drivers_list(db: AsyncSession):
             for driver in drivers
         ]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching drivers: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error fetching drivers")

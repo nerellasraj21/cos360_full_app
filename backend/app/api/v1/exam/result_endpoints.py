@@ -32,6 +32,7 @@ from app.service.exam.result_service import (
 from app.models.masters.student_parent_association_model import StudentParentLink
 from app.tools.enhanced_permissions import check_user_resource_access
 from app.tools.simple_permissions import check_role_plan_permission_with_error, get_current_user_token
+from app.tools.ownership import ensure_student_access
 
 router = APIRouter(prefix="/exams", tags=["Exam Results"])
 
@@ -100,6 +101,8 @@ async def list_results(
     """Get all student results for an exam, with optional filters."""
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
+    if role in ("Student", "Parent"):
+        raise HTTPException(status_code=403, detail="Not allowed for this role")
     await check_role_plan_permission_with_error(db, request, role, "exams", "read")
 
     return await get_exam_results(
@@ -121,6 +124,7 @@ async def get_single_result(
     """Get a single student's full result for an exam."""
     current_user = await get_current_user_token(request)
     role = current_user.get("role")
+    await ensure_student_access(db, role, uuid.UUID(current_user.get("sub")), student_id)
     await check_role_plan_permission_with_error(db, request, role, "exams", "read")
 
     return await get_student_result_or_404(db, exam_id, student_id)

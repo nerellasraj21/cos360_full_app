@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -8,6 +9,9 @@ from sqlalchemy.orm import selectinload
 from app.models.masters.parent_model import Parent
 from app.models.masters.student_parent_association_model import StudentParentLink
 from app.models.student.student_model import Student
+
+logger = logging.getLogger(__name__)
+
 
 
 async def link_student_to_parent(student_id: UUID, parent_id: UUID, db: AsyncSession) -> StudentParentLink:
@@ -46,7 +50,8 @@ async def link_student_to_parent(student_id: UUID, parent_id: UUID, db: AsyncSes
         raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error creating student-parent link: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error creating student-parent link")
 
 
 async def unlink_student_from_parent(student_id: UUID, parent_id: UUID, db: AsyncSession) -> bool:
@@ -68,7 +73,8 @@ async def unlink_student_from_parent(student_id: UUID, parent_id: UUID, db: Asyn
         raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error removing student-parent link: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error removing student-parent link")
 
 
 async def get_parents_for_student(student_id: UUID, db: AsyncSession) -> list[Parent]:
@@ -80,7 +86,8 @@ async def get_parents_for_student(student_id: UUID, db: AsyncSession) -> list[Pa
         )
         return result.scalars().all()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching parents for student: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error fetching parents for student")
 
 
 async def get_students_for_parent(parent_id: UUID, db: AsyncSession) -> list[Student]:
@@ -138,7 +145,8 @@ async def get_students_for_parent(parent_id: UUID, db: AsyncSession) -> list[Stu
 
         return students
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching students for parent: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error fetching students for parent")
 
 
 async def get_all_student_parent_links(db: AsyncSession) -> list[StudentParentLink]:
@@ -150,4 +158,5 @@ async def get_all_student_parent_links(db: AsyncSession) -> list[StudentParentLi
         )
         return result.scalars().all()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching student-parent links: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=500, detail="Error fetching student-parent links")

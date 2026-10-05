@@ -74,7 +74,7 @@ async def bulk_create_or_update_mappings(
 ):
     """
     Bulk create or update class-subject mappings.
-    Implements upsert behavior: marks existing mappings as is_active=false if NOT in the bulk request.
+    Upsert behavior: adds or updates the listed subjects and leaves the section's other mappings untouched.
 
     **section_id behavior**:
     - If section_id is provided: applies mappings to that specific section only

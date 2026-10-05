@@ -45,7 +45,7 @@ class ClassSubjectMapRead(ClassSubjectMapBase):
 class ClassSubjectMapDropdown(BaseModel):
     id: UUID
     class_name: str
-    section_name: str
+    section_name: str | None = None
     subject_name: str
     exclude_marks: bool
     order: int | None = None

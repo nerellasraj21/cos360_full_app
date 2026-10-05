@@ -1,3 +1,5 @@
+from datetime import datetime
+import logging
 import logging as log
 from uuid import UUID
 
@@ -8,6 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.masters.holidays_model import Holiday as HolidayModel
 from app.schemas.masters.holidays_schema import HolidayCreate, HolidayUpdate
 from app.tools.cache_utils import cache_dropdown, invalidate_cache
+
+logger = logging.getLogger(__name__)
+
 
 log = log.getLogger("masters.holiday_service")
 
@@ -37,7 +42,8 @@ async def create_holiday(db: AsyncSession, holiday_data: HolidayCreate):
         return created_holiday
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=f"Error creating holiday: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=400, detail="Error creating holiday")
 
 
 async def get_holiday_by_id(db: AsyncSession, holiday_id: UUID):
@@ -47,6 +53,8 @@ async def get_holiday_by_id(db: AsyncSession, holiday_id: UUID):
         if not holiday:
             raise HTTPException(status_code=404, detail="Holiday not found")
         return holiday
+    except HTTPException:
+        raise
     except Exception as e:
         log.error(f"Database error retrieving holiday: {str(e)}")
         raise HTTPException(status_code=500, detail="Database error retrieving holiday")
@@ -94,7 +102,17 @@ async def update_holiday(db: AsyncSession, holiday_id: UUID, holiday_data: Holid
         if not holiday:
             raise HTTPException(status_code=404, detail="Holiday not found")
 
-        for var, value in holiday_data.model_dump(exclude_unset=True).items():
+        changes = holiday_data.model_dump(exclude_unset=True)
+        for key in ("start_date", "end_date"):
+            if isinstance(changes.get(key), datetime):
+                changes[key] = changes[key].date()
+        if "start_date" in changes or "end_date" in changes:
+            new_start = changes.get("start_date", holiday.start_date)
+            new_end = changes.get("end_date", holiday.end_date)
+            if new_end < new_start:
+                raise HTTPException(status_code=400, detail="end_date cannot be before start_date")
+
+        for var, value in changes.items():
             setattr(holiday, var, value)
 
         await db.flush()
@@ -108,9 +126,13 @@ async def update_holiday(db: AsyncSession, holiday_id: UUID, holiday_data: Holid
         invalidate_cache("dropdown", "holidays")
 
         return updated_holiday
+    except HTTPException:
+        await db.rollback()
+        raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=f"Error updating holiday: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=400, detail="Error updating holiday")
 
 
 async def deactivate_holiday(db: AsyncSession, holiday_id: UUID):
@@ -131,9 +153,13 @@ async def deactivate_holiday(db: AsyncSession, holiday_id: UUID):
         invalidate_cache("dropdown", "holidays")
 
         return updated_holiday
+    except HTTPException:
+        await db.rollback()
+        raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=f"Error deactivating holiday: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=400, detail="Error deactivating holiday")
 
 
 async def activate_holiday(db: AsyncSession, holiday_id: UUID):
@@ -154,9 +180,13 @@ async def activate_holiday(db: AsyncSession, holiday_id: UUID):
         invalidate_cache("dropdown", "holidays")
 
         return updated_holiday
+    except HTTPException:
+        await db.rollback()
+        raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=f"Error activating holiday: {str(e)}")
+        logger.error("Unhandled error: %s", e)
+        raise HTTPException(status_code=400, detail="Error activating holiday")
 
 
 @cache_dropdown(ttl=300)  # Cache for 5 minutes
@@ -173,4 +203,4 @@ async def get_holidays_dropdown(db: AsyncSession, active_only: bool = True):
         return [{"id": holiday.id, "name": holiday.name} for holiday in holidays]
     except Exception as e:
         log.error(f"Error fetching holidays dropdown: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Fetching holidays dropdown failed: {str(e)}")
+        raise HTTPException(status_code=400, detail="Fetching holidays dropdown failed")

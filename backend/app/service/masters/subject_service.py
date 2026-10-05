@@ -47,18 +47,18 @@ async def create_subject(db: AsyncSession, subject_data: SubjectCreate, request:
         if not subject_data.name or not subject_data.name.strip():
             raise create_validation_error(message="Subject name is required", field="subject_name", request=request)
 
-        if len(subject_data.name.strip()) > 100:
+        if len(subject_data.name.strip()) > 50:
             raise create_validation_error(
-                message="Subject name cannot exceed 100 characters",
+                message="Subject name cannot exceed 50 characters",
                 field="subject_name",
                 value=subject_data.name,
                 request=request,
             )
 
         # Validate subject code if provided
-        if subject_data.short_code and len(subject_data.short_code) > 20:
+        if subject_data.short_code and len(subject_data.short_code.strip()) > 10:
             raise create_validation_error(
-                message="Subject code cannot exceed 20 characters",
+                message="Subject code cannot exceed 10 characters",
                 field="subject_code",
                 value=subject_data.short_code,
                 request=request,
@@ -257,16 +257,35 @@ async def get_all_subjects(
 async def update_subject(db: AsyncSession, subject_id: UUID, subject_data: SubjectUpdate):
     try:
         subject = await get_subject_by_id(db, subject_id)
-        if not subject:
-            raise HTTPException(status_code=404, detail="Subject not found")
-        for var, value in subject_data.model_dump(exclude_unset=True).items():
+        changes = subject_data.model_dump(exclude_unset=True)
+        if "name" in changes and changes["name"] is not None:
+            changes["name"] = changes["name"].strip()
+        if changes.get("short_code"):
+            changes["short_code"] = changes["short_code"].strip()
+        new_name = changes.get("name", subject.name)
+        new_year = changes.get("academic_year_id", subject.academic_year_id)
+        if "name" in changes or "academic_year_id" in changes:
+            duplicate = await db.execute(
+                select(Subject.id)
+                .where(Subject.name == new_name, Subject.academic_year_id == new_year, Subject.id != subject_id)
+                .limit(1)
+            )
+            if duplicate.scalars().first():
+                raise HTTPException(
+                    status_code=400, detail=f"Subject with name '{new_name}' already exists for this academic year"
+                )
+        for var, value in changes.items():
             setattr(subject, var, value)
-        await db.commit()
-        # Refresh with relationships loaded
+        await db.flush()
         result = await db.execute(
             select(Subject).options(selectinload(Subject.category)).where(Subject.id == subject_id)
         )
         subject = result.scalar_one()
+        await db.commit()
+        invalidate_cache("dropdown", "subjects")
+    except HTTPException:
+        await db.rollback()
+        raise
     except Exception as e:
         await db.rollback()
         log.error(f"Failed to update subject: {e}")
@@ -277,15 +296,17 @@ async def update_subject(db: AsyncSession, subject_id: UUID, subject_data: Subje
 async def deactivate_subject(db: AsyncSession, subject_id: UUID):
     try:
         subject = await get_subject_by_id(db, subject_id)
-        if not subject:
-            raise HTTPException(status_code=404, detail="Subject not found")
         subject.is_active = False
-        await db.commit()
-        # Refresh with relationships loaded
+        await db.flush()
         result = await db.execute(
             select(Subject).options(selectinload(Subject.category)).where(Subject.id == subject_id)
         )
         subject = result.scalar_one()
+        await db.commit()
+        invalidate_cache("dropdown", "subjects")
+    except HTTPException:
+        await db.rollback()
+        raise
     except Exception as e:
         await db.rollback()
         log.error(f"Failed to deactivate subject: {e}")
@@ -309,7 +330,7 @@ async def get_subjects_by_category_id(category_id: UUID, db: AsyncSession):
         return subjects
     except Exception as e:
         log.error(f"Error fetching subjects by category: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Fetching subjects by category failed: {str(e)}")
+        raise HTTPException(status_code=400, detail="Fetching subjects by category failed")
 
 
 @cache_dropdown(ttl=300)  # Cache for 5 minutes
@@ -326,7 +347,7 @@ async def get_subjects_dropdown(db: AsyncSession, active_only: bool = True):
         return [{"id": subj.id, "name": subj.name} for subj in subjects]
     except Exception as e:
         log.error(f"Error fetching subjects dropdown: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Fetching subjects dropdown failed: {str(e)}")
+        raise HTTPException(status_code=400, detail="Fetching subjects dropdown failed")
 
 
 @cache_dropdown(ttl=300)  # Cache for 5 minutes
@@ -345,4 +366,4 @@ async def get_subjects_by_category_id_dropdown(category_id: UUID, db: AsyncSessi
         return [{"id": subj.id, "name": subj.name} for subj in subjects]
     except Exception as e:
         log.error(f"Error fetching subjects by category dropdown: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Fetching subjects by category dropdown failed: {str(e)}")
+        raise HTTPException(status_code=400, detail="Fetching subjects by category dropdown failed")

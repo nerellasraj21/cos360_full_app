@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -40,6 +41,12 @@ async def create_class_subject_mapping(db: AsyncSession, mapping_data: ClassSubj
 
         await db.commit()
         return mapping_out
+    except IntegrityError as e:
+        await db.rollback()
+        sqlstate = getattr(e.orig, "sqlstate", None) or getattr(e.orig, "pgcode", None)
+        if sqlstate == "23503":
+            raise HTTPException(status_code=400, detail="Class, section, subject or academic year not found.")
+        raise HTTPException(status_code=409, detail="This subject is already mapped to the class and section.")
     except Exception as e:
         await db.rollback()
         log.error(f"Failed to create class-subject mapping: {e}")
@@ -63,15 +70,12 @@ async def _process_section_mappings(
     )
     existing_mappings = {m.subject_id: m for m in existing_result.scalars().all()}
 
-    # Extract subject_ids from the incoming request
-    incoming_subject_ids = {mapping_data["subject_id"] for mapping_data in mappings_data}
+    deduped: dict = {}
+    for mapping_data in mappings_data:
+        deduped[mapping_data["subject_id"]] = mapping_data
+    mappings_data = list(deduped.values())
 
-    # Mark mappings as inactive if their subject_id is NOT in the incoming request
     deactivated_count = 0
-    for subject_id, existing_mapping in existing_mappings.items():
-        if subject_id not in incoming_subject_ids and existing_mapping.is_active:
-            existing_mapping.is_active = False
-            deactivated_count += 1
 
     # Process incoming mappings: create new or update existing
     created_count = 0
@@ -125,7 +129,8 @@ async def bulk_create_or_update_class_subject_mappings(
 ) -> dict:
     """
     Bulk create or update class-subject mappings for a specific class and section.
-    Implements upsert behavior: marks existing mappings as is_active=false if NOT in the bulk request.
+    Adds or updates the requested subjects and leaves the section's other mappings untouched.
+    Duplicate subject ids in the request are collapsed.
 
     Args:
         class_id: The class ID
@@ -222,7 +227,7 @@ async def bulk_create_or_update_class_subject_mappings(
     except Exception as e:
         await db.rollback()
         log.error(f"Failed to bulk create/update class-subject mappings: {e}")
-        raise HTTPException(status_code=400, detail=f"Bulk operation failed: {str(e)}")
+        raise HTTPException(status_code=400, detail="Bulk operation failed")
 
 
 async def get_class_subject_mapping_by_id(db: AsyncSession, mapping_id: UUID) -> ClassSubjectMap:

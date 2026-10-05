@@ -95,7 +95,7 @@ async def _load_hall_ticket_data(db: AsyncSession, exam_id: UUID, student_id: UU
         JOIN subjects sub ON sub.id = ed.subject_id
         WHERE ed.exam_id = :eid
           AND ed.class_id = :cid
-          AND (:sec_id IS NULL OR ed.section_id = :sec_id OR ed.section_id IS NULL)
+          AND (CAST(:sec_id AS uuid) IS NULL OR ed.section_id = CAST(:sec_id AS uuid) OR ed.section_id IS NULL)
         ORDER BY ed.exam_date, ed.start_time
     """),
             {

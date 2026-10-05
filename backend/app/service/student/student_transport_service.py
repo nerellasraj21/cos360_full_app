@@ -105,10 +105,18 @@ async def add_student_transport(data: StudentTransportCreate, db: AsyncSession, 
                     request=request,
                 )
 
+        if stop.route_id != trip.route_id:
+            raise create_validation_error(
+                message="The selected stop does not belong to the route of the selected trip",
+                field="stop_id",
+                value=str(data.stop_id),
+                request=request,
+            )
+
         # Auto-fill fee_per_term from stop.fees if not provided
         resolved_fee = data.fee_per_term
         if resolved_fee is None:
-            if stop.fees is None:
+            if stop.fees is None or stop.fees <= 0:
                 raise create_validation_error(
                     message="This stop has no default fee — enter the amount manually",
                     field="fee_per_term",
@@ -117,10 +125,9 @@ async def add_student_transport(data: StudentTransportCreate, db: AsyncSession, 
                 )
             resolved_fee = float(stop.fees)
 
-        # Validate fee amount
-        if resolved_fee < 0:
+        if resolved_fee <= 0:
             raise create_validation_error(
-                message="Fee per term cannot be negative",
+                message="Fee per term must be greater than 0",
                 field="fee_per_term",
                 value=resolved_fee,
                 request=request,
@@ -249,14 +256,6 @@ async def get_transport_by_student_id(
         )
         records = result.scalars().all()
 
-        if not records:
-            raise create_not_found_error(
-                message="No transport assignments found for this student",
-                resource_type="transport_assignment",
-                resource_id=str(student_id),
-                request=request,
-            )
-
         return records
     except HTTPException:
         raise
@@ -306,19 +305,19 @@ async def update_partial_details_transport_assignment(
         # Validate updates
         update_data = updates.dict(exclude_unset=True)
 
-        # Validate fee amount if being updated
-        if "fee_per_term" in update_data and update_data["fee_per_term"] < 0:
+        if "fee_per_term" in update_data and (update_data["fee_per_term"] is None or update_data["fee_per_term"] <= 0):
             raise create_validation_error(
-                message="Fee per term cannot be negative",
+                message="Fee per term must be greater than 0",
                 field="fee_per_term",
                 value=update_data["fee_per_term"],
                 request=request,
             )
 
-        # Validate trip exists if being updated
+        new_trip = None
         if "trip_id" in update_data:
             trip_result = await db.execute(select(Trip).where(Trip.id == update_data["trip_id"]))
-            if not trip_result.scalar_one_or_none():
+            new_trip = trip_result.scalar_one_or_none()
+            if not new_trip:
                 raise create_not_found_error(
                     message="Trip not found",
                     resource_type="trip",
@@ -342,14 +341,34 @@ async def update_partial_details_transport_assignment(
                     request=request,
                 )
 
-        # Validate stop exists if being updated
+        new_stop = None
         if "stop_id" in update_data:
             stop_result = await db.execute(select(RouteStop).where(RouteStop.id == update_data["stop_id"]))
-            if not stop_result.scalar_one_or_none():
+            new_stop = stop_result.scalar_one_or_none()
+            if not new_stop:
                 raise create_not_found_error(
                     message="Route stop not found",
                     resource_type="route_stop",
                     resource_id=str(update_data["stop_id"]),
+                    request=request,
+                )
+
+        if new_trip is not None or new_stop is not None:
+            trip_for_check = new_trip
+            if trip_for_check is None:
+                trip_for_check = (
+                    await db.execute(select(Trip).where(Trip.id == assignment.trip_id))
+                ).scalar_one_or_none()
+            stop_for_check = new_stop
+            if stop_for_check is None:
+                stop_for_check = (
+                    await db.execute(select(RouteStop).where(RouteStop.id == assignment.stop_id))
+                ).scalar_one_or_none()
+            if trip_for_check and stop_for_check and stop_for_check.route_id != trip_for_check.route_id:
+                raise create_validation_error(
+                    message="The selected stop does not belong to the route of the selected trip",
+                    field="stop_id",
+                    value=str(stop_for_check.id),
                     request=request,
                 )
 

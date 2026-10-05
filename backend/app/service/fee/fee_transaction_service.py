@@ -30,6 +30,7 @@ from app.schemas.fee import (
     TransactionHistoryItem,
 )
 from app.service.base.user_scoped_service import UserScopedService
+from app.service.fee.fee_locks import idempotent_transaction_number, lock_student_payments
 from app.tools.database_error_mapper import map_database_error
 from app.tools.error_handler import (
     ErrorCategory,
@@ -201,6 +202,7 @@ class FeeTransactionService:
                 )
 
             validated_items = []
+            requested_by_term: dict[tuple, Decimal] = {}
 
             for i, item in enumerate(fee_items):
                 try:
@@ -274,18 +276,26 @@ class FeeTransactionService:
                         db, student_id, fee_type_id, term_date_id, academic_year_id, request
                     )
                     outstanding = term_amount.term_amount - already_paid
+                    term_key = (fee_type_id, term_date_id)
+                    requested_so_far = requested_by_term.get(term_key, Decimal("0.00"))
+                    remaining_outstanding = outstanding - requested_so_far
 
-                    if amount_paid > outstanding:
+                    if amount_paid > remaining_outstanding:
                         raise create_business_rule_error(
-                            message=f"Payment amount {amount_paid} exceeds outstanding amount {outstanding} for fee term date",
+                            message=(
+                                f"Payment amount {amount_paid} for item {i+1} exceeds the outstanding amount "
+                                f"{max(remaining_outstanding, Decimal('0.00'))} for this fee term date"
+                            ),
                             rule="payment_amount_exceeds_outstanding",
                             details={
                                 "amount_paid": float(amount_paid),
-                                "outstanding_amount": float(outstanding),
+                                "outstanding_amount": float(max(remaining_outstanding, Decimal("0.00"))),
                                 "term_date_id": str(term_date_id),
                             },
                             request=request,
+                            status_code=status.HTTP_400_BAD_REQUEST,
                         )
+                    requested_by_term[term_key] = requested_so_far + amount_paid
 
                     validated_items.append(
                         {
@@ -473,6 +483,16 @@ class FeeTransactionService:
                         message="Bank name is required for bank transfer payments", field="bank_name", request=request
                     )
 
+            await lock_student_payments(db, transaction_data.student_id)
+
+            if transaction_data.idempotency_key:
+                existing = await FeeTransactionService._find_by_number(
+                    db, idempotent_transaction_number(transaction_data.student_id, transaction_data.idempotency_key)
+                )
+                if existing:
+                    await db.commit()
+                    return existing
+
             # Validate student exists
             await FeeTransactionService.validate_student_exists(
                 db,
@@ -502,10 +522,14 @@ class FeeTransactionService:
                         "calculated_total": float(calculated_total),
                     },
                     request=request,
+                    status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Generate transaction number
-            transaction_number = await FeeTransactionService.generate_transaction_number(db)
+            transaction_number = (
+                idempotent_transaction_number(transaction_data.student_id, transaction_data.idempotency_key)
+                if transaction_data.idempotency_key
+                else await FeeTransactionService.generate_transaction_number(db)
+            )
 
             # Create transaction
             db_transaction = FeeTransaction(
@@ -608,6 +632,43 @@ class FeeTransactionService:
                 status_code=500,
                 request=request,
             )
+
+    @staticmethod
+    async def _find_by_number(db: AsyncSession, transaction_number: str) -> FeeTransaction | None:
+        result = await db.execute(
+            select(FeeTransaction)
+            .options(
+                selectinload(FeeTransaction.transaction_items),
+                selectinload(FeeTransaction.student),
+                selectinload(FeeTransaction.fee_receipts),
+            )
+            .where(FeeTransaction.transaction_number == transaction_number)
+            .limit(1)
+        )
+        transaction = result.scalars().first()
+        if transaction is None:
+            return None
+        if transaction.student:
+            transaction.student_first_name = transaction.student.first_name
+            transaction.student_last_name = transaction.student.last_name
+            transaction.student_full_name = f"{transaction.student.first_name} {transaction.student.last_name}"
+        if transaction.fee_receipts:
+            transaction.receipt_number = transaction.fee_receipts[0].receipt_number
+        return transaction
+
+    @staticmethod
+    async def get_transaction_by_number(
+        db: AsyncSession, transaction_number: str, request: Request | None = None
+    ) -> FeeTransactionRead:
+        transaction = await FeeTransactionService._find_by_number(db, transaction_number)
+        if not transaction:
+            raise create_not_found_error(
+                message=f"Transaction with number {transaction_number} not found",
+                resource_type="fee_transaction",
+                resource_id=transaction_number,
+                request=request,
+            )
+        return transaction
 
     @staticmethod
     async def get_transaction_by_id(
@@ -1165,7 +1226,7 @@ class FeeTransactionService:
             admission_result = await db.execute(
                 select(Admission.academic_year_id)
                 .where(Admission.student_id == student_id)
-                .order_by(Admission.created_at.desc())
+                .order_by(Admission.admission_date.desc())
                 .limit(1)
             )
             academic_year_id = admission_result.scalar_one_or_none()

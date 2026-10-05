@@ -167,7 +167,7 @@ class UserManagementService:
         except Exception as e:
             logger.error(f"Error retrieving users: {str(e)}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to retrieve users: {str(e)}"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve users"
             )
 
     @staticmethod
@@ -267,7 +267,7 @@ class UserManagementService:
         except Exception as e:
             logger.error(f"Error retrieving user {user_id}: {str(e)}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to retrieve user: {str(e)}"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve user"
             )
 
     @staticmethod
@@ -344,7 +344,7 @@ class UserManagementService:
             await db.rollback()
             logger.error(f"Error updating user {user_id}: {str(e)}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update user: {str(e)}"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update user"
             )
 
     @staticmethod
@@ -388,7 +388,7 @@ class UserManagementService:
             await db.rollback()
             logger.error(f"Error resetting password for user {user_id}: {str(e)}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to reset password: {str(e)}"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to reset password"
             )
 
     @staticmethod
@@ -448,5 +448,5 @@ class UserManagementService:
             await db.rollback()
             logger.error(f"Error updating role for user {user_id}: {str(e)}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update user role: {str(e)}"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update user role"
             )

@@ -98,7 +98,7 @@ async def validate_user_access(
         logger.error(f"Error in access validation endpoint: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "validation_error", "message": "Failed to validate user access", "details": str(e)},
+            detail="An internal error occurred",
         )
 
 
@@ -156,7 +156,7 @@ async def validate_endpoint_access(
         logger.error(f"Error in simplified endpoint access validation: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "validation_error", "message": "Failed to validate endpoint access", "details": str(e)},
+            detail="An internal error occurred",
         )
 
 
@@ -205,7 +205,7 @@ async def validate_menu_access(
         logger.error(f"Error in simplified menu access validation: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "validation_error", "message": "Failed to validate menu access", "details": str(e)},
+            detail="An internal error occurred",
         )
 
 
@@ -241,5 +241,5 @@ async def get_available_resources(request: Request, current_user: dict = Depends
         logger.error(f"Error getting available resources: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "system_error", "message": "Failed to retrieve available resources", "details": str(e)},
+            detail="An internal error occurred",
         )

@@ -24,6 +24,7 @@ from app.schemas.reports.attendance_report_schemas import (
     StudentAttendanceSummary,
 )
 from app.service.reports.base_report_service import BaseReportService
+from app.service.student.attendance_percentage import attendance_percentage as student_attendance_percentage
 
 logger = logging.getLogger(__name__)
 
@@ -267,9 +268,7 @@ class AttendanceReportService(BaseReportService):
             total_records = stats_row.total_records or 0
             present_count = stats_row.present_count or 0
             half_day_count = stats_row.half_day_count or 0
-            attendance_percentage = (
-                (present_count + half_day_count * 0.5) / total_records * 100
-            ) if total_records > 0 else 0.0
+            attendance_percentage = student_attendance_percentage(present_count, half_day_count, total_records)
 
             # Create date range string
             date_range = None
