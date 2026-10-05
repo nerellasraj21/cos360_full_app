@@ -201,7 +201,7 @@ export default function StudentTransportScreen() {
     if (!form.trip_id)    { showError('Error', 'Trip is required'); return; }
     if (!form.stop_id)    { showError('Error', 'Stop is required'); return; }
     const fee = parseFloat(form.fee_per_term);
-    if (isNaN(fee) || fee < 0) { showError('Error', 'Enter a valid fee amount'); return; }
+    if (isNaN(fee) || fee <= 0) { showError('Error', 'Enter a valid fee amount'); return; }
 
     const payload: StudentTransportCreate = {
       student_id: form.student_id,

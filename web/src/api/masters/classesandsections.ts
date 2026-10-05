@@ -117,8 +117,6 @@ export const getStudentsByClassSection = async (
   sectionId: string,
   asOfDate?: string
 ): Promise<StudentAdmissionResponse[]> => {
-  console.log('getStudentsByClassSection called with:', { classId, sectionId, asOfDate });
-
   const queryParams = new URLSearchParams();
   queryParams.append('class_id', classId);
   if (sectionId) {
@@ -129,19 +127,21 @@ export const getStudentsByClassSection = async (
     queryParams.append('as_of_date', asOfDate);
   }
 
-  // Use the correct student admission endpoint
-  const url = `/students/admission/?${queryParams.toString()}`;
-  console.log('API URL:', url);
-
-  try {
-    const { data } = await CAxios.get<{ items: StudentAdmissionResponse[] }>(url);
-    console.log('API Response data:', data);
-    console.log('API Response items length:', data.items?.length || 0);
-    return data.items || [];
-  } catch (error) {
-    console.error('API Error in getStudentsByClassSection:', error);
-    throw error;
+  const pageSize = 100;
+  queryParams.append('limit', String(pageSize));
+  const all: StudentAdmissionResponse[] = [];
+  let skip = 0;
+  for (;;) {
+    queryParams.set('skip', String(skip));
+    const { data } = await CAxios.get<{ items: StudentAdmissionResponse[]; has_next?: boolean }>(
+      `/students/admission/?${queryParams.toString()}`
+    );
+    const items = data.items || [];
+    all.push(...items);
+    if (!data.has_next || items.length === 0) break;
+    skip += pageSize;
   }
+  return all;
 };
 
 // Alias for backward compatibility

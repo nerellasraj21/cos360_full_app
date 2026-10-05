@@ -258,18 +258,11 @@ export const useApproveFeeRefund = () => {
 };
 
 export const useProcessFeeRefund = () => {
-  return usePermissionProtectedMutation<any, Error, { refund_id: string }>({
+  return usePermissionProtectedMutation<any, Error, { refund_id: string; refund_method: 'cash' | 'bank_transfer' | 'cheque'; refund_reference?: string }>({
     resource: PERMISSION_RESOURCES.FEE_REFUNDS,
     action: 'process',
-    mutationFn: ({ refund_id }) => feeRefundsApi.processFeeRefund({ refund_id })
+    mutationFn: (data) => feeRefundsApi.processFeeRefund(data)
   });
-};
-
-export const useDeleteFeeRefund = () => {
-  return usePermissionProtectedDeleteMutation<void, Error, string>(
-    PERMISSION_RESOURCES.FEE_REFUNDS,
-    feeRefundsApi.deleteFeeRefund
-  );
 };
 
 export const useFeeRefundTransactionSummary = (transactionId: string, enabled: boolean = true) => {

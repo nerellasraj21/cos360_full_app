@@ -444,9 +444,9 @@ export const CertificateUploadPage: React.FC = () => {
                         value={recvRemarks}
                         onChange={(e) => setRecvRemarks(e.target.value)}
                         className={inputClass}
-                        placeholder="Optional remarks (max 500 characters)"
+                        placeholder="Optional remarks (max 255 characters)"
                         rows={2}
-                        maxLength={500}
+                        maxLength={255}
                       />
                     </div>
                   </div>
@@ -552,9 +552,9 @@ export const CertificateUploadPage: React.FC = () => {
                             value={issuedRemarks}
                             onChange={(e) => setIssuedRemarks(e.target.value)}
                             className={inputClass}
-                            placeholder="Optional remarks (max 500 characters)"
+                            placeholder="Optional remarks (max 255 characters)"
                             rows={2}
-                            maxLength={500}
+                            maxLength={255}
                           />
                         </div>
                       </div>

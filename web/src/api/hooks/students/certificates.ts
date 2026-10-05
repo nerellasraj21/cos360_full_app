@@ -425,7 +425,7 @@ export function useCreateCertificate() {
       formData.append('certificate_type_id', data.certificate_type_id);
       if (data.issue_date) formData.append('issue_date', data.issue_date);
       if (data.remarks) formData.append('remarks', data.remarks);
-      if (data.certificate_file) formData.append('certificate_file', data.certificate_file);
+      if (data.certificate_file) formData.append('file', data.certificate_file);
 
       const response = await CAxios.post(`${CERTIFICATES_BASE}/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -451,7 +451,7 @@ export function useUpdateCertificate() {
       formData.append('certificate_type_id', data.certificate_type_id);
       if (data.issue_date) formData.append('issue_date', data.issue_date);
       if (data.remarks) formData.append('remarks', data.remarks);
-      if (data.certificate_file) formData.append('certificate_file', data.certificate_file);
+      if (data.certificate_file) formData.append('file', data.certificate_file);
 
       const response = await CAxios.patch(`${CERTIFICATES_BASE}/${id}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },

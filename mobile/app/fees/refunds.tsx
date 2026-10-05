@@ -78,6 +78,7 @@ export default function FeeRefundsScreen() {
      refund: FeeRefundWithStatus | null;
    }>({ visible: false, refund: null });
    const [processReferenceNumber, setProcessReferenceNumber] = useState('');
+   const [processMethod, setProcessMethod] = useState<'cash' | 'bank_transfer' | 'cheque'>('cash');
 
   // Cancel refund modal with mandatory reason (matches web's cancel workflow)
   const [cancelModal, setCancelModal] = useState<{
@@ -288,6 +289,7 @@ export default function FeeRefundsScreen() {
   // M-6: open process modal with reference number field
   const handleProcess = (refund: FeeRefundWithStatus) => {
     setProcessReferenceNumber('');
+    setProcessMethod('cash');
     setProcessModal({ visible: true, refund });
   };
 
@@ -295,7 +297,8 @@ export default function FeeRefundsScreen() {
     if (!processModal.refund) return;
     processMutation.mutate({
       refund_id: processModal.refund.id,
-      ...(processReferenceNumber.trim() ? { reference_number: processReferenceNumber.trim() } : {}),
+      refund_method: processMethod,
+      ...(processReferenceNumber.trim() ? { refund_reference: processReferenceNumber.trim() } : {}),
     });
     setProcessModal({ visible: false, refund: null });
   };
@@ -918,6 +921,27 @@ export default function FeeRefundsScreen() {
                     Processing refund {(processModal.refund as any).refund_number ?? processModal.refund.id?.slice(-8) ?? 'N/A'} for {formatINR(processModal.refund.refund_amount)}
                   </Text>
                 )}
+                <Text style={[styles.label, { color: colors.foreground }]}>Refund Method *</Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                  {(['cash', 'bank_transfer', 'cheque'] as const).map((method) => (
+                    <TouchableOpacity
+                      key={method}
+                      onPress={() => setProcessMethod(method)}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: processMethod === method ? colors.primary : colors.border,
+                        backgroundColor: processMethod === method ? colors.primary : colors.background,
+                      }}
+                    >
+                      <Text style={{ color: processMethod === method ? 'white' : colors.foreground }}>
+                        {method === 'bank_transfer' ? 'Bank Transfer' : method === 'cash' ? 'Cash' : 'Cheque'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
                 <Text style={[styles.label, { color: colors.foreground }]}>Reference Number (optional)</Text>
                 <TextInput
                   value={processReferenceNumber}

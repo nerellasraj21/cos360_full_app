@@ -249,7 +249,7 @@ export interface StudentDropdownSimpleItem {
 
 // ─── Attendance ───────────────────────────────────────────────────────────────
 
-export type AttendanceStatus = 'present' | 'absent' | 'late' | 'leave';
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'half_day' | 'leave';
 
 /** POST /student/attendance/ */
 export interface StudentAttendanceCreate {
@@ -650,11 +650,20 @@ export const studentAdmissionsApi = {
     classId: string,
     sectionId?: string,
   ): Promise<StudentAdmissionResponse[]> => {
-    let url = `/students/admission/?class_id=${encodeURIComponent(classId)}&active_only=true`;
-    if (sectionId) url += `&section_id=${encodeURIComponent(sectionId)}`;
-    const response = await apiClient.get(url);
-    const data = response.data;
-    return data.items ?? data ?? [];
+    const pageSize = 100;
+    const all: StudentAdmissionResponse[] = [];
+    let skip = 0;
+    for (;;) {
+      let url = `/students/admission/?class_id=${encodeURIComponent(classId)}&active_only=true&limit=${pageSize}&skip=${skip}`;
+      if (sectionId) url += `&section_id=${encodeURIComponent(sectionId)}`;
+      const response = await apiClient.get(url);
+      const data = response.data;
+      const items: StudentAdmissionResponse[] = data.items ?? [];
+      all.push(...items);
+      if (!data.has_next || items.length === 0) break;
+      skip += pageSize;
+    }
+    return all;
   },
 
   /** POST /students/admission/ */

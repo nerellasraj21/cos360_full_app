@@ -283,6 +283,9 @@ export interface FeeRefundApproveResponse {
 
 export interface FeeRefundProcessRequest {
   refund_id: string;
+  refund_method: 'cash' | 'bank_transfer' | 'cheque';
+  refund_reference?: string;
+  processing_remarks?: string;
 }
 
 export interface FeeRefundProcessResponse {
@@ -1061,19 +1064,12 @@ export const feeRefundsApi = {
     return response.data;
   },
 
-  updateFeeRefund: async (id: string, data: Partial<FeeRefundCreateRequest>): Promise<FeeRefundResponse> => {
-    const response = await apiClient.put(`/fee/refunds/${id}`, data);
-    return response.data;
-  },
-
-  deleteFeeRefund: async (id: string): Promise<void> => {
-    await apiClient.delete(`/fee/refunds/${id}`);
-  },
-
-  /** POST /fee/refunds/{id}/cancel — proper cancel workflow (preserves audit trail), matches web app */
+  /** Cancels a pending refund: the backend has no cancel route, so this rejects it through POST /fee/refunds/approve with the reason as remarks */
   cancelFeeRefund: async (id: string, reason: string): Promise<FeeRefundResponse> => {
-    const response = await apiClient.post(`/fee/refunds/${id}/cancel`, {
-      cancellation_reason: reason,
+    const response = await apiClient.post('/fee/refunds/approve', {
+      refund_id: id,
+      action: 'reject',
+      approval_remarks: reason,
     });
     return response.data;
   },

@@ -229,6 +229,8 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
         return;
       }
 
+      const hasPreviousSchool = (data.is_previous_school as unknown) === true || (data.is_previous_school as unknown) === 'true';
+
       // Restructure flat form data into nested API format
       // Use current academic year from store
       const cleanedData = {
@@ -249,10 +251,10 @@ const MultiStepAdmissionForm: React.FC<MultiStepAdmissionFormProps> = ({ onCompl
         district_id: data.district_id || undefined,
         mandal_id: data.mandal_id || undefined,
         pincode: data.pincode || undefined,
-        is_previous_school: data.is_previous_school || false,
-        previous_school_name: data.is_previous_school ? (data.previous_school_name || undefined) : 'NA',
-        previous_class: data.is_previous_school ? (data.previous_class || undefined) : 'NA',
-        previous_school_remark: data.is_previous_school ? (data.previous_school_remark || undefined) : 'NA',
+        is_previous_school: hasPreviousSchool,
+        previous_school_name: hasPreviousSchool ? (data.previous_school_name || undefined) : 'NA',
+        previous_class: hasPreviousSchool ? (data.previous_class || undefined) : 'NA',
+        previous_school_remark: hasPreviousSchool ? (data.previous_school_remark || undefined) : 'NA',
         student: {
           first_name: data.student_first_name ?? '',
           last_name: data.student_last_name ?? '',

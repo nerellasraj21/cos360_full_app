@@ -1,7 +1,6 @@
 import type {
   FeeRefund,
   FeeRefundCreateRequest,
-  FeeRefundUpdateRequest,
   FeeRefundWithDetails,
   RefundSummary,
   RefundHealthCheck
@@ -33,27 +32,27 @@ export const createFeeRefund = async (
 
 // List fee refunds with pagination
 export const fetchFeeRefunds = async (
-  skip = 0,
+  offset = 0,
   limit = 10,
   filters?: {
     student_id?: string;
     academic_year_id?: string;
     status?: string;
-    processed_by?: string;
+    refund_reason?: string;
     date_range?: { start_date?: string; end_date?: string };
   }
 ): Promise<PaginatedResponse<FeeRefundWithDetails>> => {
   try {
-    const params: any = { skip, limit };
+    const params: any = { offset, limit };
 
     if (filters) {
       if (filters.student_id) params.student_id = filters.student_id;
       if (filters.academic_year_id) params.academic_year_id = filters.academic_year_id;
       if (filters.status) params.status = filters.status;
-      if (filters.processed_by) params.processed_by = filters.processed_by;
+      if (filters.refund_reason) params.refund_reason = filters.refund_reason;
       if (filters.date_range) {
-        if (filters.date_range.start_date) params.start_date = filters.date_range.start_date;
-        if (filters.date_range.end_date) params.end_date = filters.date_range.end_date;
+        if (filters.date_range.start_date) params.date_from = filters.date_range.start_date;
+        if (filters.date_range.end_date) params.date_to = filters.date_range.end_date;
       }
     }
 
@@ -76,33 +75,11 @@ export const fetchFeeRefundById = async (
   }
 };
 
-// Update fee refund
-export const updateFeeRefund = async (
-  refundId: string,
-  refundData: FeeRefundUpdateRequest
-): Promise<FeeRefund> => {
-  try {
-    const { data } = await CAxios.put(`${FEE_REFUNDS}${refundId}`, refundData);
-    return data;
-  } catch (error) {
-    throw handleApiError(error);
-  }
-};
-
-// Delete fee refund
-export const deleteFeeRefund = async (refundId: string): Promise<void> => {
-  try {
-    await CAxios.delete(`${FEE_REFUNDS}${refundId}`);
-  } catch (error) {
-    throw handleApiError(error);
-  }
-};
-
 // Approve or reject refund
 export const approveOrRejectRefund = async (data: {
   refund_id: string;
   action: 'approve' | 'reject';
-  approved_by_user_id: string;
+  approved_by_user_id?: string;
   approval_remarks?: string;
 }): Promise<FeeRefund> => {
   try {
@@ -116,8 +93,8 @@ export const approveOrRejectRefund = async (data: {
 // Process refund
 export const processRefund = async (data: {
   refund_id: string;
-  processed_by_user_id: string;
-  refund_method?: 'cash' | 'bank_transfer' | 'cheque';
+  processed_by_user_id?: string;
+  refund_method: 'cash' | 'bank_transfer' | 'cheque';
   refund_reference?: string;
   processing_remarks?: string;
 }): Promise<FeeRefund> => {
@@ -129,32 +106,19 @@ export const processRefund = async (data: {
   }
 };
 
-// Cancel refund
+// Cancel a pending refund (the backend records it as a rejection with the reason as remarks)
 export const cancelFeeRefund = async (
   refundId: string,
   reason: string
 ): Promise<FeeRefund> => {
   try {
-    const { data } = await CAxios.post(`${FEE_REFUNDS}${refundId}/cancel`, {
-      cancellation_reason: reason
+    const { data } = await CAxios.post(`${FEE_REFUNDS}approve`, {
+      refund_id: refundId,
+      action: 'reject',
+      approval_remarks: reason
     });
     return data;
   } catch (error) {
-    throw handleApiError(error);
-  }
-};
-
-// Get refund by transaction ID
-export const fetchRefundByTransactionId = async (
-  transactionId: string
-): Promise<FeeRefundWithDetails | null> => {
-  try {
-    const { data } = await CAxios.get(`${FEE_REFUNDS}by-transaction/${transactionId}`);
-    return data;
-  } catch (error: any) {
-    if (error.response?.status === 404) {
-      return null;
-    }
     throw handleApiError(error);
   }
 };
@@ -181,44 +145,6 @@ export const fetchRefundStatistics = async (
     }
 
     const { data } = await CAxios.get(`${FEE_REFUNDS}statistics`, { params });
-    return data;
-  } catch (error) {
-    throw handleApiError(error);
-  }
-};
-
-// Approve/reject refunds (bulk)
-export const approveFeeRefunds = async (
-  refundIds: string[],
-  approvedBy: string,
-  action: 'approve' | 'reject',
-  rejectionReason?: string
-): Promise<FeeRefund[]> => {
-  try {
-    const { data } = await CAxios.post(`${FEE_REFUNDS}approve`, {
-      refund_ids: refundIds,
-      approved_by: approvedBy,
-      action,
-      rejection_reason: rejectionReason
-    });
-    return data;
-  } catch (error) {
-    throw handleApiError(error);
-  }
-};
-
-// Process refunds (bulk)
-export const processFeeRefunds = async (
-  refundIds: string[],
-  processedBy: string,
-  referenceNumber?: string
-): Promise<FeeRefund[]> => {
-  try {
-    const { data } = await CAxios.post(`${FEE_REFUNDS}process`, {
-      refund_ids: refundIds,
-      processed_by: processedBy,
-      reference_number: referenceNumber
-    });
     return data;
   } catch (error) {
     throw handleApiError(error);

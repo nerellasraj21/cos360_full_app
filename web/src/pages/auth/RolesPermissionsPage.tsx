@@ -60,8 +60,6 @@ import {
   applyPermissionTemplate,
   validateRoleDeletion,
   getTenantRoles,
-  debugGetTenantRoles,
-  testAdminEndpoint,
   type ResourcePermission,
   type PermissionMatrix,
   type BulkPermissionRequest,

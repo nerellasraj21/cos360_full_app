@@ -22,6 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ReadOrListPermissionGuard } from '@/components/PermissionGuards';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
 import { useToastContext } from '@/components/ToastProvider';
+import { attendancePercentage } from '@/src/utils/attendance';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -123,9 +124,9 @@ function AttendanceHistoryView({
     const absent = sorted.filter((r) => r.status === 'absent').length;
     const late = sorted.filter((r) => r.status === 'late').length;
     const leave = sorted.filter((r) => r.status === 'leave').length;
+    const halfDay = sorted.filter((r) => r.status === 'half_day').length;
     const total = sorted.length;
-    // Leave, like absent, does not contribute to the attendance percentage.
-    const pct = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
+    const pct = attendancePercentage(present, halfDay, total);
     return { present, absent, late, leave, total, pct };
   }, [sorted]);
 
@@ -482,17 +483,17 @@ function StaffAttendanceView() {
   }, [studentsData, attendanceRecords]);
 
   const stats = useMemo(() => {
-    let present = 0, absent = 0, late = 0, leave = 0;
+    let present = 0, absent = 0, late = 0, leave = 0, halfDay = 0;
     (studentsData as any[]).forEach((s: any) => {
       const status = statusMap[s.student?.id];
       if (status === 'present') present++;
       else if (status === 'absent') absent++;
       else if (status === 'late') late++;
       else if (status === 'leave') leave++;
+      else if (status === 'half_day') halfDay++;
     });
     const total = (studentsData as any[]).length;
-    // Leave, like absent, does not count towards the % Present figure.
-    const pct = total > 0 ? Math.round((present / total) * 100) : 0;
+    const pct = attendancePercentage(present, halfDay, total);
     return { present, absent, late, leave, total, pct };
   }, [studentsData, statusMap]);
 

@@ -704,6 +704,7 @@ export default function StudentAdmissionScreen() {
       if (!formData.admission_date) e.admission_date = 'Required';
       else if (!isValidDate(formData.admission_date)) e.admission_date = 'Invalid date';
       else if (isFutureDate(formData.admission_date)) e.admission_date = 'Cannot be in the future';
+      if (!formData.academic_year_id) e.academic_year_id = 'Required';
       if (!formData.admitted_class_id) e.admitted_class_id = 'Required';
       if (!formData.student.first_name.trim()) e.student = { ...e.student, first_name: 'First name is required' };
       if (formData.student.date_of_birth && isFutureDate(formData.student.date_of_birth))
@@ -1393,7 +1394,7 @@ export default function StudentAdmissionScreen() {
         </View>
       </View>
       <View style={fStyles.row}>
-        <View style={fStyles.half}>{renderDropdown('Academic Year (Optional)', 'academic_year_id', academicYearsData || [], 'Select year')}</View>
+        <View style={fStyles.half}>{renderDropdown('Academic Year *', 'academic_year_id', academicYearsData || [], 'Select year')}</View>
         <View style={fStyles.half}>{renderDropdown('Admitted Year (Optional)', 'admitted_academic_year_id', academicYearsData || [], 'Same as above')}</View>
       </View>
       <View style={fStyles.row}>

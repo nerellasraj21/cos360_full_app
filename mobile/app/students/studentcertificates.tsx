@@ -14,6 +14,7 @@ import { useMyCertificates, useCertificateTypesDropdown, useIssuableCertificateT
 import { studentCertificatesApi, studentAdmissionsApi, issuableCertificatesApi } from '@/src/api/students';
 import { DeletePermissionGuard, CreatePermissionGuard } from '@/src/components/mobile/MobilePermissionGuard';
 import { PERMISSION_RESOURCES } from '@/src/types/permissions';
+import { buildCertificateValues, fillCertificateTemplate } from '@/src/utils/certificateTemplate';
 import { useToastContext } from '@/components/ToastProvider';
 import { ConfirmModal, useConfirmModal } from '@/components/ConfirmModal';
 import { ScreenAccessGate } from '@/components/ScreenAccessGate';
@@ -39,10 +40,15 @@ function CertificateItem({ item, colors, onRevoked, serialNo }: { item: any; col
   };
 
   const revokeMutation = useMutation({
-    mutationFn: () => studentCertificatesApi.deleteCertificate(item.id),
+    mutationFn: () =>
+      item._cert_source === 'generated'
+        ? issuableCertificatesApi.deleteIssuedCertificate(item.id)
+        : studentCertificatesApi.deleteCertificate(item.id),
     onSuccess: () => {
       showSuccess('Revoked', 'Certificate revoked successfully');
       queryClient.invalidateQueries({ queryKey: ['certificates'] });
+      queryClient.invalidateQueries({ queryKey: ['certs-by-student'] });
+      queryClient.invalidateQueries({ queryKey: ['issuable-certs-by-student'] });
       onRevoked?.();
     },
     onError: () => showError('Error', 'Failed to revoke certificate'),
@@ -545,8 +551,8 @@ function AdminCertificates() {
             </TouchableOpacity>
             <ThemedText style={[styles.fieldLabel, { marginTop: 10, color: colors['muted-foreground'] }]}>Remarks</ThemedText>
             <TextInput style={[styles.textInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground, minHeight: 60 }]}
-              value={recvRemarks} onChangeText={setRecvRemarks} placeholder="Optional remarks (max 500 characters)"
-              placeholderTextColor={colors['muted-foreground']} multiline maxLength={500} />
+              value={recvRemarks} onChangeText={setRecvRemarks} placeholder="Optional remarks (max 255 characters)"
+              placeholderTextColor={colors['muted-foreground']} multiline maxLength={255} />
             <View style={styles.formBtns}>
               <TouchableOpacity
                 style={[styles.submitBtn2, { flex: 1, backgroundColor: receivedMutation.isPending ? colors.muted : colors.primary }]}
@@ -605,8 +611,8 @@ function AdminCertificates() {
                 </TouchableOpacity>
                 <ThemedText style={[styles.fieldLabel, { marginTop: 10, color: colors['muted-foreground'] }]}>Remarks</ThemedText>
                 <TextInput style={[styles.textInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground, minHeight: 60 }]}
-                  value={issuedRemarks} onChangeText={setIssuedRemarks} placeholder="Optional remarks (max 500 characters)"
-                  placeholderTextColor={colors['muted-foreground']} multiline maxLength={500} />
+                  value={issuedRemarks} onChangeText={setIssuedRemarks} placeholder="Optional remarks (max 255 characters)"
+                  placeholderTextColor={colors['muted-foreground']} multiline maxLength={255} />
                 <View style={styles.formBtns}>
                   <TouchableOpacity
                     style={[styles.submitBtn2, { flex: 1, backgroundColor: issuedMutation.isPending ? colors.muted : colors.primary }]}
@@ -672,7 +678,7 @@ function AdminCertificates() {
                       style={[styles.textInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground, minHeight: 60 }]}
                       value={genRemarks}
                       onChangeText={setGenRemarks}
-                      placeholder="Optional remarks (max 500 characters)"
+                      placeholder="Optional remarks (max 255 characters)"
                       placeholderTextColor={colors['muted-foreground']}
                       multiline
                       maxLength={500}
@@ -682,19 +688,26 @@ function AdminCertificates() {
                       <TouchableOpacity
                         style={[styles.submitBtn2, { flex: 1, backgroundColor: (generateMutation.isPending || !genTemplateId) ? colors.muted : '#8B5CF6' }]}
                         disabled={generateMutation.isPending || !genTemplateId}
-                        onPress={() => {
+                        onPress={async () => {
                           const tpl = (templatesData as any[]).find((t: any) => t.id === genTemplateId);
                           if (!tpl) return;
+                          let editedHtml = tpl.html_template;
+                          try {
+                            const admission = await studentAdmissionsApi.getAdmissionByStudentId(selectedStudentId);
+                            editedHtml = fillCertificateTemplate(tpl.html_template, buildCertificateValues(admission));
+                          } catch {
+                            showError('Error', 'Could not load student details for the template');
+                            return;
+                          }
                           generateMutation.mutate({
                             student_id: selectedStudentId,
                             template_id: genTemplateId,
-                            edited_html: tpl.html_template,
+                            edited_html: editedHtml,
                             remarks: genRemarks || undefined,
                           }, {
                             onSuccess: () => {
                               setGenTemplateId('');
                               setGenRemarks('');
-                              // Invalidate the issuable list so the generated cert appears
                               queryClient.invalidateQueries({ queryKey: ['issuable-certs-by-student', selectedStudentId] });
                             },
                           });

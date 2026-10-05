@@ -725,16 +725,6 @@ export async function getTenantRoles(): Promise<any> {
   return data;
 }
 
-export async function debugGetTenantRoles(): Promise<any> {
-  const { data } = await CAxios.get('/admin/role-mgmt/debug-roles/');
-  return data;
-}
-
-export async function testAdminEndpoint(): Promise<any> {
-  const { data } = await CAxios.get('/admin/role-mgmt/test/');
-  return data;
-}
-
 export function useRoles() {
   return useQuery({
     queryKey: ['roles'],

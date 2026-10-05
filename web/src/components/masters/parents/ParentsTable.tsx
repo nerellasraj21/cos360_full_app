@@ -18,6 +18,19 @@ interface ParentsTableProps {
 
 interface ParentFormData extends ParentInput {}
 
+export function buildParentPayload(form: ParentFormData): ParentInput {
+    const payload: ParentInput = {
+        name: form.name.trim(),
+        relation_to_student: form.relation_to_student,
+    };
+    if (form.email?.trim()) payload.email = form.email.trim();
+    if (form.phone?.trim()) payload.phone = form.phone.trim();
+    if (form.occupation?.trim()) payload.occupation = form.occupation.trim();
+    if (form.aadhar_number?.trim()) payload.aadhar_number = form.aadhar_number.trim();
+    if (form.gender) payload.gender = form.gender;
+    return payload;
+}
+
 export function ParentsTable({ className }: ParentsTableProps) {
     const { checkPermission } = usePermission();
     const canCreate = checkPermission('parent_management', 'create');
@@ -39,8 +52,7 @@ export function ParentsTable({ className }: ParentsTableProps) {
         occupation: '',
         aadhar_number: '',
         gender: undefined,
-        relation_to_student: 'Father',
-        user_id: ''
+        relation_to_student: 'Father'
     });
 
     const { data: parentsResponse, isLoading } = useParents();
@@ -99,8 +111,7 @@ export function ParentsTable({ className }: ParentsTableProps) {
             occupation: '',
             aadhar_number: '',
             gender: undefined,
-            relation_to_student: 'Father',
-            user_id: ''
+            relation_to_student: 'Father'
         });
         setIsFormDirty(false);
         setEditingParent(null);
@@ -115,8 +126,7 @@ export function ParentsTable({ className }: ParentsTableProps) {
             occupation: parent.occupation || '',
             aadhar_number: parent.aadhar_number || '',
             gender: parent.gender as 'Male' | 'Female' | 'Other' | undefined,
-            relation_to_student: parent.relation_to_student,
-            user_id: parent.user_id
+            relation_to_student: parent.relation_to_student
         });
         setIsFormDirty(false);
         setEditingParent(parent);
@@ -133,19 +143,21 @@ export function ParentsTable({ className }: ParentsTableProps) {
             return;
         }
 
-        if (!formData.user_id.trim()) {
-            toast.error('User ID is required');
+        if (!editingParent && !formData.email?.trim() && !formData.phone?.trim()) {
+            toast.error('Email or phone is required to create the parent login');
             return;
         }
+
+        const payload = buildParentPayload(formData);
 
         try {
             if (editingParent) {
                 await updateMutation.mutateAsync({
                     id: editingParent.id,
-                    data: formData
+                    data: payload
                 });
             } else {
-                await createMutation.mutateAsync(formData);
+                await createMutation.mutateAsync(payload);
             }
             setIsFormDirty(false);
             setShowCreateDialog(false);
@@ -454,17 +466,6 @@ export function ParentsTable({ className }: ParentsTableProps) {
                                     <SelectItem value="Guardian">Guardian</SelectItem>
                                 </SelectContent>
                             </Select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-foreground mb-1">
-                                User ID *
-                            </label>
-                            <Input
-                                value={formData.user_id}
-                                onChange={(e) => setFormData({ ...formData, user_id: e.target.value })}
-                                placeholder="Enter associated user ID"
-                            />
                         </div>
                     </div>
 

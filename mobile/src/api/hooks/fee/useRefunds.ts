@@ -110,20 +110,3 @@ export function useProcessFeeRefund() {
     },
   });
 }
-
-export function useDeleteFeeRefund() {
-  const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToastContext();
-  return usePermissionProtectedMutation<void, Error, string>({
-    mutationFn: (id) => feeRefundsApi.deleteFeeRefund(id),
-    resource: PERMISSION_RESOURCES.FEE_REFUNDS,
-    action: 'delete',
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['feeRefunds'] });
-      showSuccess('Refund deleted successfully');
-    },
-    onError: (error) => {
-      showError(error.message || 'Failed to delete refund');
-    },
-  });
-}

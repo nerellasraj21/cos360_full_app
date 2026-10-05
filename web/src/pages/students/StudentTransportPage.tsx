@@ -340,6 +340,7 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
   // Derive vehicleId from selected trip for pricing dropdown
   const selectedTrip = trips.find(t => t.id === tripId);
   const vehicleId = selectedTrip?.vehicle_id;
+  const routeStops = selectedTrip ? stops.filter(s => s.route_id === selectedTrip.route_id) : stops;
   const { data: pricingOptions = [] } = useTransportPricingDropdown(vehicleId);
 
   // ── Auto-fill Fee per Term from the student's assigned transport fee ─────────
@@ -443,7 +444,13 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
             <ReactSelect
               options={trips.map(t => ({ value: t.id, label: `Trip #${t.trip_number}` }))}
               value={tripId ? { value: tripId, label: `Trip #${trips.find(t => t.id === tripId)?.trip_number ?? ''}` } : null}
-              onChange={opt => setTripId(opt?.value ?? '')}
+              onChange={opt => {
+                const newTripId = opt?.value ?? '';
+                setTripId(newTripId);
+                const newRouteId = trips.find(t => t.id === newTripId)?.route_id;
+                const currentStop = stops.find(s => s.id === stopId);
+                if (currentStop && newRouteId && currentStop.route_id !== newRouteId) setStopId('');
+              }}
               placeholder="Select trip..."
               isClearable
               menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
@@ -454,7 +461,7 @@ function AssignTransportDialog({ open, onOpenChange, transport }: AssignTranspor
           <div className="space-y-2">
             <Label>Stop</Label>
             <ReactSelect
-              options={stops.map(s => ({ value: s.id, label: `#${s.number} – ${s.name}` }))}
+              options={routeStops.map(s => ({ value: s.id, label: `#${s.number} – ${s.name}` }))}
               value={stopId ? { value: stopId, label: (() => { const s = stops.find(s => s.id === stopId); return s ? `#${s.number} – ${s.name}` : ''; })() } : null}
               onChange={opt => {
                 const newStopId = opt?.value ?? '';

@@ -336,7 +336,7 @@ function AdminTransportView() {
       return;
     }
     const fee = parseFloat(feePerTerm);
-    if (isNaN(fee) || fee < 0) {
+    if (isNaN(fee) || fee <= 0) {
       showError('Validation', 'Enter a valid fee amount');
       return;
     }

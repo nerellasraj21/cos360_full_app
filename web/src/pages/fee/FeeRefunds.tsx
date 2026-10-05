@@ -280,7 +280,7 @@ function FeeRefundsContent() {
   });
 
   const processRefundMutation = useMutation({
-    mutationFn: ({ refundId, processedByUserId, refundMethod, refundReference, processingRemarks }: { refundId: string; processedByUserId: string; refundMethod?: 'cash' | 'bank_transfer' | 'cheque'; refundReference?: string; processingRemarks?: string }) =>
+    mutationFn: ({ refundId, processedByUserId, refundMethod, refundReference, processingRemarks }: { refundId: string; processedByUserId: string; refundMethod: 'cash' | 'bank_transfer' | 'cheque'; refundReference?: string; processingRemarks?: string }) =>
       processRefund({ refund_id: refundId, processed_by_user_id: processedByUserId, refund_method: refundMethod, refund_reference: refundReference, processing_remarks: processingRemarks }),
     onSuccess: () => {
       toast.success('Refund processed successfully');

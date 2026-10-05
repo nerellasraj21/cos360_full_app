@@ -220,6 +220,10 @@ function ParentsScreenContent() {
       showError('Validation', 'Aadhar number must be 12 digits');
       return;
     }
+    if (!editingParent && !form.email.trim() && !form.phone.trim()) {
+      showError('Validation', 'Email or phone is required to create the parent login');
+      return;
+    }
     const payload = buildPayload(form);
     if (editingParent) {
       updateMutation.mutate({ id: editingParent.id, data: payload });

@@ -7,7 +7,6 @@ export interface Parent {
   aadhar_number?: string;
   gender?: string;
   relation_to_student: 'Father' | 'Mother' | 'Guardian';
-  user_id: string;
   students?: Student[];
   created_at: string;
   updated_at: string;
@@ -21,7 +20,6 @@ export interface ParentInput {
   aadhar_number?: string;
   gender?: 'Male' | 'Female' | 'Other';
   relation_to_student: 'Father' | 'Mother' | 'Guardian';
-  user_id: string;
 }
 
 export interface ParentUpdateRequest {

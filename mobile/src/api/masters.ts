@@ -782,10 +782,24 @@ export const classSectionsApi = {
   },
 
   getStudentsByClassSection: async (classId: string, sectionId?: string): Promise<any[]> => {
-    const params: Record<string, string> = { class_id: classId, active_only: 'true' };
-    if (sectionId) params.section_id = sectionId;
-    const response = await apiClient.get('/students/admission/', { params });
-    return response.data.items || response.data;
+    const pageSize = 100;
+    const all: any[] = [];
+    let skip = 0;
+    for (;;) {
+      const params: Record<string, string | number> = {
+        class_id: classId,
+        active_only: 'true',
+        limit: pageSize,
+        skip,
+      };
+      if (sectionId) params.section_id = sectionId;
+      const response = await apiClient.get('/students/admission/', { params });
+      const items: any[] = response.data.items || [];
+      all.push(...items);
+      if (!response.data.has_next || items.length === 0) break;
+      skip += pageSize;
+    }
+    return all;
   },
 };
 

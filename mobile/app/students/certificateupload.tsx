@@ -115,8 +115,8 @@ function CertificateUploadPageContent() {
         student_id: selectedStudent.id,
         certificate_type_id: formData.certificateTypeId,
         issue_date: formData.issueDate || new Date().toISOString().split('T')[0],
-        description: formData.certificateName,
-        certificate_file: {
+        remarks: formData.description || formData.certificateName,
+        file: {
           uri: selectedFile.uri,
           type: selectedFile.type || 'application/octet-stream',
           name: selectedFile.name || 'certificate',
