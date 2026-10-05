@@ -57,26 +57,26 @@ Endpoint prefixes (all under `/api/v1`). Note that the naming is inconsistent (u
 - `/school-settings`: GET and PUT, plus `upload-image` and `upload-signature` (multipart field `photo`).
 
 ## Rules & gotchas
-1. **Bulk CSM replaces the set; it does not append.** Any subject missing from `subjects[]` for that class+section+year is set to `is_active=false`. The web "Add mappings" modal does not preload existing mappings, so submitting two new subjects deactivates every other mapping for those sections. Unknown `subject_id`s are skipped without an error.
+1. **Bulk CSM adds or updates; it does not replace.** Subjects missing from `subjects[]` are left untouched (`deactivated_count` is always 0), duplicate ids in a request are collapsed, and removal is a per-row update or delete. Unique indexes on (class, section, subject, year) and a class-wide one for null sections (migration 0007) prevent duplicate rows. Unknown `subject_id`s are skipped without an error.
 2. **`PUT /masters/class_sections/{id}` with `sections` deletes every section of the class and re-inserts them with new IDs.** That breaks admissions, fee mappings and timetables that point at the old IDs, or fails on the foreign key. Keep `sections` out of the payload and edit sections one at a time. `ClassUpdate.academic_year_id` has no default, so it must be sent (it may be null). `SectionUpdate.id` must be sent too.
 3. **Sections endpoints have two URL shapes.** Only `/masters/class_sections/sections/{id}` exists for GET, PUT and DELETE. Web `api/masters/classesandsections.ts` still exports `/{classId}/sections/{sectionId}` variants that return 404, so don't use them. Also, `POST /{class_id}/sections` expects a JSON **array**, while mobile `classSectionsApi.createSection` sends a single object.
 4. **List endpoints default `active_only=true`.** Academic years, holidays and subjects default to true, and the class/section dropdowns filter on `is_active`. Management screens must pass `active_only=false`, as web and mobile do, or they only show the active year.
 5. **Backend dropdowns and the academic-year list are cached in memory for 5 minutes** (`@cache_dropdown`, a `TTLCache` keyed by `current_schema()`).
    - The cache lives in each process, so other workers see stale data until the TTL expires.
-   - Invalidation is by key substring, and several invalidations are no-ops: `invalidate_cache("castes_dropdown")` and the `states_`/`districts_`/`mandals_` variants pass a pattern as the cache *type*. Section update/delete and subject update/deactivate do not invalidate at all.
+   - Invalidation is by key substring, and several invalidations are no-ops: `invalidate_cache("castes_dropdown")` and the `states_`/`districts_`/`mandals_` variants pass a pattern as the cache *type*. Section update/delete and subject update/deactivate now invalidate; caste and location writes still do not.
    - Expect up to 5 minutes of stale dropdowns after edits.
-6. **`GET /masters/class_sections/read_all` ignores `academic_year_id`.** Web sends it, but the endpoint doesn't pass it on, so classes from every year come back. If there are no classes, it returns 400 (a wrapped 404) rather than `[]`.
+6. **`GET /masters/class_sections/read_all`** takes `academic_year_id` and `active_only` (default false) and returns `[]` when nothing matches.
 7. **Name mismatches between backend and clients.**
    - Subjects: backend `short_code`/`category` vs web `code`/`subject_category`. `fetchSubjects` maps them and handles both the array and `{items}` shapes.
    - Academic years: the field is `title`, not `name`.
    - Dropdown items: always `{id, name}` (years use `{id, title}`). Mobile `getClassSectionsDropdown`/`getHolidaysDropdown` are typed `{id,label}`, which is wrong.
 8. **`SubjectRead.category` is required.** A subject with a null `category_id` (the column is nullable) breaks every subject response with a 500. Always set a category.
 9. **Uniqueness depends on which layer checks it.**
-   - The models declare `unique=True` on `classes.name`, `subjects.name` and `subject_categories.name`. Sections are unique per class (`tenant_id, class_id, name`, migration 0005), so every class can have its own A, B, C.
-   - The service only checks subject name and short code *per academic year*. Category names are compared case-sensitively.
+   - Classes and subjects are unique per academic year (`tenant_id, academic_year_id, name`, migration 0006); `subject_categories.name` is unique per tenant. Sections are unique per class (`tenant_id, class_id, name`, migration 0005), so every class can have its own A, B, C. Lookups by class name alone (`sections-by-class-name`, `by-class-section`) are ambiguous when a name exists in several years and take the first match.
+   - The services check class and subject names per academic year before insert and on update; subject short codes are checked per year by the service only. Category names are compared case-sensitively.
    - Section names repeat across classes (the web generates A–D for every class); a Section row belongs to one class through `class_id`, there is no shared mapping table.
 10. **A CSM created with a null section** (single `POST /` with no `section_id`) is a class-level row.
-    - Postgres unique constraints treat NULLs as distinct, so duplicates are possible.
+    - Postgres unique constraints treat NULLs as distinct; a partial unique index on (tenant, class, subject, year) where `section_id IS NULL` covers class-level rows.
     - `GET /dropdown` fails validation for such rows (`section_name: str`).
     - The timetable editor treats `section_id == null` as "applies to every section".
     - Prefer the bulk endpoint.
@@ -104,7 +104,7 @@ Endpoint prefixes (all under `/api/v1`). Note that the naming is inconsistent (u
 
 ## Known gaps
 - Academic years and holidays have no start ≤ end check and no overlap check.
-- `update_class_with_sections` catches every exception and returns 400 with the text "Error fetching classes…". Real 404s are masked the same way in `get_class_with_sections`.
+- `update_class_with_sections` and `get_class_with_sections` re-raise their 404 (unknown class is 404).
 - School logo and signature uploads are written to `media/school/{images,signatures}/school_<field>.<ext>`. That path is **not tenant-scoped**, so every tenant overwrites the same file. `PUT /school-settings` also uses `commit()` → `refresh()`, which is against the repo rule.
 - Mobile Locations screen and mobile add-section are broken (see parity above).
 - There are two copies of the bulk-mapping API and hook on web:

@@ -5,8 +5,8 @@ Flows, decisions, and feature map: [graph view](../graph/views/expense.md) (sour
 
 ## What it does
 - **Categories** (for example Infrastructure or Utilities) contain **types** (for example Electricity or Water).
-  - Category names must be unique.
-  - Type names must be unique within their category.
+  - Category names must be unique among active categories (a soft-deleted category's name can be reused).
+  - Type names must be unique within their category, inactive types included; changing only a type's category re-checks the name in the target category.
   - A type can't be created in, or moved to, an inactive category.
   - Both are soft-deleted (`is_active = False`).
   - A type that has any transactions can't be deleted. A category can be deleted even when it has types, because that dependency check is commented out.
@@ -14,7 +14,7 @@ Flows, decisions, and feature map: [graph view](../graph/views/expense.md) (sour
   - Fields: `expense_type_id`, `amount`, `transaction_date`, `description`, `payment_method`, `vendor_name`, `reference_number`, optional `department_id` and `academic_year_id`.
   - The client must generate a unique `idempotency_key`. A duplicate key is rejected.
   - Every new transaction starts as `pending`.
-- **Approval** is a single step. `requires_approval` is set once, when the transaction is created (see rule 1).
+- **Approval** is a single step. `requires_approval` is set when the transaction is created and recalculated when a pending transaction's amount, payment method or override is edited (see rule 1).
   - `POST /expense/transactions/{id}/approval` takes `{action: "approve"|"reject", approval_comment}`. The comment is required, 1–500 characters.
   - Only transactions that are `pending` **and** have `requires_approval` can be approved or rejected.
   - Once approved, a transaction can't be edited.
@@ -42,15 +42,15 @@ Endpoint prefixes:
 - `/expense/audit`: `/logs`, `/logs/{id}`, `/transactions/{id}/logs`, `/transactions/{id}/summary`
 
 ## Rules & gotchas
-1. **The approval threshold is hard-coded** in `ExpenseTransactionService.create_transaction`:
+1. **The approval threshold is hard-coded** in `ExpenseTransactionService._compute_requires_approval`:
    ```python
-   requires_approval = (override
-       or amount > Decimal("1000.00")
-       or payment_method.lower() in ["check", "wire_transfer"])
+   requires_approval = override if override is not None else (
+       amount > Decimal("1000.00") or payment_method.lower() in ["check", "wire_transfer"])
    ```
+   - `requires_approval_override=false` exempts the transaction; `true` forces approval; null applies the rules.
    - The clients send `cheque` and `bank_transfer`, so only the amount rule and the override ever trigger.
    - `ExpenseSettings` is ignored here.
-   - `requires_approval` is never recalculated on update. Editing the amount of a pending, auto-exempt transaction to a larger value skips approval.
+   - `requires_approval` is recalculated on update of a pending transaction when the amount, payment method or override changes.
 2. **Transactions that don't need approval stay `pending` forever.** Nothing auto-approves them, and they can't be approved.
    - No endpoint ever sets `paid` or `cancelled`. The mobile status tabs for those values are always empty.
    - The summary's default filter (everything except `cancelled`) **includes pending and rejected** expenses.

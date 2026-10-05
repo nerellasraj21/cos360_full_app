@@ -41,7 +41,8 @@ There are **two independent subsystems**. They share no tables.
   - `GET /templates/`, `GET /issued/?student_id=` and `GET /issued/{id}/` need `issuable_certificates:read`.
   - `DELETE /issued/{id}/` needs `issuable_certificates:delete`.
 - Both tables soft-delete with `is_active = "False"`. The column is a **string**.
-- `POST /generate/ {student_id, template_id, edited_html, remarks?}` stores the HTML exactly as sent. **The backend does no placeholder filling and makes no PDF.** `pdf_content` is never written.
+- `POST /generate/ {student_id, template_id, edited_html, remarks?}` stores the HTML exactly as sent. **The backend does no placeholder filling and makes no PDF.** `pdf_content` is never written. It rejects an inactive template (400) and a `student_id` that is not in the tenant (404).
+- Uploaded certificate `remarks` is capped at 255 characters (the column size); longer text is 422.
 - Three default templates exist: Bonafide (green, confirms enrollment), Transfer (blue), and Conduct (red, character). They can be added two ways:
   - `scripts/setup_issuable_certificates.py [tenant]` (creates the tables and seeds the templates).
   - The web "Load Default Templates" button, which posts `src/lib/defaultCertificateTemplates.ts`.
@@ -63,11 +64,7 @@ Dead code: mobile `src/api/certificates.ts` (it is not imported, and it calls ro
    - Clients can't tell the two kinds apart in lists. Add a category filter in the service before building separate tabs.
 2. **Relative download URL.** The `presigned_url` is `/media/...`. Only the web admin page prefixes the API origin. The web Student, Parent and Teacher pages set `window.location.href` to the relative path, and mobile passes it to `Linking.openURL`, so all of them break unless the web app and API share an origin. Always prefix, as `CertificateUploadPage.handleDownload` does.
 3. **Parent download always 403.** `download_certificate` compares `StudentParentLink.parent_id` with the **user** id, but it must resolve `parents.id` from `parents.user_id` first, as `/my-child/*` does.
-4. **Web multipart field name is wrong in two hooks.** `useCreateCertificate` / `useUpdateCertificate` (web `src/api/hooks/students/certificates.ts`) send the file as `certificate_file`, but the backend field is `file`. As a result:
-   - Legacy `POST /certificates/` fails with 422.
-   - A PATCH ignores the new file.
-   - `useUpdateCertificate` also always sends `certificate_type_id`.
-   Mobile and the web upload tabs correctly use `file`.
+4. **Multipart file field is `file`.** The web create/update hooks and mobile `certificateupload.tsx` now send `file` (they used `certificate_file` before).
 5. **Admin-only is by role name.** A tenant `Staff` user who holds every `student_certificates` permission still gets 403 on upload, lists and the selector. The web still routes Staff (and any non-student/parent/teacher role) to `CertificateUploadPage`. Mobile sends Teachers to the admin view as well.
 6. **Trailing slash on types.** `GET /certificates/types` (no slash) matches `GET /certificates/{certificate_id}` first and fails with a UUID 422, because the `/certificates` router is mounted before `/certificates/types`. Always call `/certificates/types/`.
    - `/issuable-certificates/*` routes are declared with trailing slashes too; call them exactly as declared.
@@ -96,11 +93,10 @@ Dead code: mobile `src/api/certificates.ts` (it is not imported, and it calls ro
 ## Known gaps
 - Category filtering is missing from all list endpoints (rule 1).
 - Parent download is broken (rule 3). Downloads for non-admin roles and on mobile are broken by the relative URL (rule 2).
-- Web create/update hooks send the wrong file field (rule 4).
 - `school_name` is hardcoded to "Your School Name" in the web generator, and `date_of_leaving*` placeholders are left blank (the data isn't stored).
 - There is no server-side PDF, no signature/issuer support, and no QR verification. Generated certificates are invisible to students and parents.
 - `media/` is served without auth, so any certificate file is public to anyone holding its URL (see `architecture.md`).
-- `generated_certificates.student_id` and `issued_by` have no foreign keys, and `GET /issuable-certificates/issued/` is unpaginated.
+- `generated_certificates.student_id` and `issued_by` have no foreign keys (generate validates the student and an active template in the service), and `GET /issuable-certificates/issued/` is unpaginated.
 - Endpoints read `UUID(current_user["sub"])` without a guard, so a malformed `sub` gives a 500, not a 401.
 - The issuable setup script is unsafe to run casually:
   - `setup_issuable_certificates.py` puts the schema argument straight into `SET search_path` with no quoting.

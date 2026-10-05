@@ -63,7 +63,7 @@ Optional (defaults in `app/config.py`):
 |---|---|
 | Auth | `JWT_ALGORITHM` (HS256), `ACCESS_TOKEN_EXPIRE_MINUTES` (30) |
 | HTTP | `ALLOWED_ORIGINS` — a list, so pass it as JSON (`["https://a","https://b"]`); defaults to `["*"]` with credentials allowed. Set it explicitly in production. |
-| Runtime | `DEBUG`, `ENVIRONMENT`, `LOG_LEVEL`, `PAGE_SIZE` |
+| Runtime | `DEBUG`, `ENVIRONMENT`, `LOG_LEVEL`, `PAGE_SIZE`, `RATE_LIMIT_ENABLED` (default true; set false only in automated test environments) |
 | Tenancy | `TENANT_STRICT_MODE` (true = `cschema` header required), `TENANT_ALLOW_DEFAULT_FALLBACK`, `TENANT_DEVELOPMENT_MODE`, `TENANT_DEFAULT_NAME` |
 | Redis | `REDIS_URL` (rate limiter), `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB` (Celery) |
 | Storage (declared, unused) | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT_URL`, `STALE_FILE_TTL_DAYS`; also unused: `SYNC_DATABASE_URL`, `ASYNC_DATABASE_URL` |

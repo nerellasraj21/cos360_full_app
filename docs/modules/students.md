@@ -27,7 +27,8 @@ Related: `docs/architecture.md` (tenancy, file storage, Celery), `docs/permissio
   - `admission_date` defaults to today and cannot be in the future.
 - **Format validation:**
   - Aadhar/APAAR must be exactly 12 digits; `primary_phone` exactly 10.
-  - Parent Aadhaar (`father_/mother_/guardian_aadhar_number`) is optional and not format-checked on admission, by choice. The parents master (`ParentCreate`) still requires 12 digits when a value is given, and `ParentOut` does not re-validate, so stored values of any length read back fine.
+  - Parent Aadhaar (`father_/mother_/guardian_aadhar_number`) is optional but must be 12 digits when given, on admission (`ParentCreate`) and on PATCH (`StudentAdmissionUpdate`, which also checks student Aadhar/APAAR, primary phone, parent email and salary range). `ParentOut` does not re-validate, so stored values of any length read back fine.
+  - A guardian with a name or any detail but no email is rejected (422); it used to be dropped silently.
   - `salary_range` is one of `below_1l | 1l_3l | 3l_5l | 5l_10l | above_10l` (see `GET /parents/salary-ranges/dropdown`).
 - **Parent reuse (siblings):** if a father, mother or guardian email already belongs to a user with role `Parent`, that parent is reused. Their fields are overwritten with the new payload and the new child is linked.
   - Father and mother may not share an email.
@@ -69,19 +70,14 @@ Related: `docs/architecture.md` (tenancy, file storage, Celery), `docs/permissio
 ## Rules & gotchas
 1. **Two different IDs.** List rows carry `id` = admission id and `student.id` = student id. `GET /id/{…}`, `PATCH /{…}`, `toggle-active` and photo routes take the **student id**. `DELETE /{…}` and `GET /by-admission/{…}` take the **admission id**. Mixing them up gives a 404.
 2. **Parents are nested under `student`.** The response has `student.father`, `student.mother` and `student.guardian`, not top-level fields. Ownership: `StudentOut.extract_father_mother_guardian` copies the `_father`/`_mother`/`_guardian` values the service sets. The **list** endpoint fills father and mother but **not guardian**. `student.is_active` is filled only by list and toggle; the detail GET returns `null`.
-3. **Guardian needs an email.** `add_admission` silently drops a guardian whose email is blank, so both clients require the guardian email once a guardian name is entered. PATCH can only update an existing guardian link; it cannot add one.
+3. **Guardian needs an email.** The API rejects (422) a guardian that has a name or details but no email, and both clients require the guardian email once a guardian name is entered. PATCH can only update an existing guardian link; it cannot add one.
 4. **Login identity never follows edits.**
    - Changing `admission_number` or a parent's email via PATCH updates the `student_admissions` / `parents` row only; `users.username` and `users.email` keep their original values.
    - Parents are shared across siblings, so editing a parent through one child's admission changes it for all siblings.
    - Creating an admission with an existing parent email overwrites that parent's name, phone and other fields.
-5. **`DELETE /students/admission/{admission_id}` is unsafe.**
-   - It deletes the student, the student's user, **every linked parent and their users**. That includes parents shared with siblings.
-   - It then returns a dict while declaring `response_model=StudentAdmissionResponse`, so the client gets a 500 **after** the commit.
-   - No client calls it. Use toggle-active instead.
-6. **List pagination:** `GET /students/admission/` defaults to `limit=10` (max 100) and **ignores `active_only`**.
-   - Both attendance rosters (web `getStudentsByClassSection`, mobile `studentAdmissionsApi.getStudentsByClassSection`) send no `limit`, so they show at most 10 students per class.
-   - They also include inactive students.
-   - Pass `limit=100` and filter on `student.is_active`, or use `/students/admission/students/dropdown`, which honours `active_only`.
+5. **`DELETE /students/admission/{admission_id}`** deletes the student's attendance, documents, certificates, fee mappings, transport assignments, parent links, admission, student and user, and a parent (with their user) only when no other student is linked. It returns 200 `{message}`, or 409 (nothing deleted) when the student has fee payments, concessions, previous dues, exam marks or results, homework, or another admission. No client calls it; prefer toggle-active.
+6. **List pagination:** `GET /students/admission/` defaults to `limit=10` (max 100); `active_only=true` (default false) keeps only active students.
+   - The roster helpers (web `getStudentsByClassSection`, mobile `studentAdmissionsApi`/`classSectionsApi.getStudentsByClassSection`) send `active_only=true` and page 100 at a time until `has_next` is false.
 7. **`is_primary` means two different things.**
    - UI (web `StudentStepForm`, mobile): `not_primary` = "Day Scholar", `primary` = "Hostel".
    - Bulk upload and backend: "Student type" `Pre Primary` → `primary`, and `add_admission` turns `is_primary == "primary"` into `admission_type = pre_primary` when no `admission_type` is sent. The bulk path never sends one.
@@ -117,10 +113,8 @@ Related: `docs/architecture.md` (tenancy, file storage, Celery), `docs/permissio
 | Admission form dates | `DatePicker` | typed `DD/MM/YYYY` (slashes auto-inserted) **or** calendar icon, both kept in sync; form state and payload stay `YYYY-MM-DD` |
 
 ## Known gaps
-- Attendance roster capped at 10 students and includes inactive students (rule 6).
 - Teachers are not scoped to their classes; they see and mark every student.
 - Student document files cannot be downloaded (rule 14), and there is no document-type master or verification on the backend.
-- `DELETE` admission is destructive to shared parents and returns 500 (rule 5).
 - `POST /parents/` is broken (rule 15). There is no way to add a guardian to an existing admission (rule 3).
 - `send-confirmation` / `send-absence-alerts` fail on import (rule 17).
 - Homework is not built: a `student_homework` model exists, but the only route is `POST /students/homework/send-reminders` (no CRUD, no UI).

@@ -52,6 +52,15 @@
         "CI": "1"
       },
       "port": 8081
+    },
+    {
+      "name": "qa-api",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "scripts/qa/run_test_api.py"
+      ],
+      "cwd": "backend",
+      "port": 8100
     }
   ]
 }
