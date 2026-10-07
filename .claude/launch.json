@@ -77,7 +77,7 @@
       "port": 5174,
       "env": {
         "VITE_API_BASE_URL": "http://127.0.0.1:8100/api/v1",
-        "VITE_DEFAULT_TENANT": "qa_school"
+        "VITE_DEFAULT_TENANT": "qa_manual"
       }
     },
     {

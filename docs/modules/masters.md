@@ -118,3 +118,10 @@ Endpoint prefixes (all under `/api/v1`). Note that the naming is inconsistent (u
 - There are two copies of the bulk-mapping API and hook on web:
   - The duplicate `createBulkClassSubjectMappings` in `web/src/api/masters/subjects.ts` posts to `/class-subject-mappings/` (missing `/masters`). It is wrapped by a duplicate `useCreateBulkClassSubjectMappings` in `api/hooks/masters/subjects.ts`.
   - Only the pair in `api/masters/classsubjectmappings.ts` / `api/hooks/masters/classsubjectmappings.ts` is correct, and that is the one the modal uses.
+- UI defects found by the UI automation run (details and case IDs in `docs/features/masters.md`, Known gaps 20 to 24):
+  - UI-MST-01: web Add Academic Year dialog closes even when the save fails.
+  - UI-MST-02: mobile ignores the academic year chosen at sign-in.
+  - UI-MST-20: web bulk mapping dialog numbers subjects 1, 3, 5 when picked one at a time.
+  - UI-MST-21: mobile "Select Class" picker opens behind the "Add Subject Mappings" sheet.
+  - UI-MST-30: School Email relies on native browser validation; the inline errors do not show for "bad".
+- Tests leave rows behind because some masters cannot be removed through the API: subjects (deactivate only), the school settings row, and Parent-role users created with parents.

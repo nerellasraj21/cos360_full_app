@@ -15,7 +15,7 @@ _Last verified against code: 2026-10-07_
 | QA tenant | `qa_school` | For automated tests only. Provisioned by `scripts/qa/setup_qa_tenant.py`: plan Full, default academic year, the super admin, and Admin, Staff, Teacher, Student and Parent logins. It has no school data; the API tests create and delete their own rows. |
 | Second QA tenant | `qa_school_b` | For tenant-isolation tests. The API suite creates it on first use (fixture `tenant_b`, through the super admin API) with the `QA_B_ADMIN_*` login. |
 | Manual-test tenant | `qa_manual` | For manual testing, UI automation and the journeys. Provisioned like `qa_school` with the same QA logins, then filled with a realistic school by `scripts/seed_demo_data.py`: classes and sections, subjects, staff, students with parents, fee structure and payments, exams with marks and results, transport, expenses, certificates, message templates, timetables and documents. |
-| Web under test | `http://localhost:5174` | Vite dev server with `VITE_API_BASE_URL` pointed at the test API (launch config `web-qa`). The web app takes its tenant from `VITE_DEFAULT_TENANT` on localhost: `qa_school` for automation, `qa_manual` for manual testing. |
+| Web under test | `http://localhost:5174` | Vite dev server with `VITE_API_BASE_URL` pointed at the test API (launch config `web-qa`). The web app takes its tenant from `VITE_DEFAULT_TENANT` on localhost; for manual and UI testing it is `qa_manual`. Open it as `localhost`, not `127.0.0.1`: the dev server answers on `localhost` only. |
 | Mobile under test | `http://localhost:8082` | Expo web with `EXPO_PUBLIC_API_URL` pointed at the test API (launch config `mobile-qa`). The organisation is typed at sign-in. |
 
 The same database also holds the `demo_school` and other demo tenants. The tests never touch them.
@@ -52,7 +52,7 @@ The same database also holds the `demo_school` and other demo tenants. The tests
 - Testers use `qa_manual`. Sign in with the QA logins, or with a seeded student (admission number) or parent (email, or `<admission number>.father` / `.mother`) and the temporary password, which forces a password change at first sign-in.
 - Rebuild `qa_manual` before a release test cycle (`setup_manual_tenant.py --reset`) so every tester starts from the same data. Journeys create their own data on top of it.
 - The tester's guide is `docs/testing/manual-testing-guide.md`; the journeys are in `docs/testing/e2e-journeys.md`.
-- Playwright in COS360_QA reads `QA_TENANT` from its `.env` and runs against `qa_school` by default. Specs that need school data set the tenant to `qa_manual`.
+- Playwright in COS360_QA runs the UI tests against `qa_manual` (set `UI_TENANT` to change it); the API suite keeps using `QA_TENANT` (`qa_school`). The web dev server must be started for the same tenant (launch config `web-qa` uses `qa_manual`).
 
 ## Daily use
 
