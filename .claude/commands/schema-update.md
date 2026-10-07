@@ -14,7 +14,7 @@ Comprehensive workflow for updating database schemas in COS360 multi-tenant syst
 - [ ] **Breaking Changes**: Identify backwards compatibility issues
 - [ ] **Data Migration**: Assess data transformation requirements
 - [ ] **API Changes**: Determine endpoint modifications needed
-- [ ] **Multi-Tenant Impact**: Consider effect on all tenant schemas
+- [ ] **Multi-Tenant Impact**: One shared schema; a new tenant table needs `BaseOrg` and `enable_tenant_rls`
 - [ ] **Performance Impact**: Evaluate query performance changes
 
 #### Change Types
@@ -94,7 +94,7 @@ class StudentOut(BaseModel):
 #### Automatic Migration Creation
 ```bash
 # Generate migration for schema changes
-alembic revision --autogenerate -m "add_emergency_contact_and_enrollment_status_to_students"
+alembic revision --autogenerate --rev-id <next number> -m "add_emergency_contact_and_enrollment_status_to_students"
 
 # Review generated migration
 cat migrations/versions/<generated_revision>_add_emergency_contact_and_enrollment_status_to_students.py
@@ -213,7 +213,7 @@ async def test_update_enrollment_status():
 async def test_api_create_student_with_new_fields():
     response = await client.post(
         "/api/v1/student/admissions/",
-        headers={"Authorization": f"Bearer {token}", "cschema": "test_tenant"},
+        headers={"Authorization": f"Bearer {token}"},
         json={
             "first_name": "John",
             "last_name": "Doe",
@@ -263,8 +263,8 @@ async def create_student(
 ## COS360-Specific Schema Update Considerations
 
 ### Multi-Tenant Schema Management
-1. **Schema Synchronization**: Ensure all tenant schemas get updates
-2. **Data Migration**: Handle existing data across all tenants
+1. **One migration**: The shared schema gets one Alembic revision (`/migration`, `docs/operations/database-migrations.md`)
+2. **Data Migration**: Handle existing rows of every tenant (backfills run as the owner role, across all `tenant_id`s)
 3. **Rollback Compatibility**: Ensure safe rollback procedures
 4. **Performance Impact**: Test impact on multi-tenant queries
 
@@ -278,7 +278,7 @@ async def create_student(
 - [ ] **Service Functions**: Ensure new/updated functions use `flush() → select() → commit()`
 - [ ] **Relationship Loading**: Use `selectinload()` for relationships
 - [ ] **Error Handling**: Proper rollback on exceptions
-- [ ] **Multi-Tenant Context**: Maintain schema context throughout operations
+- [ ] **Multi-Tenant Context**: Use the tenant session; never set `search_path` or schema-qualify tenant tables
 
 ## Execution Workflow
 
@@ -298,7 +298,7 @@ async def create_student(
 - [ ] **Backward Compatibility**: Existing API calls still work
 - [ ] **Data Integrity**: No data loss during migration
 - [ ] **Performance**: No significant performance degradation
-- [ ] **Multi-Tenant**: All tenant schemas updated correctly
+- [ ] **Multi-Tenant**: `test_every_tenant_table_has_forced_rls` passes and autogenerate shows no drift
 - [ ] **Security**: No security implications from changes
 
 ## Example Usage

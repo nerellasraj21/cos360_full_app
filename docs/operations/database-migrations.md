@@ -2,7 +2,7 @@
 
 How schema changes reach the shared database, how to set up a local database, and how to back up.
 
-_Last verified against code: 2026-10-01_
+_Last verified against code: 2026-10-07_
 
 ## The database
 
@@ -40,16 +40,17 @@ The app role must never be the owner or a superuser, because both bypass row-lev
    MIGRATION_DATABASE_URL=postgresql+psycopg2://cos360_owner:<owner_password>@localhost:5432/cos360_unischema
    ```
 4. `alembic upgrade head` from `backend/`.
+5. Create tenants with `POST /super_admin/system/tenants/`, or for local work use the scripted tenants: the demo tenant (`backend/CLAUDE.md`, Scripts) and the QA tenant (`docs/testing/test-environment.md`). Both live in this same database.
 
 ## How Alembic is wired (`backend/migrations/env.py`)
 
-- One schema, one `alembic_version`. `migrations/versions/` starts at a baseline (`0001`); `0002` enables RLS on every tenant table. The old per-schema history is in `migrations/legacy_versions/` for reference and cannot be applied.
-- `MIGRATION_DATABASE_URL` is required and `env.py` sets no `search_path`. `+asyncpg` and `+psycopg` prefixes are rewritten for psycopg2.
+- One schema, one `alembic_version`. `migrations/versions/` starts at a baseline (`0001`); `0002` enables RLS on every tenant table. Revision ids are sequential four-digit numbers (`0001`, `0002`, ...), not Alembic's random hex. The old per-schema history is in `migrations/legacy_versions/` for reference and cannot be applied; `SCHEMA_NAME` is read only there.
+- `MIGRATION_DATABASE_URL` is required and `env.py` sets no `search_path`. `+asyncpg` and `+psycopg` prefixes are rewritten for psycopg2, and `ssl=` becomes `sslmode=`. `alembic.ini` has no URL of its own.
 - `load_all_models()` imports every model file and applies the per-tenant uniqueness rule, so autogenerate sees the same metadata the app does. On a clean database autogenerate reports no changes; anything else is real drift.
 
 ## Procedure: making a schema change
 
-1. Change the model, then `alembic revision --autogenerate -m "<what>"`. Read the output line by line.
+1. Change the model, then `alembic revision --autogenerate --rev-id <next number> -m "<what>"` (check the current head with `alembic heads`). Read the output line by line.
 2. **A new tenant table** needs `tenant_id` (inherit `BaseOrg`; it is added for you) and RLS in the same revision:
    ```python
    from app.db.rls import enable_tenant_rls
@@ -58,7 +59,7 @@ The app role must never be the owner or a superuser, because both bypass row-lev
        op.create_table("vehicles_extra", ...)
        enable_tenant_rls(op, "vehicles_extra")
    ```
-   `test_every_tenant_table_has_forced_rls` fails if a table is missed.
+   `test_every_tenant_table_has_forced_rls` (`backend/tests/integration/test_tenant_isolation.py`, run against the local database) fails if a table is missed.
 3. **A unique key on a tenant table** is made per tenant automatically. If another table references it by foreign key, make that foreign key composite with `tenant_id`.
 4. A new platform table (no tenant data) inherits `BasePublic` and needs no RLS.
 5. Never create tables at runtime: the app role has no DDL rights.

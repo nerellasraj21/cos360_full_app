@@ -17,8 +17,8 @@ The user tests everything. If it crashes or doesn't work, it's on us for not ver
 
 ## Commands (run from `web/`)
 
-`npm install` · `npm run dev` · `npm run build:check` (tsc -b + vite build — the real type check) · `npm run lint` · `npx shadcn@latest add <component>`.
-There is no `test` script and no web CI. Vitest is installed; the only tests are under `src/components/dropdown-system/**/__tests__` (`npx vitest run`).
+`npm install` · `npm run dev` · `npm run build:check` (tsc -b + vite build - the real type check) · `npm run lint` · `npm test` (vitest run) · `npx shadcn@latest add <component>`.
+There is no web CI. Unit tests live in `src/__tests__/<module>/*.test.ts`; `vitest.config.ts` runs `src/**/*.test.ts` in the `node` environment (no jsdom), so `.tsx` component tests and `src/components/dropdown-system/**/__tests__` do not run. Put the test case ID at the start of the test name (`docs/testing/strategy.md`).
 Use npm (`package-lock.json`); don't use yarn.
 
 ## Folder layout (`src/`)
@@ -177,4 +177,4 @@ Summary only (model: `docs/permissions.md`). The UI hides what the backend would
 
 ## Logging
 
-Don't add `console.log`. Use `logger` from `src/lib/config.ts` (`logger.debug` respects `VITE_LOG_LEVEL`). Existing `console.log`s in `authStore.hasPermission`, `usePermission` and `PermissionGuard` are noise and should be removed when touched.
+Don't add `console.log`. Use `logger` from `src/lib/config.ts` (`logger.debug` respects `VITE_LOG_LEVEL`). Remove any existing `console.log` you come across in files you touch.

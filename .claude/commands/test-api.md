@@ -6,22 +6,26 @@ Comprehensive testing framework for COS360 FastAPI multi-tenant application with
 ## Usage
 `/test-api [module] [coverage]` - Execute comprehensive API testing
 
+## Where the real procedure lives
+- Phases, test case IDs and coverage rules: `docs/testing/strategy.md`.
+- QA database, `qa_` tenants and the test API on port 8100: `docs/testing/test-environment.md`.
+- What is tracked, what CI runs, run commands: `docs/operations/testing.md`.
+- API tests and QA scripts run only against the local database and `qa_` tenants. Logins come from `backend/.env.test` (gitignored); never put credentials in commands, tests or docs.
+
 ## Testing Strategy
 
 ### 1. Unit Tests for Services
 
 #### Service Layer Testing
-```python
-# Test service functions independently
-pytest app/service/fee/test_fee_category_service.py -v
-pytest app/service/masters/test_staff_service.py -v
-pytest app/service/student/test_admission_service.py -v
+```bash
+# From backend/; unit tests use mocked sessions and need no database
+pytest tests/unit/<module>/ -v
 ```
 
 #### Database Refresh Pattern Testing
 - [ ] **Create Operations**: Verify `flush() → select() → commit()` pattern
 - [ ] **Update Operations**: Ensure no `commit() → refresh()` usage
-- [ ] **Multi-tenant Context**: Test schema isolation
+- [ ] **Multi-tenant Context**: Test tenant isolation (tenant_id + row-level security)
 - [ ] **Relationship Loading**: Validate `selectinload()` usage
 
 ### 2. API Endpoint Testing
@@ -29,15 +33,15 @@ pytest app/service/student/test_admission_service.py -v
 #### Authentication Testing
 ```bash
 # Test tenant authentication
-curl -X POST http://localhost:8000/api/v1/auth/login \
+curl -X POST http://127.0.0.1:8100/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -H "cschema: test_tenant" \
-  -d '{"username": "admin", "password": "testpass123"}'
+  -H "cschema: qa_school" \
+  -d '{"username": "<QA_ADMIN_USER>", "password": "<QA_ADMIN_PASSWORD>", "academic_year_id": "<id from /auth/academic-years>"}'
 
 # Test super admin authentication
-curl -X POST http://localhost:8000/api/v1/super_admin/auth/login \
+curl -X POST http://127.0.0.1:8100/api/v1/super_admin/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username": "superadmin", "password": "admin123"}'
+  -d '{"username": "<QA_SUPERADMIN_USER>", "password": "<QA_SUPERADMIN_PASSWORD>"}'
 ```
 
 #### CRUD Operations Testing
@@ -51,21 +55,17 @@ curl -X POST http://localhost:8000/api/v1/super_admin/auth/login \
 
 #### Tenant Isolation Testing
 ```python
-# Test data isolation between tenants
-async def test_tenant_isolation():
-    # Create data in tenant A (test tenants only; never the live little_bunny schema)
-    tenant_a_data = await create_test_data(schema="test_tenant_schema")
-
-    # Verify data not accessible from tenant B (a second test schema cloned from cos360_master)
-    tenant_b_data = await get_data_from_tenant(schema="<second_test_schema>")
-
-    assert tenant_a_data not in tenant_b_data
+# Data created in QA_TENANT must be invisible from the second qa_ tenant (QA_B_TENANT, tests/api/support.py)
+def test_tenant_isolation(api_a, api_b):
+    created = api_a.post("/masters/subjects/", json={...})
+    listed = api_b.get("/masters/subjects/")
+    assert created["id"] not in [row["id"] for row in listed["items"]]
 ```
+Database-level checks (forced RLS on every tenant table) are in `backend/tests/integration/test_tenant_isolation.py`.
 
-#### Schema Context Testing
-- [ ] **Header Detection**: Test `cschema` header processing
-- [ ] **Schema Switching**: Verify proper tenant context switching
-- [ ] **Database Sessions**: Test tenant-specific database connections
+#### Tenant Context Testing
+- [ ] **Header Detection**: `cschema` picks the tenant only before login (`/auth/login`, `/auth/academic-years`)
+- [ ] **Token Tenant**: Authenticated requests use the token's `tenant_id`; a `cschema` header for another tenant gets 403
 - [ ] **Cross-Tenant Prevention**: Ensure no data leakage
 
 ### 4. Permission System Testing
@@ -151,12 +151,6 @@ async def test_database_integration():
 
 ### 7. Performance Testing
 
-#### Load Testing
-```bash
-# Use locust for load testing
-locust -f tests/performance/locustfile.py --host=http://localhost:8000
-```
-
 #### Database Performance
 - [ ] **Query Optimization**: Test N+1 query prevention
 - [ ] **Pagination Performance**: Test large dataset pagination
@@ -222,53 +216,24 @@ async def test_error_handling():
 
 ### Run Full Test Suite
 ```bash
-# Run all tests
-pytest -v
-
-# Run with coverage
-pytest --cov=app --cov-report=html
-
-# Run specific module tests
-pytest tests/test_fee_management.py -v
-pytest tests/test_authentication.py -v
-pytest tests/test_multi_tenant.py -v
+# From backend/ (docs/operations/testing.md)
+pytest tests/unit/                              # phase 1, no database
+pytest tests/api -m api                         # phase 2, needs scripts/qa/run_test_api.py running
+pytest tests/api -m "api and tc" -k FEE-03      # one documented feature
+pytest tests/integration -m integration         # local database only
 ```
 
-### Performance Testing
-```bash
-# Run performance tests
-pytest tests/performance/ -v
-
-# Load testing
-locust -f tests/performance/load_test.py --host=http://localhost:8000 --users=50 --spawn-rate=5
-```
+There is no performance or load test suite in the repo.
 
 ## Test Data Management
 
 ### Test Fixtures
-```python
-# Create comprehensive test fixtures
-@pytest.fixture
-async def test_tenant_admin():
-    return {
-        "username": "admin",
-        "password": "testpass123",
-        "schema": "test_tenant_schema"
-    }
-
-@pytest.fixture
-async def test_academic_year():
-    return await create_test_academic_year()
-
-@pytest.fixture
-async def test_fee_category():
-    return await create_test_fee_category()
-```
+Use the session fixtures in `backend/tests/api/conftest.py` (`logins` per role, `academic_year_id`, per-role API clients). They read the QA logins from `backend/.env.test`; never hardcode usernames or passwords.
 
 ### Test Database Setup
-- [ ] **Isolated Test Database**: Use separate database for testing
-- [ ] **Schema Recreation**: Clean schema setup for each test run
-- [ ] **Test Data Seeding**: Consistent test data across test runs
+- [ ] **Isolated Test Database**: The local `cos360_unischema` database and `qa_` tenants only
+- [ ] **Baseline**: `python scripts/qa/setup_qa_tenant.py --reset` before a full run
+- [ ] **Own Data**: Each test creates rows with unique names and removes them
 - [ ] **Cleanup Procedures**: Proper test data cleanup
 
 ## Output Format

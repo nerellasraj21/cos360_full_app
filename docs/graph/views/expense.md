@@ -54,7 +54,7 @@ graph LR
 
 ### expense/categories-and-types
 
-Maintain expense categories (unique names) and their types (unique within a category); both are soft-deleted.
+Maintain expense categories (names unique among active categories) and their types (unique within a category, inactive included); both are soft-deleted.
 - Roles: expense_categories and expense_types permissions.
 - Parity: Both clients.
 - Note: A type cannot be created in or moved to an inactive category, and cannot be deleted if it has transactions; a category can be deleted even with types.
@@ -108,8 +108,9 @@ Web expense landing page with 3 stat cards (Categories, Types, Transactions) and
 
 Reports by category, by type, trend and period summary, plus an export.
 - Roles: expense_reports with the export extra action.
-- Parity: Both clients; mobile posts export to /expense/reports instead of /expense/reports/export.
+- Parity: Both clients show by-category, by-type and trend reports; neither starts an export, and the unused mobile exportReport posts to /expense/reports instead of /expense/reports/export.
 - Note: Export is mocked: a fixed export_id and a status that always says completed.
+- Note: Without status_filter the reports count every status, including pending and rejected.
 - Implemented by: `endpoint:GET /expense/reports/by-category`, `endpoint:GET /expense/reports/by-type`, `endpoint:GET /expense/reports/summary`, `endpoint:GET /expense/reports/trend`, `endpoint:POST /expense/reports/export`, `mobile:app/expense/reports.tsx`, `service:app/service/expense/expense_reporting_service.py`, `web:src/pages/expense/reports.tsx`
 
 ### expense/expense-settings
@@ -118,6 +119,7 @@ Key/value settings rows with CRUD, value lookup by key, UI common settings and r
 - Roles: expense_settings permission.
 - Parity: Both clients.
 - Note: Nothing in the transaction flow reads the settings.
+- Note: Create and delete also require the role name admin, tenant_admin or super_admin; reset is a stub that changes nothing.
 - Implemented by: `endpoint:GET /expense/settings`, `endpoint:GET /expense/settings/key/{setting_key}/value`, `endpoint:GET /expense/settings/ui/common`, `endpoint:POST /expense/settings`, `mobile:app/expense/settings.tsx`, `service:app/service/expense/expense_settings_service.py`, `table:expense_settings`, `web:src/pages/expense/settings.tsx`
 
 ### expense/expense-summary
@@ -164,10 +166,10 @@ Implements: `feature:expense/record-expense`
 1. The web or mobile form `web:src/components/expense/ExpenseTransactionForm.tsx` `mobile:app/expense/transactions/create.tsx` computes the total from client-side line items (unit price x quantity, with tax and discount).
 2. It sends only the final amount, with a client-generated idempotency_key, to `endpoint:POST /expense/transactions`; line items are not sent and `table:expense_transaction_items` is never written.
 3. The endpoint fills org_id with the request's tenant id `service:app/db/tenant_session.py`
-4. The service rejects a duplicate idempotency_key, sets requires_approval (override, or amount > 1000.00, or payment_method in check/wire_transfer) and saves the transaction as pending `service:app/service/expense/expense_transaction_service.py` `table:expense_transactions`.
+4. The service rejects a duplicate idempotency_key, computes requires_approval (a non-null override wins, otherwise amount > 1000.00 or payment_method in check/wire_transfer) and saves the transaction as pending `service:app/service/expense/expense_transaction_service.py` `table:expense_transactions`.
 
 - Note: Clients never send academic_year_id and the backend sets no default, so year-filtered summaries omit UI-created transactions.
-- Note: requires_approval is never recalculated on update.
+- Note: Editing a pending transaction's amount, payment method or override recomputes requires_approval.
 
 ```mermaid
 flowchart TD
@@ -176,7 +178,7 @@ flowchart TD
   s1 --> s2
   s3["3. The endpoint fills org_id with the request's tenant id<br/>service:app/db/tenant_session.py"]
   s2 --> s3
-  s4["4. The service rejects a duplicate idempotency_key, sets requires_appr...<br/>service:app/service/expense/expense_transaction_service.py<br/>table:expense_transactions"]
+  s4["4. The service rejects a duplicate idempotency_key, computes requires_...<br/>service:app/service/expense/expense_transaction_service.py<br/>table:expense_transactions"]
   s3 --> s4
 ```
 
@@ -190,10 +192,8 @@ Implements: `feature:expense/categories-and-types`
 1. Create a category `endpoint:POST /expense/categories` `service:app/service/expense/expense_category_service.py` `table:expense_categories` `web:src/pages/expense/categories.tsx`.
 2. Create types with category_id `endpoint:POST /expense/types` `service:app/service/expense/expense_type_service.py` `table:expense_types` `web:src/pages/expense/types.tsx`.
 3. Forms use the dropdowns `endpoint:GET /expense/categories/dropdown` and `endpoint:GET /expense/types/dropdown` with category_id.
-4. For tenant setup, backend/scripts/seed_expense_permissions.py seeds both permission layers: Admin full access; Staff create, read, list and update; Teacher read and list.
-5. backend/scripts/seed_expense_menu_test_tenant.py seeds the menu; users must log in again afterwards.
-
-- Note: Seeds cover categories, types, transactions and reports only; attachments, audit logs and settings permissions must be seeded separately or those endpoints return 403.
+4. Provisioning grants Admin every expense resource from permission_catalog.ALL_ADMIN, limited to the plan's plan_resource_access `service:app/service/tenant/role_seed_service.py`.
+5. The expense menu comes from the shared menu catalog and the plan's menu access; users must log in again to see a changed menu.
 
 ```mermaid
 flowchart TD
@@ -202,9 +202,9 @@ flowchart TD
   s1 --> s2
   s3["3. Forms use the dropdowns  and  with category_id.<br/>endpoint:GET /expense/categories/dropdown<br/>endpoint:GET /expense/types/dropdown"]
   s2 --> s3
-  s4["4. For tenant setup, backend/scripts/seed_expense_permissions.py seeds..."]
+  s4["4. Provisioning grants Admin every expense resource from permission_ca...<br/>service:app/service/tenant/role_seed_service.py"]
   s3 --> s4
-  s5["5. backend/scripts/seed_expense_menu_test_tenant.py seeds the menu; us..."]
+  s5["5. The expense menu comes from the shared menu catalog and the plan's ..."]
   s4 --> s5
 ```
 
@@ -243,9 +243,9 @@ flowchart TD
 
 ### expense/hard-coded-approval-threshold (unintended)
 
-- **Decision**: requires_approval is computed once at create in ExpenseTransactionService.create_transaction: override, or amount > 1000.00, or payment method check/wire_transfer.
+- **Decision**: requires_approval is computed by ExpenseTransactionService._compute_requires_approval on create and when a pending transaction's amount, payment method or override changes: a non-null override wins, otherwise amount > 1000.00 or payment method check/wire_transfer.
 - **Why**: Not a deliberate choice. Approval rules are meant to come from ExpenseSettings and be re-evaluated when the amount changes.
-- **Tradeoff**: ExpenseSettings is ignored; clients send cheque and bank_transfer, so only the amount rule and override trigger; editing the amount later skips approval.
+- **Tradeoff**: ExpenseSettings is ignored; clients send cheque and bank_transfer, so only the amount rule and the override trigger.
 - Shapes: `feature:expense/expense-approval`, `flow:expense/record-expense`, `service:app/service/expense/expense_transaction_service.py`
 
 ### expense/line-items-ui-only
@@ -278,7 +278,7 @@ flowchart TD
 
 ### expense/approval-threshold
 
-The rule deciding requires_approval at create: override, amount above 1000.00, or payment method check/wire_transfer; transactions that do not require approval can never be approved.
+The rule deciding requires_approval on create and on edits of a pending transaction: a non-null override wins, otherwise amount above 1000.00 or payment method check/wire_transfer; transactions that do not require approval can never be approved.
 - Related: `decision:expense/hard-coded-approval-threshold`, `feature:expense/expense-approval`
 
 ### expense/expense-category

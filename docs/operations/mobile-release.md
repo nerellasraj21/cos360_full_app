@@ -3,7 +3,7 @@
 How the Expo app in `mobile/` is configured, built and shipped to Android and iOS, and what must change before a
 store release.
 
-_Last verified against code: 2026-09-29_
+_Last verified against code: 2026-10-07_
 
 ## Identity (`mobile/app.json`)
 
@@ -34,12 +34,12 @@ _Last verified against code: 2026-09-29_
 - `EXPO_PUBLIC_*` values are inlined into the JS bundle at build time and are visible to anyone with the app.
   Only put public config there, never secrets.
 - Used by code:
-  - `EXPO_PUBLIC_API_URL` — must include `/api/v1`. Defaults to `http://localhost:8000/api/v1`
+  - `EXPO_PUBLIC_API_URL`: must include `/api/v1`. Defaults to `http://localhost:8000/api/v1`
     (`src/api/client.ts`, `src/api/auth.ts`, and a few screens that read it directly).
 - **Cloud builds don't see your `.env`**: it is gitignored, so EAS doesn't upload it. Without further setup a store
   build silently talks to `localhost`. Set the variables per profile, either in the `env` block of `eas.json`
   (fine for public URLs) or as EAS environment variables (`eas env:create`).
-- Local dev: copy `.env.example` → `.env`. After any change run `npx expo start --clear`; on Android with Expo Go,
+- Local dev: copy `.env.example` to `.env`. After any change run `npx expo start --clear`; on Android with Expo Go,
   also clear the app's data. The Android emulator reaches the host at `10.0.2.2`. A physical device needs the
   host's LAN IP on the same Wi-Fi, a backend started with `uvicorn ... --host 0.0.0.0` (the default binds
   127.0.0.1 only), and port 8000 allowed through the Windows firewall.
@@ -74,7 +74,7 @@ permissions.
 - Before the first store build:
   - `infoPlist.NSAppTransportSecurity.NSAllowsArbitraryLoads` is `true`, which allows plain HTTP. Remove it (the
     production API must be HTTPS), or App Review will ask for a justification.
-  - The app icon must be 1024×1024 with no alpha channel.
+  - The app icon must be 1024x1024 with no alpha channel.
   - `ITSAppUsesNonExemptEncryption: false` is already set (HTTPS only), which answers export compliance.
   - Don't add the `aps-environment` entitlement until push is implemented. `expo-notifications` is not installed,
     and the Communication module sends SMS/WhatsApp/email, not push.
@@ -104,7 +104,7 @@ build.
 
 - [ ] `npx tsc --noEmit`, `npm run lint`, `npm test` pass (from `mobile/`).
 - [ ] The production profile's `EXPO_PUBLIC_API_URL` points at the HTTPS production API, including `/api/v1`.
-- [ ] Backend changes the release depends on are deployed and migrated in every tenant schema.
+- [ ] Backend changes the release depends on are deployed, and the database is at the Alembic head they need.
 - [ ] `expo.version` bumped; EAS handles build numbers.
 - [ ] Manual regression pass on a real device for all five roles (`testing.md`).
 - [ ] No debug screens reachable. Debug components return `null` unless `__DEV__`; keep it that way.

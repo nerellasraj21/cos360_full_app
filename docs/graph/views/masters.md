@@ -42,30 +42,32 @@ graph LR
   n19{{"year-setup-and-selection"}}
   n19 -->|implements| n1
   n19 -->|implements| n2
-  n20[/"castes-per-tenant-locations-shared"/]
-  n20 -.->|shapes| n3
-  n20 -.->|shapes| n7
-  n20 -.->|shapes| n17
-  n21[/"inline-category-creation"/]
-  n21 -.->|shapes| n10
-  n21 -.->|shapes| n18
-  n22[/"one-active-academic-year"/]
-  n22 -.->|shapes| n1
-  n22 -.->|shapes| n2
-  n22 -.->|shapes| n19
-  n23[/"section-level-class-subject-mapping"/]
-  n23 -.->|shapes| n4
-  n23 -.->|shapes| n14
-  n24[/"sections-dropdown-uses-hook"/]
-  n24 -.->|shapes| n8
-  n25[/"soft-deactivate-vs-hard-delete"/]
-  n25 -.->|shapes| n2
-  n25 -.->|shapes| n5
-  n25 -.->|shapes| n10
-  n25 -.->|shapes| n11
-  n25 -.->|shapes| n13
-  n26[/"subject-categories-alias-router"/]
+  n20[/"additive-bulk-mapping"/]
+  n20 -.->|shapes| n14
+  n21[/"castes-per-tenant-locations-shared"/]
+  n21 -.->|shapes| n3
+  n21 -.->|shapes| n7
+  n21 -.->|shapes| n17
+  n22[/"inline-category-creation"/]
+  n22 -.->|shapes| n10
+  n22 -.->|shapes| n18
+  n23[/"one-active-academic-year"/]
+  n23 -.->|shapes| n1
+  n23 -.->|shapes| n2
+  n23 -.->|shapes| n19
+  n24[/"section-level-class-subject-mapping"/]
+  n24 -.->|shapes| n4
+  n24 -.->|shapes| n14
+  n25[/"sections-dropdown-uses-hook"/]
+  n25 -.->|shapes| n8
+  n26[/"soft-deactivate-vs-hard-delete"/]
+  n26 -.->|shapes| n2
+  n26 -.->|shapes| n5
   n26 -.->|shapes| n10
+  n26 -.->|shapes| n11
+  n26 -.->|shapes| n13
+  n27[/"subject-categories-alias-router"/]
+  n27 -.->|shapes| n10
 ```
 
 ## Features
@@ -85,6 +87,7 @@ Create, edit, deactivate and permanently delete academic years (title, start/end
 - Roles: Admin has full CRUD on academic_years; other roles read/list.
 - Parity: Both clients have a management screen; both must pass active_only=false or only the active year is listed.
 - Note: DELETE only deactivates; DELETE /{id}/permanent hard-deletes and is blocked while admissions, fee mappings, fee types or CSMs reference the year.
+- Note: end_date before start_date is rejected on create and update.
 - Flows: [masters/new-academic-year-setup](#mastersnew-academic-year-setup), [masters/year-setup-and-selection](#mastersyear-setup-and-selection)
 - Implemented by: `endpoint:DELETE /masters/academic_years/{academic_year_id}`, `endpoint:DELETE /masters/academic_years/{academic_year_id}/permanent`, `endpoint:GET /masters/academic_years`, `endpoint:POST /masters/academic_years`, `endpoint:PUT /masters/academic_years/{academic_year_id}`, `mobile:app/masters/academicyears.tsx`, `service:app/service/masters/academic_year_service.py`, `table:academic_years`, `web:src/pages/masters/academicyears.tsx`
 - Shaped by: [masters/one-active-academic-year](#mastersone-active-academic-year), [masters/soft-deactivate-vs-hard-delete](#masterssoft-deactivate-vs-hard-delete)
@@ -147,9 +150,9 @@ Dropdown endpoints for years, classes, sections, subjects, categories, CSMs and 
 ### masters/school-settings
 
 Single per-tenant row with school name, contacts, address, board, academic-year label, logo and principal signature (web menu label: School Registration).
-- Roles: school_settings:read and update; the menu item is hidden for teacher and student roles on web and mobile.
+- Roles: school_settings:read and update, Admin only by default; the menu item is hidden for teacher and student roles on web and mobile.
 - Note: PUT is a full replace of the text fields (omitted fields become null); logo and signature change only through the upload endpoints.
-- Note: Uploaded files go to media/school/{images,signatures}/ with a fixed name that is not tenant-scoped, so tenants overwrite each other.
+- Note: Uploaded files go to media/{tenant_id}/school/{images,signatures}/school_<field>.<ext>.
 - Flows: [masters/school-settings-setup](#mastersschool-settings-setup)
 - Implemented by: `endpoint:GET /school-settings`, `endpoint:POST /school-settings/upload-image`, `endpoint:POST /school-settings/upload-signature`, `endpoint:PUT /school-settings`, `mobile:app/admin/school-settings.tsx`, `mobile:src/api/schoolSettings.ts`, `service:app/service/masters/school_settings_service.py`, `table:school_settings`, `web:src/api/schoolSettings.ts`, `web:src/lib/menuUtils.ts`, `web:src/pages/settings/SchoolSettings.tsx`
 
@@ -184,10 +187,10 @@ Implements: `feature:masters/classes-and-sections`
 2. The service creates the class and its sections in one transaction `service:app/service/masters/class_service.py` `table:classes` `table:sections`.
 3. Later section additions go through `endpoint:POST /masters/class_sections/{class_id}/sections` with a JSON list body (needs sections:create) `web:src/components/masters/classesandsections/SectionsManagement.tsx`.
 4. Single sections are edited or deleted through `endpoint:PUT /masters/class_sections/sections/{section_id}` and `endpoint:DELETE /masters/class_sections/sections/{section_id}`; the /{classId}/sections/{sectionId} variants in `web:src/api/masters/classesandsections.ts` return 404.
-5. Editing the class itself calls `endpoint:PUT /masters/class_sections/{class_id}` without sections `web:src/components/masters/classesandsections/EditClassModal.tsx`; academic_year_id must be sent (may be null).
+5. Editing the class itself calls `endpoint:PUT /masters/class_sections/{class_id}` without sections `web:src/components/masters/classesandsections/EditClassModal.tsx`; academic_year_id must be sent (omitted is 422, null is 400).
 
-- Failure: Sending sections in the class PUT deletes every section and re-inserts them with new IDs, breaking admissions, fee mappings and timetables or failing on the foreign key.
 - Failure: Mobile add-section `mobile:app/masters/classesandsections.tsx` sends a single object instead of a list and fails validation.
+- Failure: Sending sections in the class PUT deletes every section and re-inserts them with new IDs; if any old section is referenced the whole update is refused with 400.
 
 ```mermaid
 flowchart TD
@@ -234,12 +237,10 @@ Implements: `feature:masters/class-subject-mappings`
 2. Web sends one `endpoint:POST /masters/class-subject-mappings/bulk` per selected section, or a single call with section_id=null for All Sections `web:src/api/masters/classsubjectmappings.ts` `web:src/api/hooks/masters/classsubjectmappings.ts`.
 3. Body: {class_id, section_id|null, academic_year_id, subjects:[{subject_id, order, exclude_marks, is_active}]}.
 4. With section_id=null the service fans out one row per active section of the class `service:app/service/masters/class_subject_mapping_service.py` `table:sections` and returns sections_processed.
-5. For each class+section+year, subjects in the list are upserted and any existing mapping missing from subjects[] is set is_active=false `table:class_subject_mappings`; unknown subject_ids are skipped silently.
+5. For each class+section+year, subjects in the list are created or updated and other mappings are left untouched `table:class_subject_mappings`; duplicate subject ids are collapsed and unknown subject_ids are skipped silently.
 6. Consumers read the result through `endpoint:GET /masters/class-subject-mappings/by-class/{class_id}` or `endpoint:GET /masters/class-subject-mappings/by-classes` (timetable picker, exam subject configuration); dedupe by subject_id for a class-level list.
 
-- Failure: The web modal does not preload existing mappings, so submitting two new subjects deactivates every other mapping for those sections.
-
-- Note: A single POST without section_id `endpoint:POST /masters/class-subject-mappings` creates a class-level row; NULLs are distinct in the unique constraint so duplicates are possible, and the dropdown endpoint fails on such rows. Prefer bulk.
+- Note: A single POST without section_id `endpoint:POST /masters/class-subject-mappings` creates a class-level row, kept unique by a partial index; the dropdown returns it with section_name null. Prefer bulk.
 
 ```mermaid
 flowchart TD
@@ -250,13 +251,13 @@ flowchart TD
   s2 --> s3
   s4["4. With section_id=null the service fans out one row per active sectio...<br/>service:app/service/masters/class_subject_mapping_service.py<br/>table:sections"]
   s3 --> s4
-  s5["5. For each class+section+year, subjects in the list are upserted and ...<br/>table:class_subject_mappings"]
+  s5["5. For each class+section+year, subjects in the list are created or up...<br/>table:class_subject_mappings"]
   s4 --> s5
   s6["6. Consumers read the result through  or  (timetable picker, exam subj...<br/>endpoint:GET /masters/class-subject-mappings/by-class/{class_id}<br/>endpoint:GET /masters/class-subject-mappings/by-classes"]
   s5 --> s6
 ```
 
-Shaped by: [masters/section-level-class-subject-mapping](#masterssection-level-class-subject-mapping)
+Shaped by: [masters/additive-bulk-mapping](#mastersadditive-bulk-mapping), [masters/section-level-class-subject-mapping](#masterssection-level-class-subject-mapping)
 
 ### masters/new-academic-year-setup
 
@@ -268,7 +269,7 @@ Implements: `feature:masters/academic-years`, `feature:masters/class-subject-map
 2. Create each class with its sections for that year `endpoint:POST /masters/class_sections`.
 3. Make sure subject categories exist (tenant-wide, reused across years) `endpoint:POST /masters/subject_categories/categories`.
 4. Create the year's subjects with a category `endpoint:POST /masters/subjects`; subjects are scoped to academic_year_id.
-5. Map subjects to each class and section `endpoint:POST /masters/class-subject-mappings/bulk`, sending the full intended set per section.
+5. Map subjects to each class and section `endpoint:POST /masters/class-subject-mappings/bulk`; the call adds or updates and never removes other mappings.
 6. Build each section's timetable `flow:timetable-calendar/build-timetable` and add the year's holidays `endpoint:POST /masters/holidays`.
 7. Fee setup and admissions for the year are done in their own modules; expect up to 5 minutes of stale dropdowns after these edits `service:app/tools/cache_utils.py`.
 
@@ -283,7 +284,7 @@ flowchart TD
   s2 --> s3
   s4["4. Create the year's subjects with a category ; subjects are scoped to...<br/>endpoint:POST /masters/subjects"]
   s3 --> s4
-  s5["5. Map subjects to each class and section , sending the full intended ...<br/>endpoint:POST /masters/class-subject-mappings/bulk"]
+  s5["5. Map subjects to each class and section ; the call adds or updates a...<br/>endpoint:POST /masters/class-subject-mappings/bulk"]
   s4 --> s5
   s6["6. Build each section's timetable  and add the year's holidays .<br/>flow:timetable-calendar/build-timetable<br/>endpoint:POST /masters/holidays"]
   s5 --> s6
@@ -391,6 +392,14 @@ Shaped by: [masters/one-active-academic-year](#mastersone-active-academic-year)
 
 ## Decisions
 
+### masters/additive-bulk-mapping (active)
+
+- **Decision**: The bulk class-subject mapping call adds or updates the listed subjects and leaves the section's other mappings untouched; removing a mapping is a per-row update or delete.
+- **Why**: The web modal does not preload existing mappings, so treating subjects[] as the complete set deactivated every unlisted mapping when an admin added a few subjects.
+- **Alternatives**: Replace-set semantics, where subjects missing from the request are deactivated.
+- **Tradeoff**: deactivated_count in the response is always 0, and clearing a section's mappings needs one call per row.
+- Shapes: `concept:masters/class-subject-mapping`, `endpoint:POST /masters/class-subject-mappings/bulk`, `flow:masters/map-subjects-to-class`
+
 ### masters/castes-per-tenant-locations-shared
 
 - **Decision**: Castes and sub-castes are tenant tables; states, districts and mandals are shared platform tables with no tenant_id.
@@ -415,7 +424,7 @@ Shaped by: [masters/one-active-academic-year](#mastersone-active-academic-year)
 
 - **Decision**: Class-subject mappings are per section: unique on (class_id, section_id, subject_id, academic_year_id), and section_id=null in the bulk call means all active sections.
 - **Why**: Different sections of one class can study different subject sets.
-- **Tradeoff**: Class-level rows with a null section can still be created by the single POST; NULLs are distinct in the unique constraint, so duplicates are possible.
+- **Tradeoff**: Class-level rows with a null section can still be created by the single POST; a partial unique index keeps them unique per class, subject and year.
 - Shapes: `endpoint:POST /masters/class-subject-mappings/bulk`, `feature:masters/class-subject-mappings`, `flow:masters/map-subjects-to-class`, `table:class_subject_mappings`
 
 ### masters/sections-dropdown-uses-hook
@@ -462,7 +471,7 @@ A grade within an academic year (name, short_code, academic_year_id, is_active) 
 
 ### masters/class-level-mapping
 
-A class-subject mapping with section_id null. The timetable editor treats it as applying to every section; the dropdown endpoint fails on it.
+A class-subject mapping with section_id null. The timetable editor treats it as applying to every section; the dropdown returns it with section_name null.
 - Related: `concept:masters/class-subject-mapping`, `table:class_subject_mappings`
 
 ### masters/class-subject-mapping
@@ -489,11 +498,6 @@ Salary ranges and admission types are fixed backend lists returned as {value, la
 
 State -> district -> mandal address lookup in the public schema shared by all tenants; a mandal is the sub-district administrative unit.
 - Related: `feature:masters/location-lookups`, `table:public.districts`, `table:public.mandals`, `table:public.states`
-
-### masters/replace-set-bulk-mapping
-
-The bulk CSM call treats subjects[] as the complete set for a class+section+year: missing subjects are deactivated, not left alone.
-- Related: `concept:masters/class-subject-mapping`, `endpoint:POST /masters/class-subject-mappings/bulk`
 
 ### masters/school-registration
 

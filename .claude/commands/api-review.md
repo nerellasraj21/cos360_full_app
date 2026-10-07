@@ -33,14 +33,15 @@ Comprehensive code review for COS360 FastAPI multi-tenant application focusing o
 
 - [ ] **Multi-Tenant Compliance**
 
-  - Uses tenant-specific database sessions
-  - Proper schema isolation maintained
+  - Uses `Depends(get_tenant_db)`; background code uses `open_tenant_session(tenant_id)`
+  - Tenant models inherit `BaseOrg` (no hand-declared `tenant_id`, no `schema` in `__table_args__`)
+  - Raw SQL is not schema-qualified, and `ON CONFLICT` targets on tenant tables include `tenant_id`
   - No cross-tenant data leakage
 
 - [ ] **Database Refresh Pattern**
 
   - Uses `flush() → select() → commit()` pattern for operations returning objects
-  - Avoids `commit() → refresh()` pattern that causes multi-tenant issues
+  - Avoids `commit() -> refresh()` (async sessions cannot lazy-load after commit; `MissingGreenlet`)
   - Proper relationship loading with `selectinload()`
 
 - [ ] **SQLAlchemy Best Practices**
@@ -66,7 +67,7 @@ Comprehensive code review for COS360 FastAPI multi-tenant application focusing o
   - No raw SQL queries without parameterization
 
 - [ ] **Multi-Tenant Security**
-  - Tenant isolation enforced at database level
+  - Tenant isolation enforced by row-level security; a new tenant table calls `enable_tenant_rls` in its migration
   - No tenant data accessible from other tenants
   - Proper tenant context validation
 

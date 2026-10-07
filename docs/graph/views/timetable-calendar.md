@@ -61,6 +61,7 @@ graph LR
 Read-only holiday/event calendar for every role.
 - Roles: Everyone with holiday_management:read/list.
 - Parity: Web enables only the Month and All Events views (week, day, year are commented out). Mobile app/calendar.tsx has list/grid with an upcoming/past filter and passes limit 100.
+- Note: The default role seed grants holiday_management read/list to Admin, Teacher and Staff only; Student and Parent get 403 unless the tenant adds the grant.
 - Flows: [timetable-calendar/holiday-crud](#timetable-calendarholiday-crud)
 - Implemented by: `endpoint:GET /masters/holidays`, `mobile:app/calendar.tsx`, `web:src/components/calendar/Calendar.tsx`, `web:src/routes/_app/Calender.tsx`
 - Shaped by: [timetable-calendar/holiday-color-per-event](#timetable-calendarholiday-color-per-event)
@@ -76,7 +77,7 @@ Special rows (Snacks, Lunch, Dispersal or a custom label such as Assembly) span 
 ### timetable-calendar/holiday-management
 
 Admin creates, edits, drags, deactivates and restores holidays/events for an academic year (name, description, start/end date, color).
-- Roles: Backend enforces holiday_management:create/update/delete; web Calendar.tsx and mobile masters/holidays.tsx check holidays:* instead, so controls hide unless the alias exists.
+- Roles: Backend enforces holiday_management:create/update/delete; mobile masters/holidays.tsx checks the same names, web Calendar.tsx checks holidays:* instead, so its controls hide unless the alias exists.
 - Parity: Drag-and-drop rescheduling is web only; mobile admin uses masters/holidays.tsx.
 - Note: Holidays are display-only; attendance, timetable and fee logic do not read them.
 - Flows: [timetable-calendar/holiday-crud](#timetable-calendarholiday-crud)
@@ -88,14 +89,15 @@ Admin creates, edits, drags, deactivates and restores holidays/events for an aca
 Read-only per-day timetable for a student's own section or a parent's selected child.
 - Roles: Student and parent.
 - Parity: Mobile only; web has no viewer and its editor does not auto-select the user's own section.
+- Note: The default role seed gives Student and Parent no timetable_management:read, so the viewer gets 403 unless the tenant adds the grant.
 - Flows: [timetable-calendar/load-section-timetable](#timetable-calendarload-section-timetable), [timetable-calendar/student-parent-view](#timetable-calendarstudent-parent-view)
 - Implemented by: `endpoint:GET /masters/subjects`, `endpoint:GET /students/admission/my-admission`, `endpoint:GET /students/timetable/frontend/{section_id}`, `mobile:app/timetable.tsx`
 
 ### timetable-calendar/timetable-editor
 
 Weekly grid per section (rows are time ranges, columns are days) with subject rows and special rows, optional Saturday column; create, replace and delete.
-- Roles: Admin edits with timetable_management:create/update/delete; others read (timetable_management:read). Web renders read-only without update.
-- Parity: Editor on both clients. Mobile gates on a timetables resource instead of timetable_management.
+- Roles: Admin edits with timetable_management:create/update/delete; reading needs timetable_management:read, which the default role seed gives only to Admin. Web renders read-only without update.
+- Parity: Editor on both clients; both gate on timetable_management.
 - Note: The model has no teacher/staff and no academic year; the year is implied by the section's class. Auto-generation, workload and clash checks are not implemented.
 - Flows: [timetable-calendar/build-timetable](#timetable-calendarbuild-timetable), [timetable-calendar/load-section-timetable](#timetable-calendarload-section-timetable), [timetable-calendar/save-timetable](#timetable-calendarsave-timetable)
 - Implemented by: `endpoint:DELETE /students/timetable/frontend/{section_id}`, `endpoint:GET /students/timetable/frontend/{section_id}`, `endpoint:POST /students/timetable/frontend`, `endpoint:PUT /students/timetable/frontend/{section_id}`, `mobile:app/masters/timetable.tsx`, `mobile:src/api/students.ts`, `service:app/service/masters/timetable_service.py`, `table:slot_times`, `table:timetable_slots`, `table:timetable_subject_options`, `table:timetables`, `web:src/api/timetable.ts`, `web:src/pages/masters/TimeTableEditor.tsx`, `web:src/routes/_app/TimeTable.tsx`
@@ -217,8 +219,9 @@ Implements: `feature:timetable-calendar/timetable-editor`
 5. After a successful save web invalidates ['timetable','frontend',sectionId]; toasts and setIsEditing(false) run in the mutate callbacks.
 
 - Failure: POST keeps only Monday-Friday (Saturday subjects silently dropped, special rows written Mon-Fri); PUT keeps any day key and writes special rows Mon-Sun. Save twice when Saturday matters.
-- Failure: POST on a section that already has a timetable violates the unique timetables.section_id and returns 500; clients must choose PUT vs POST from the GET result.
 - Failure: Non-UUID subject values (free-text Saturday cell on web, untouched mobile rows with subjects {}) fail with 422.
+- Failure: POST on a section that already has a timetable returns 409; clients must choose PUT vs POST from the GET result.
+- Failure: POST returns 404 for an unknown section, 400 for an unknown subject id and 422 for a malformed time.
 
 ```mermaid
 flowchart TD

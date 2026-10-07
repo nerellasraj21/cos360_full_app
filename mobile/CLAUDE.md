@@ -133,7 +133,7 @@ Android auto-commits and dismisses. iOS (`components/ui/ios-date-picker-modal.ts
 
 ## Testing
 
-Jest with `jest-expo` preset (config in `package.json`). Tests live in `components/__tests__/` (`test-utils.tsx` provides `renderWithProviders`). `__mocks__/@react-navigation/native.js` is auto-applied to **every** test: it fakes `useNavigation`/`usePreventRemove` (helpers `__triggerBeforeRemove`, `__navigationDispatchMock`, `__resetFormDirtyGuardNavMock`) and passes everything else through. Keep it pass-through-safe when extending it.
+Jest with `jest-expo` preset (config in `package.json`; `jest.setup.js` installs the AsyncStorage mock). Unit tests live in `__tests__/<module>/`, plus `components/__tests__/`, `services/__tests__/` and `src/api/__tests__/` (`components/__tests__/test-utils.tsx` provides `renderWithProviders` and is excluded from discovery). Put the test case ID at the start of the test name (`docs/testing/strategy.md`). `__mocks__/@react-navigation/native.js` is auto-applied to **every** test: it fakes `useNavigation`/`usePreventRemove` (helpers `__triggerBeforeRemove`, `__navigationDispatchMock`, `__resetFormDirtyGuardNavMock`) and passes everything else through. Keep it pass-through-safe when extending it.
 
 ## Environment and builds
 

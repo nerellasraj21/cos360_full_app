@@ -86,24 +86,29 @@ graph LR
   n37 -.->|shapes| n12
   n38[/"report-stats-reuse-report-query"/]
   n38 -.->|shapes| n6
-  n39[/"sms-optional-per-payment"/]
-  n39 -.->|shapes| n2
+  n39[/"serialise-payments-per-student"/]
   n39 -.->|shapes| n17
-  n40[/"update-term-dates-in-place"/]
-  n40 -.->|shapes| n8
+  n40[/"sms-optional-per-payment"/]
+  n40 -.->|shapes| n2
+  n40 -.->|shapes| n17
+  n41[/"student-terms-follow-class-template"/]
+  n41 -.->|shapes| n1
+  n41 -.->|shapes| n13
+  n42[/"update-term-dates-in-place"/]
+  n42 -.->|shapes| n8
 ```
 
 ## Features
 
 ### fee/class-fee-mapping
 
-Set the fee for a class per fee type and year, optionally mark it mandatory (all_by_default) so every admitted student gets a student mapping automatically; class-mapping term amounts are a display template only.
+Set the fee for a class per fee type and year, optionally mark it mandatory (all_by_default) so every admitted student gets a student mapping automatically; class-mapping term amounts set the per-term split that new student mappings copy when they match.
 - Roles: Admin (fee_class_mappings, fee_class_mapping_term_amounts permissions).
-- Parity: Web handles class mappings and their term amounts as tabs in /fee/mappings; mobile has a separate class-mappings screen whose edit sends UUID class_id/academic_year_id and fails with 422.
+- Parity: Web handles class mappings and their term amounts as tabs in /fee/mappings; mobile has a separate class-mappings screen.
 - Note: Unique per (class, fee type, year). fee_class_mappings has no section_id.
 - Flows: [fee/apply-mandatory-fees-on-admission](#feeapply-mandatory-fees-on-admission), [fee/set-up-fee-structure](#feeset-up-fee-structure)
 - Implemented by: `endpoint:PATCH /fee/class-mappings/{mapping_id}/toggle-mandatory`, `endpoint:POST /fee/class-mapping-term-amounts`, `endpoint:POST /fee/class-mappings`, `endpoint:POST /fee/class-mappings/bulk`, `endpoint:PUT /fee/class-mappings/{mapping_id}`, `mobile:app/fees/class-mappings.tsx`, `mobile:app/fees/mappings.tsx`, `service:app/service/fee/fee_class_map_term_amount_service.py`, `service:app/service/fee/fee_class_mapping_service.py`, `table:fee_class_map_term_amounts`, `table:fee_class_mappings`, `web:src/pages/fee/FeeMappings.tsx`
-- Shaped by: [fee/mandatory-fees-applied-by-backend](#feemandatory-fees-applied-by-backend)
+- Shaped by: [fee/mandatory-fees-applied-by-backend](#feemandatory-fees-applied-by-backend), [fee/student-terms-follow-class-template](#feestudent-terms-follow-class-template)
 
 ### fee/collect-payment
 
@@ -153,7 +158,7 @@ Students and parents read their own or their children's fee summary, receipts, t
 - Roles: Student (own scope), Parent (related scope).
 - Parity: Both clients have my-fees, my-receipts and my-transactions. Mobile collection.tsx calls the summaries without the required academic_year_id query parameter.
 - Flows: [fee/fee-self-service](#feefee-self-service)
-- Implemented by: `endpoint:GET /fee/collection/child-summary/{student_id}`, `endpoint:GET /fee/collection/my-summary`, `endpoint:GET /fee/collection/receipts/{receipt_id}/pdf`, `endpoint:GET /fee/receipts/my-children-receipts`, `endpoint:GET /fee/receipts/my-receipts`, `endpoint:GET /fee/transactions/my-children-fees`, `endpoint:GET /fee/transactions/my-fees`, `mobile:app/fees/my-fees.tsx`, `mobile:app/fees/my-receipts.tsx`, `mobile:app/fees/my-transactions.tsx`, `service:app/service/fee/fee_collection_service.py`, `web:src/pages/fee/FeeCollection/ParentFeeSummaryPage.tsx`, `web:src/pages/fee/FeeCollection/StudentFeeSummaryPage.tsx`, `web:src/pages/fee/MyReceiptsPage.tsx`, `web:src/pages/fee/MyTransactionsPage.tsx`
+- Implemented by: `endpoint:GET /fee/collection/child-summary/{student_id}`, `endpoint:GET /fee/collection/my-summary`, `endpoint:GET /fee/collection/receipts/{receipt_id}/pdf`, `endpoint:GET /fee/receipts/my-children-receipts`, `endpoint:GET /fee/receipts/my-receipts`, `endpoint:GET /fee/transactions/my-children-fees`, `endpoint:GET /fee/transactions/my-fees`, `endpoint:GET /fee/transactions/my-outstanding-fees`, `mobile:app/fees/my-fees.tsx`, `mobile:app/fees/my-receipts.tsx`, `mobile:app/fees/my-transactions.tsx`, `service:app/service/fee/fee_collection_service.py`, `web:src/pages/fee/FeeCollection/ParentFeeSummaryPage.tsx`, `web:src/pages/fee/FeeCollection/StudentFeeSummaryPage.tsx`, `web:src/pages/fee/MyReceiptsPage.tsx`, `web:src/pages/fee/MyTransactionsPage.tsx`
 
 ### fee/fee-structure
 
@@ -178,7 +183,7 @@ List fee transactions, update transaction and cheque status (cheque/DD clearance
 
 Dues from earlier years, carried forward from COS360 data or entered by hand, shown on their own tab and never mixed into this year's dues.
 - Roles: fee_old permission; settle (write-off) needs fee_old:update and delete needs fee_old:delete.
-- Parity: Both clients have an Old Fees tab, but mobile calls /fee/old/... (404) and sends the wrong carry-forward payload (422).
+- Parity: Both clients have an Old Fees tab, but mobile calls /fee/old/... (404) and sends the wrong carry-forward and manual-create bodies (422).
 - Flows: [fee/carry-forward-old-fees](#feecarry-forward-old-fees), [fee/manage-old-fees](#feemanage-old-fees)
 - Implemented by: `endpoint:DELETE /fee/old-fees/{old_fee_id}`, `endpoint:GET /fee/old-fees/student/{student_id}`, `endpoint:PATCH /fee/old-fees/{old_fee_id}/settle`, `endpoint:POST /fee/old-fees`, `endpoint:POST /fee/old-fees/carry-forward`, `endpoint:PUT /fee/old-fees/{old_fee_id}`, `mobile:app/fees/collection/[studentId].tsx`, `service:app/service/fee/fee_old_service.py`, `table:fee_old`, `web:src/pages/fee/FeeCollection/OldFeeTab.tsx`
 - Shaped by: [fee/old-fees-separate-table](#feeold-fees-separate-table)
@@ -196,20 +201,20 @@ Receipts with sequential REC-YYMM-NNNN numbers, a SHA-256 integrity hash, verify
 
 Refund requests against completed transactions with an approval flow: pending -> approved -> processed, or pending -> rejected.
 - Roles: fee_refunds permission with extra actions approve and process.
-- Parity: Both clients. Mobile approve omits approved_by_user_id and process sends reference_number without refund_method (422). Both call PUT/DELETE /fee/refunds/{id} and POST /{id}/cancel, which do not exist.
+- Parity: Both clients create, approve or reject, process and cancel (as a rejection) refunds against the same endpoints.
 - Flows: [fee/refund](#feerefund)
 - Implemented by: `endpoint:GET /fee/refunds/approved/processing`, `endpoint:GET /fee/refunds/pending/approval`, `endpoint:GET /fee/refunds/statistics`, `endpoint:POST /fee/refunds`, `endpoint:POST /fee/refunds/approve`, `endpoint:POST /fee/refunds/process`, `mobile:app/fees/refunds.tsx`, `service:app/service/fee/fee_refund_service.py`, `table:fee_refunds`, `web:src/pages/fee/FeeRefunds.tsx`
 - Shaped by: [fee/refund-total-counts-processed](#feerefund-total-counts-processed)
 
 ### fee/student-fee-mapping
 
-Assign a fee type to a student for a year (what the student actually owes), with one term amount per due date created by an equal split of total_fee.
+Assign a fee type to a student for a year (what the student actually owes), with one term amount per due date taken from the class mapping's term amounts when they match, otherwise an equal split of total_fee.
 - Roles: Admin (fee_student_mappings permission).
 - Parity: Web uses a tab in /fee/mappings; mobile has student-mappings and assign-student-fees screens.
 - Note: Unique per (student, fee type, year). Summary and payment read only student mappings and their term amounts, never class mappings.
 - Flows: [fee/apply-mandatory-fees-on-admission](#feeapply-mandatory-fees-on-admission), [fee/set-up-fee-structure](#feeset-up-fee-structure)
 - Implemented by: `endpoint:DELETE /fee/student-mappings/{mapping_id}`, `endpoint:POST /fee/student-mappings`, `endpoint:POST /fee/student-mappings/bulk`, `mobile:app/fees/assign-student-fees.tsx`, `mobile:app/fees/student-mappings.tsx`, `service:app/service/fee/fee_student_mapping_service.py`, `table:fee_student_map_term_amounts`, `table:fee_student_mappings`, `web:src/pages/fee/FeeMappings.tsx`
-- Shaped by: [transport/no-backend-link-to-fee-module](#transportno-backend-link-to-fee-module)
+- Shaped by: [fee/student-terms-follow-class-template](#feestudent-terms-follow-class-template), [transport/no-backend-link-to-fee-module](#transportno-backend-link-to-fee-module)
 
 ## Flows
 
@@ -304,6 +309,8 @@ Implements: `feature:fee/collect-payment`, `feature:fee/receipts`
 - Failure: fee_items must sum exactly to amount_to_pay, have no duplicate fee types, not be an empty list, and each item must not exceed that type's outstanding.
 - Failure: Non-divisible totals leave term shares summing 0.01 short, so paying the full amount via fee_items fails with 'exceeds the scheduled term amounts by 0.01'.
 
+- Note: Before reading dues the backend takes a per-student advisory lock, so parallel payments for one student run one at a time; an optional idempotency_key replays the original payment instead of creating a second one.
+
 ```mermaid
 flowchart TD
   s1["1. The web page /fee/collection searches students   ; q needs at least...<br/>endpoint:GET /fee/collection/search-student<br/>web:src/pages/fee/FeeCollection/index.tsx<br/>web:src/pages/fee/FeeCollection/StudentSearch.tsx"]
@@ -323,24 +330,25 @@ flowchart TD
   s7 --> s8
 ```
 
-Shaped by: [fee/sms-optional-per-payment](#feesms-optional-per-payment)
+Shaped by: [fee/serialise-payments-per-student](#feeserialise-payments-per-student), [fee/sms-optional-per-payment](#feesms-optional-per-payment)
 
 ### fee/fee-self-service
 
 Implements: `feature:fee/fee-self-service`
 
 
-1. Student summary: `endpoint:GET /fee/collection/my-summary` with academic_year_id; the student is taken from the token `web:src/pages/fee/FeeCollection/StudentFeeSummaryPage.tsx` `mobile:app/fees/my-fees.tsx`.
+1. Student summary: web and mobile my-fees read `endpoint:GET /fee/transactions/my-outstanding-fees` (fee_transactions:read_own); the student is taken from the token `web:src/pages/fee/FeeCollection/StudentFeeSummaryPage.tsx` `mobile:app/fees/my-fees.tsx`.
 2. Student receipts and transactions: `endpoint:GET /fee/receipts/my-receipts` (list_own) and `endpoint:GET /fee/transactions/my-fees` `web:src/pages/fee/MyReceiptsPage.tsx` `web:src/pages/fee/MyTransactionsPage.tsx`.
 3. Parent summary: `endpoint:GET /fee/collection/child-summary/{student_id}` with academic_year_id; the parent-child link is checked `table:student_parent_links`.
 4. Parent receipts and transactions: `endpoint:GET /fee/receipts/my-children-receipts` (read_related) and `endpoint:GET /fee/transactions/my-children-fees`.
 5. PDF for everyone: `endpoint:GET /fee/collection/receipts/{receipt_id}/pdf`; for own/related scopes the backend checks the transaction's student and returns 404, not 403, on a mismatch.
 
 - Note: These endpoints use check_user_resource_access (own/related scopes); a student with only *_own grants gets 403 on the exact-action endpoints.
+- Note: `endpoint:GET /fee/collection/my-summary` needs fee_collection:read, which the default Student role does not have (403); only mobile collection.tsx still calls it.
 
 ```mermaid
 flowchart TD
-  s1["1. Student summary:  with academic_year_id; the student is taken from ...<br/>endpoint:GET /fee/collection/my-summary<br/>web:src/pages/fee/FeeCollection/StudentFeeSummaryPage.tsx<br/>mobile:app/fees/my-fees.tsx"]
+  s1["1. Student summary: web and mobile my-fees read  (fee_transactions:rea...<br/>endpoint:GET /fee/transactions/my-outstanding-fees<br/>web:src/pages/fee/FeeCollection/StudentFeeSummaryPage.tsx<br/>mobile:app/fees/my-fees.tsx"]
   s2["2. Student receipts and transactions:  (list_own) and   .<br/>endpoint:GET /fee/receipts/my-receipts<br/>endpoint:GET /fee/transactions/my-fees<br/>web:src/pages/fee/MyReceiptsPage.tsx<br/>web:src/pages/fee/MyTransactionsPage.tsx"]
   s1 --> s2
   s3["3. Parent summary:  with academic_year_id; the parent-child link is ch...<br/>endpoint:GET /fee/collection/child-summary/{student_id}<br/>table:student_parent_links"]
@@ -362,6 +370,8 @@ Implements: `feature:fee/old-fees`
 4. `endpoint:PATCH /fee/old-fees/{old_fee_id}/settle` writes the fee off (fee_old:update); both clients confirm first, since it cannot be undone.
 5. `endpoint:DELETE /fee/old-fees/{old_fee_id}` only works for manual_entry rows.
 
+- Note: Settle sets is_settled without changing paid_amount, so the row still shows an outstanding amount while the summary's old_fee_pending_amount drops to 0.
+
 ```mermaid
 flowchart TD
   s1["1. Schools new to COS360 enter dues by hand with  (source manual_entry...<br/>endpoint:POST /fee/old-fees<br/>service:app/service/fee/fee_old_service.py<br/>table:fee_old"]
@@ -382,15 +392,14 @@ Shaped by: [fee/old-fees-separate-table](#feeold-fees-separate-table)
 Implements: `feature:fee/receipts`
 
 
-1. A receipt is created by /pay for completed payments or by `endpoint:POST /fee/receipts/generate/{transaction_id}`; the number is REC-YYMM-NNNN, current max plus one per tenant per month `service:app/service/fee/fee_receipt_service.py` `table:fee_receipts`.
+1. A receipt is created by /pay for completed payments or by `endpoint:POST /fee/receipts/generate/{transaction_id}`; the number is REC-YYMM-NNNN, the month's highest numeric suffix plus one under a per-tenant advisory lock `service:app/service/fee/fee_receipt_service.py` `table:fee_receipts`.
 2. The content hash is SHA-256 of the sorted-key JSON of the rendered ReceiptContent and is stored on the receipt and the transaction `table:fee_transactions`.
 3. Reads `endpoint:GET /fee/receipts/{receipt_id}` fill class_section and academic_year at read time via _enrich_receipt_fields into a new FeeReceiptRead `web:src/pages/fee/Receipts.tsx` `mobile:app/fees/receipts.tsx`.
 4. The PDF is regenerated from data on every download `endpoint:GET /fee/collection/receipts/{receipt_id}/pdf`.
-5. Reprints are tracked with `endpoint:POST /fee/receipts/{receipt_id}/reprint`; manual renumbering uses `endpoint:PATCH /fee/receipts/{receipt_id}/number`.
+5. Reprints are tracked with `endpoint:POST /fee/receipts/{receipt_id}/reprint`; manual renumbering uses `endpoint:PATCH /fee/receipts/{receipt_id}/number` and returns 400 for a number already in use.
 6. `endpoint:GET /fee/receipts/{receipt_id}/verify` re-renders content from live data and returns a flat {receipt_id, receipt_number, is_valid, stored_hash, current_hash, verification_date}.
 
 - Failure: Renaming the student, promoting them, or renumbering the receipt makes is_valid=false without tampering.
-- Failure: Two payments at the same moment can collide on the receipt number unique constraint and return 500.
 
 ```mermaid
 flowchart TD
@@ -401,7 +410,7 @@ flowchart TD
   s2 --> s3
   s4["4. The PDF is regenerated from data on every download .<br/>endpoint:GET /fee/collection/receipts/{receipt_id}/pdf"]
   s3 --> s4
-  s5["5. Reprints are tracked with ; manual renumbering uses .<br/>endpoint:POST /fee/receipts/{receipt_id}/reprint<br/>endpoint:PATCH /fee/receipts/{receipt_id}/number"]
+  s5["5. Reprints are tracked with ; manual renumbering uses  and returns 40...<br/>endpoint:POST /fee/receipts/{receipt_id}/reprint<br/>endpoint:PATCH /fee/receipts/{receipt_id}/number"]
   s4 --> s5
   s6["6. re-renders content from live data and returns a flat {receipt_id, r...<br/>endpoint:GET /fee/receipts/{receipt_id}/verify"]
   s5 --> s6
@@ -443,21 +452,20 @@ Shaped by: [fee/concession-approver-is-a-label](#feeconcession-approver-is-a-lab
 Implements: `feature:fee/refunds`
 
 
-1. Request a refund `endpoint:POST /fee/refunds` `service:app/service/fee/fee_refund_service.py` `web:src/pages/fee/FeeRefunds.tsx` `mobile:app/fees/refunds.tsx`; only for completed transactions, amount at most total_amount minus refunds already approved or processed `table:fee_refunds` `table:fee_transactions`.
-2. The refund gets a number RFD{YYYYMMDD}{6 hex} and status pending.
-3. An approver lists `endpoint:GET /fee/refunds/pending/approval` and posts `endpoint:POST /fee/refunds/approve` with {refund_id, action: approve|reject, approval_remarks, approved_by_user_id}; only works while pending.
-4. A processor lists `endpoint:GET /fee/refunds/approved/processing` and posts `endpoint:POST /fee/refunds/process` with {refund_id, refund_method: cash|bank_transfer|cheque, refund_reference?, processing_remarks?, processed_by_user_id}; only works once approved.
+1. Request a refund `endpoint:POST /fee/refunds` `service:app/service/fee/fee_refund_service.py` `web:src/pages/fee/FeeRefunds.tsx` `mobile:app/fees/refunds.tsx`; only for completed transactions, with the transaction row locked, and the amount at most total_amount minus refunds already pending, approved or processed `table:fee_refunds` `table:fee_transactions`.
+2. Student, admission number and year are copied from the transaction (400 if the body sends different ones); the refund gets a number RFD{YYYYMMDD}{6 hex} and status pending.
+3. An approver lists `endpoint:GET /fee/refunds/pending/approval` and posts `endpoint:POST /fee/refunds/approve` with {refund_id, action: approve|reject, approval_remarks?}; only works while pending, and a rejection is final and frees the amount.
+4. A processor lists `endpoint:GET /fee/refunds/approved/processing` and posts `endpoint:POST /fee/refunds/process` with {refund_id, refund_method: cash|bank_transfer|cheque, refund_reference?, processing_remarks?}; only works once approved.
 5. Per-transaction totals are available from `endpoint:GET /fee/refunds/transaction/{transaction_id}/summary`.
 
-- Failure: The user-id fields are required in the body (422 if missing) even though the endpoint overwrites them from the token.
-
-- Note: Pending refunds are not counted against the limit and approval does not re-check it, so several pending refunds can exceed the transaction.
+- Note: The requested_by, approved_by and processed_by user ids are optional in the body and always taken from the token.
+- Note: There is no cancel route; both clients cancel a pending refund by rejecting it with the reason as approval_remarks.
 - Note: Refunds are not subtracted from paid in the fee summary.
 
 ```mermaid
 flowchart TD
-  s1["1. Request a refund    ; only for completed transactions, amount at mo...<br/>endpoint:POST /fee/refunds<br/>service:app/service/fee/fee_refund_service.py<br/>web:src/pages/fee/FeeRefunds.tsx<br/>mobile:app/fees/refunds.tsx<br/>table:fee_refunds<br/>table:fee_transactions"]
-  s2["2. The refund gets a number RFD{YYYYMMDD}{6 hex} and status pending."]
+  s1["1. Request a refund    ; only for completed transactions, with the tra...<br/>endpoint:POST /fee/refunds<br/>service:app/service/fee/fee_refund_service.py<br/>web:src/pages/fee/FeeRefunds.tsx<br/>mobile:app/fees/refunds.tsx<br/>table:fee_refunds<br/>table:fee_transactions"]
+  s2["2. Student, admission number and year are copied from the transaction ..."]
   s1 --> s2
   s3["3. An approver lists  and posts  with {refund_id, action: approve|reje...<br/>endpoint:GET /fee/refunds/pending/approval<br/>endpoint:POST /fee/refunds/approve"]
   s2 --> s3
@@ -493,10 +501,10 @@ Implements: `feature:fee/class-fee-mapping`, `feature:fee/fee-structure`, `featu
 3. Create a fee category for the year `endpoint:POST /fee/categories` `table:fee_categories` `web:src/pages/fee/FeeCategories.tsx`. Category names are unique per year.
 4. Create fee types in the category, each bound to one fee term `endpoint:POST /fee/types` `table:fee_types` `web:src/pages/fee/FeeTypes.tsx`. Type names are unique per category.
 5. Create class mappings (fee per class, fee type and year) `endpoint:POST /fee/class-mappings` or `endpoint:POST /fee/class-mappings/bulk` `service:app/service/fee/fee_class_mapping_service.py` `table:fee_class_mappings` `web:src/pages/fee/FeeMappings.tsx`.
-6. Optionally add class-mapping term amounts as a display template `endpoint:POST /fee/class-mapping-term-amounts` `table:fee_class_map_term_amounts`; the backend never reads them for dues.
+6. Optionally add class-mapping term amounts `endpoint:POST /fee/class-mapping-term-amounts` `table:fee_class_map_term_amounts`; they must cover every term date and sum to the class total_fee, and student mappings created afterwards copy them.
 7. If all_by_default=true (the mandatory flag, toggled with `endpoint:PATCH /fee/class-mappings/{mapping_id}/toggle-mandatory`), auto_map_students_for_class_mapping creates a student mapping and its term amounts for every student admitted to that class and year `table:student_admissions` `table:fee_student_mappings` `table:fee_student_map_term_amounts`.
 8. New admissions pick up mandatory class fees through auto_apply_mandatory_fees_to_admission, called from the admission service `service:app/service/student/admission_service.py`.
-9. Assign optional fees with `endpoint:POST /fee/student-mappings` or `endpoint:POST /fee/student-mappings/bulk` `service:app/service/fee/fee_student_mapping_service.py` `mobile:app/fees/assign-student-fees.tsx`; create_term_amounts splits total_fee equally across the term dates.
+9. Assign optional fees with `endpoint:POST /fee/student-mappings` or `endpoint:POST /fee/student-mappings/bulk` `service:app/service/fee/fee_student_mapping_service.py` `mobile:app/fees/assign-student-fees.tsx`; create_term_amounts copies the matching class-mapping term amounts, or splits total_fee equally across the term dates.
 
 - Result: The student is visible in collection with dues, because summary and payment only read fee_student_mappings and fee_student_map_term_amounts.
 
@@ -513,13 +521,13 @@ flowchart TD
   s3 --> s4
   s5["5. Create class mappings (fee per class, fee type and year)  or    .<br/>endpoint:POST /fee/class-mappings<br/>endpoint:POST /fee/class-mappings/bulk<br/>service:app/service/fee/fee_class_mapping_service.py<br/>table:fee_class_mappings<br/>web:src/pages/fee/FeeMappings.tsx"]
   s4 --> s5
-  s6["6. Optionally add class-mapping term amounts as a display template  ; ...<br/>endpoint:POST /fee/class-mapping-term-amounts<br/>table:fee_class_map_term_amounts"]
+  s6["6. Optionally add class-mapping term amounts  ; they must cover every ...<br/>endpoint:POST /fee/class-mapping-term-amounts<br/>table:fee_class_map_term_amounts"]
   s5 --> s6
   s7["7. If all_by_default=true (the mandatory flag, toggled with ), auto_ma...<br/>endpoint:PATCH /fee/class-mappings/{mapping_id}/toggle-mandatory<br/>table:student_admissions<br/>table:fee_student_mappings<br/>table:fee_student_map_term_amounts"]
   s6 --> s7
   s8["8. New admissions pick up mandatory class fees through auto_apply_mand...<br/>service:app/service/student/admission_service.py"]
   s7 --> s8
-  s9["9. Assign optional fees with  or   ; create_term_amounts splits total_...<br/>endpoint:POST /fee/student-mappings<br/>endpoint:POST /fee/student-mappings/bulk<br/>service:app/service/fee/fee_student_mapping_service.py<br/>mobile:app/fees/assign-student-fees.tsx"]
+  s9["9. Assign optional fees with  or   ; create_term_amounts copies the ma...<br/>endpoint:POST /fee/student-mappings<br/>endpoint:POST /fee/student-mappings/bulk<br/>service:app/service/fee/fee_student_mapping_service.py<br/>mobile:app/fees/assign-student-fees.tsx"]
   s8 --> s9
 ```
 
@@ -600,11 +608,12 @@ Shaped by: [fee/mandatory-fees-applied-by-backend](#feemandatory-fees-applied-by
 - **Tradeoff**: Legitimate changes (student rename, promotion, receipt renumber) make is_valid=false.
 - Shapes: `endpoint:GET /fee/receipts/{receipt_id}/verify`, `feature:fee/receipts`, `service:app/service/fee/fee_receipt_service.py`
 
-### fee/receipt-number-max-plus-one (unintended)
+### fee/receipt-number-max-plus-one (active)
 
-- **Decision**: Receipt numbers are REC-YYMM-NNNN, computed as current max plus one per tenant per month and protected by a unique constraint, not a sequence or lock.
-- **Why**: Not a deliberate choice. Receipt numbers should come from a sequence or a lock so concurrent payments cannot collide.
-- **Tradeoff**: Concurrent payments can collide and return 500.
+- **Decision**: Receipt numbers are REC-YYMM-NNNN per tenant per month, computed as the highest numeric suffix for the month plus one, skipping numbers already taken, under a per-tenant transaction advisory lock (lock_receipt_numbering in fee_locks.py); the (tenant_id, receipt_number) unique index stays as a backstop.
+- **Why**: Concurrent payments used to collide on max plus one and return 500; the lock serialises numbering without a sequence per tenant and month, and skipping taken or non-numeric numbers keeps manual renumbering from breaking the series.
+- **Alternatives**: A Postgres sequence per tenant and month.
+- **Since**: 2026-10
 - Shapes: `feature:fee/receipts`, `service:app/service/fee/fee_receipt_service.py`, `table:fee_receipts`
 
 ### fee/receipt-pdf-on-demand
@@ -631,11 +640,27 @@ Shaped by: [fee/mandatory-fees-applied-by-backend](#feemandatory-fees-applied-by
 - **Since**: 2026-09
 - Shapes: `feature:fee/fee-reports`, `service:app/service/reports/fee_report_service.py`
 
+### fee/serialise-payments-per-student (active)
+
+- **Decision**: /fee/collection/pay and POST /fee/transactions take a per-student transaction advisory lock (lock_student_payments) and accept an optional idempotency_key; the transaction number is derived from (student, key) as TXK plus a hash, and a repeat with the same key returns the original transaction.
+- **Why**: Parallel payments for one student could together exceed the due, and a retried submit could record the same payment twice.
+- **Tradeoff**: Neither client sends an idempotency_key yet, so a double submit from the UI still creates two payments.
+- **Since**: 2026-10
+- Shapes: `flow:fee/collect-payment`, `service:app/service/fee/fee_collection_service.py`, `service:app/service/fee/fee_transaction_service.py`
+
 ### fee/sms-optional-per-payment
 
 - **Decision**: The parent SMS is chosen per payment (send_sms, default on) and is sent last; an SMS failure never rolls back the payment.
 - **Why**: The parent may be present at the counter, or the SMS quota may be limited.
 - Shapes: `feature:fee/collect-payment`, `flow:fee/collect-payment`, `service:app/service/fee/fee_collection_service.py`
+
+### fee/student-terms-follow-class-template (active)
+
+- **Decision**: create_term_amounts copies the class mapping's term amounts (same class, fee type and year) into the student's term amounts when they cover exactly the fee term's dates and sum to the student's total_fee; otherwise it splits total_fee equally, rounded to 2 decimals per share.
+- **Why**: Schools set uneven instalments on the class mapping and expect students to owe those amounts; class-mapping term amounts were previously a display template the backend never read.
+- **Tradeoff**: Equal-split totals that do not divide evenly still leave the shares 0.01 short of total_fee.
+- **Since**: 2026-10
+- Shapes: `feature:fee/class-fee-mapping`, `feature:fee/student-fee-mapping`, `service:app/service/fee/fee_student_mapping_service.py`
 
 ### fee/update-term-dates-in-place
 
@@ -719,7 +744,7 @@ What a student actually owes for a fee type in a year (fee_student_mappings plus
 
 ### fee/term-amount
 
-The amount due on one term date for one mapping. Student term amounts are an equal split of total_fee, rounded to 2 decimals per share; class-mapping term amounts are a display template only.
+The amount due on one term date for one mapping. Student term amounts copy the class mapping's term amounts when those cover every term date and sum to the student's total_fee, and are otherwise an equal split of total_fee rounded to 2 decimals per share.
 - Note: Term-amount rows need both term_id and term_date_id (both NOT NULL).
 - Related: `concept:fee/student-mapping`, `table:fee_class_map_term_amounts`, `table:fee_student_map_term_amounts`
 

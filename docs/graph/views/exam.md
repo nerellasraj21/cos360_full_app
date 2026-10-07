@@ -94,13 +94,15 @@ graph LR
   n43 -.->|shapes| n29
   n44[/"results-no-cascade-on-exam-delete"/]
   n45[/"service-commit-ownership"/]
-  n46[/"subjects-from-class-subject-map"/]
-  n46 -.->|shapes| n21
-  n47[/"web-excel-client-side"/]
-  n47 -.->|shapes| n9
-  n47 -.->|shapes| n24
-  n48[/"wizard-state-session-storage"/]
-  n48 -.->|shapes| n21
+  n46[/"student-parent-role-name-and-ownership-gating"/]
+  n46 -.->|shapes| n18
+  n47[/"subjects-from-class-subject-map"/]
+  n47 -.->|shapes| n21
+  n48[/"web-excel-client-side"/]
+  n48 -.->|shapes| n9
+  n48 -.->|shapes| n24
+  n49[/"wizard-state-session-storage"/]
+  n49 -.->|shapes| n21
 ```
 
 ## Features
@@ -108,8 +110,8 @@ graph LR
 ### exam/audit-log
 
 Append-only per-exam audit trail of compute, publish, unlock, hall-ticket and notification actions, viewable per exam.
-- Roles: Admin (exams:read); screens gated by role name.
-- Parity: Web AuditLog.tsx reads actor_name, description and created_at, which the API does not return; mobile falls back to performed_by, performed_at and reason.
+- Roles: Admin, Teacher, Staff (exams:read); Student and Parent get 403 by role name; screens gated by role name.
+- Parity: Web and mobile both show action, old and new value, reason and performed_at; neither shows an actor name because the API returns only the performed_by UUID.
 - Flows: [exam/audit-trail](#examaudit-trail)
 - Implemented by: `endpoint:GET /exams/{exam_id}/audit`, `mobile:app/exam/audit-log.tsx`, `mobile:app/exam/audit.tsx`, `service:app/service/exam/audit_service.py`, `table:exam_audit_log`, `web:src/pages/exam/AuditLog.tsx`, `web:src/pages/exam/AuditLogExamList.tsx`
 - Shaped by: [exam/admin-screens-role-name-gating](#examadmin-screens-role-name-gating), [exam/audit-log-immutable-no-fk](#examaudit-log-immutable-no-fk)
@@ -145,7 +147,7 @@ Create an exam with its class-sections, per-subject configs with components, and
 
 Exam dates per class, section and subject: single, bulk and multi-section create, update and delete.
 - Roles: Admin (exams:create/update/delete).
-- Parity: Both clients strip exam_id from date creates, so adding a date after creation gets 422.
+- Parity: Web sends exam_id in the body of date creates; mobile omits it, so adding a date on mobile after creation gets 422.
 - Flows: [exam/post-creation-changes](#exampost-creation-changes)
 - Implemented by: `endpoint:DELETE /exams/{exam_id}/dates/{date_id}`, `endpoint:GET /exams/{exam_id}/dates`, `endpoint:POST /exams/{exam_id}/dates`, `endpoint:POST /exams/{exam_id}/dates/bulk`, `endpoint:POST /exams/{exam_id}/dates/multi-section`, `endpoint:PUT /exams/{exam_id}/dates/{date_id}`, `mobile:app/exam/dates.tsx`, `service:app/service/exam/exam_date_service.py`, `table:exam_dates`, `web:src/pages/exam/ExamDates.tsx`
 - Depends on: `feature:exam/exam-creation`
@@ -205,8 +207,8 @@ Exam grade schemes (grand total) and subject grade schemes (per subject), each a
 ### exam/hall-tickets
 
 Hall-ticket eligibility per enrolled student from attendance % and fee-paid %, admin overrides, publish flag, and PDF or ZIP download.
-- Roles: Admin (exams:*).
-- Parity: Web and mobile both have admin compute, override, publish and download; neither has student self-download.
+- Roles: Admin (exams:*); Teacher and Staff read lists and download; Student and Parent may download only their own or a linked child's ticket.
+- Parity: Web and mobile both have admin compute, override, publish and download; neither has a student self-download screen; web saves the download-all ZIP under a .pdf name.
 - Flows: [exam/hall-tickets](#examhall-tickets)
 - Implemented by: `endpoint:GET /exams/{exam_id}/hall-tickets/download`, `endpoint:GET /exams/{exam_id}/hall-tickets/download-all`, `endpoint:GET /exams/{exam_id}/hall-tickets/eligible`, `endpoint:GET /exams/{exam_id}/hall-tickets/enrolled-students`, `endpoint:GET /exams/{exam_id}/hall-tickets/ineligible`, `endpoint:POST /exams/{exam_id}/hall-tickets/compute`, `endpoint:POST /exams/{exam_id}/hall-tickets/publish`, `endpoint:PUT /exams/{exam_id}/hall-tickets/{student_id}/override`, `job:app/tasks/exam/hall_ticket_pdf.py`, `mobile:app/exam/hall-ticket-download.tsx`, `mobile:app/exam/hall-tickets.tsx`, `mobile:app/exam/hall-tickets/[examId].tsx`, `service:app/service/exam/hall_ticket_service.py`, `table:hall_ticket_eligibility`, `web:src/components/exam/EligibilityPanel.tsx`, `web:src/components/exam/HallTicketCard.tsx`, `web:src/pages/exam/HallTicketDownload.tsx`, `web:src/pages/exam/HallTicketEligibility.tsx`, `web:src/pages/exam/HallTicketsExamList.tsx`
 - Depends on: `feature:exam/exam-creation`, `feature:exam/exam-settings`
@@ -257,12 +259,12 @@ Publish an exam so computed results become visible to students and parents.
 ### exam/student-parent-results
 
 Students and parents view published computed results and raw marks for an exam (own, or linked child).
-- Roles: Student (exam_results:read_own/list_own, exams:read), Parent (exams:read plus student_parent_links check).
+- Roles: Student (exam_results:read_own/list_own, which seeding does not grant, plus exams:read), Parent (exams:read plus student_parent_links check).
 - Parity: Web uses a role switch in results/$id and my-marks/$examId; mobile has results/[examId] and my-marks/[examId].
 - Flows: [exam/publish-and-view-results](#exampublish-and-view-results)
 - Implemented by: `endpoint:GET /exams/my-results`, `endpoint:GET /exams/{exam_id}/child-marks/{student_id}`, `endpoint:GET /exams/{exam_id}/child-result/{student_id}`, `endpoint:GET /exams/{exam_id}/my-marks`, `endpoint:GET /exams/{exam_id}/my-result`, `mobile:app/exam/my-marks/[examId].tsx`, `mobile:app/exam/my-marks/index.tsx`, `mobile:app/exam/results/[examId].tsx`, `service:app/service/exam/result_service.py`, `table:student_exam_results`, `table:student_marks`, `table:student_parent_links`, `web:src/pages/exam/MyMarksPage.tsx`, `web:src/pages/exam/StudentResults.tsx`
 - Depends on: `feature:exam/result-publishing`
-- Shaped by: [exam/raw-marks-visible-before-publish](#examraw-marks-visible-before-publish)
+- Shaped by: [exam/raw-marks-visible-before-publish](#examraw-marks-visible-before-publish), [exam/student-parent-role-name-and-ownership-gating](#examstudent-parent-role-name-and-ownership-gating)
 
 ## Flows
 
@@ -271,7 +273,7 @@ Students and parents view published computed results and raw marks for an exam (
 Implements: `feature:exam/audit-log`
 
 
-1. log_action writes rows for results_computed, results_published, exam_unlocked, hall_tickets_computed, eligibility_overridden, hall_tickets_published and notification_queued `service:app/service/exam/audit_service.py` `table:exam_audit_log`
+1. log_action writes rows for results_computed, results_published, exam_unlocked, hall_tickets_computed, eligibility_overridden, hall_tickets_published, notification_queued and exam_deleted `service:app/service/exam/audit_service.py` `table:exam_audit_log`
 2. Mark saves are not audited.
 3. The audit endpoint pages rows and returns raw columns performed_by (user UUID), performed_at, reason and metadata_ `endpoint:GET /exams/{exam_id}/audit` `web:src/pages/exam/AuditLog.tsx` `mobile:app/exam/audit-log.tsx`
 
@@ -415,7 +417,7 @@ Implements: `feature:exam/exam-notifications`
 2. Mobile exam detail has an Exam Schedule QuickSend; both QuickSends go through the communication module `mobile:components/communication/QuickSendButton.tsx`
 3. The notify endpoint (web ExamNotification, mobile notify screen) only counts recipients and sends nothing `endpoint:POST /exams/{exam_id}/notify` `service:app/service/exam/notification_service.py` `web:src/pages/exam/ExamNotification.tsx` `mobile:app/exam/notify.tsx`
 
-- Note: The manual send-results-notification, send-hall-ticket-notification and dates/send-schedule endpoints need exams:send_sms and import non-existent models, so they return 500.
+- Note: The manual send-results-notification, send-hall-ticket-notification and dates/send-schedule endpoints queue NotificationQueue rows and enqueue send_notification_batch, but need exams:send_sms, which no seeded role holds, so they return 403 by default.
 
 ```mermaid
 flowchart TD
@@ -466,7 +468,7 @@ Implements: `feature:exam/mark-entry-permissions`
 
 - Result: Once any active row exists for an exam, only those users pass authorize_mark_entry.
 
-- Failure: The grant endpoint reads current_user id instead of the sub claim, so real JWTs cause a 500 and permissions cannot be granted.
+- Note: Grants also lock out Admin, and the Excel template download and upload do not call authorize_mark_entry.
 
 ```mermaid
 flowchart TD
@@ -497,6 +499,7 @@ Implements: `feature:exam/hall-tickets`
 9. Download returns a PDF (404 if not computed, 403 if ineligible); download-all returns a ZIP of eligible students `endpoint:GET /exams/{exam_id}/hall-tickets/download` `endpoint:GET /exams/{exam_id}/hall-tickets/download-all` `job:app/tasks/exam/hall_ticket_pdf.py` `web:src/pages/exam/HallTicketDownload.tsx`
 
 - Note: Compute, override and publish write hall_tickets_computed, eligibility_overridden and hall_tickets_published audit rows.
+- Note: A Student or Parent downloading a single ticket passes ensure_student_access (app/tools/ownership.py); another student id gets 403.
 
 ```mermaid
 flowchart TD
@@ -568,7 +571,8 @@ Implements: `feature:exam/config-templates`, `feature:exam/exam-dates`, `feature
 7. Copy or apply-template then fills an empty target class-section `endpoint:POST /exam-patterns/{exam_id}/copy` `endpoint:POST /exam-patterns/{exam_id}/apply-template`
 8. Subjects not mapped to the target class-section raise 422 unless skip_missing_subjects=true.
 
-- Failure: Date creates without exam_id in the body get 422; both clients strip it.
+- Failure: Date creates without exam_id in the body get 422; mobile omits it.
+- Failure: A subject-config PUT that changes a column returns 500 (MissingGreenlet) after the change is committed.
 
 ```mermaid
 flowchart TD
@@ -601,8 +605,9 @@ Implements: `feature:exam/result-publishing`, `feature:exam/student-parent-resul
 3. my-marks and child-marks return raw marks at any time `endpoint:GET /exams/{exam_id}/my-marks` `endpoint:GET /exams/{exam_id}/child-marks/{student_id}` `web:src/pages/exam/MyMarksPage.tsx` (mobile my-marks/[examId] screen)
 4. Parent routes verify the student_parent_links row and return 403 otherwise `table:student_parent_links`
 
-- Failure: publish_exam imports non-existent model modules, so POST /publish returns 500.
-- Failure: GET /exams/my-results is shadowed by GET /exams/{exam_id} (router include order) and returns 422.
+- Failure: Students get 403 on my-result and my-results because the tenant plans omit the exam_results resource, so plan-limited role seeding never grants exam_results:read_own/list_own.
+
+- Note: GET /exams/{exam_id}/results/{student_id} lets a Student or Parent read their own or linked child's result through ensure_student_access, without a publish check `endpoint:GET /exams/{exam_id}/results/{student_id}`
 
 ```mermaid
 flowchart TD
@@ -758,9 +763,9 @@ flowchart TD
 
 ### exam/results-no-cascade-on-exam-delete
 
-- **Decision**: student_marks, student_subject_results and student_exam_results reference exams without ON DELETE CASCADE, while config, date, permission and eligibility tables cascade; DELETE is allowed only on draft exams.
-- **Why**: Marks and results must never disappear by accident when an exam is deleted, so those tables deliberately do not cascade.
-- **Tradeoff**: Deleting a draft that has marks or results (possible after active -> draft) fails with 500.
+- **Decision**: student_marks, student_subject_results and student_exam_results reference exams without ON DELETE CASCADE, while config, date, permission and eligibility tables cascade; delete_exam removes marks and results explicitly and refuses published exams with 409.
+- **Why**: Marks and results must never disappear by accident through a DB cascade; deleting them is an explicit, audited step in the service.
+- **Tradeoff**: Deleting any non-published exam destroys its entered marks and results; the exam_deleted audit row records the deleted counts.
 - Shapes: `endpoint:DELETE /exams/{exam_id}`, `table:student_exam_results`, `table:student_marks`, `table:student_subject_results`
 
 ### exam/service-commit-ownership (unintended)
@@ -768,6 +773,15 @@ flowchart TD
 - **Decision**: grading_service, remark_grade_service and board_pattern_service commit internally, so their endpoints must not commit or refresh again; the other exam services only flush and the endpoint commits.
 - **Why**: Not a deliberate choice: these services were written earlier in a different style and never aligned with the flush-in-service, commit-in-endpoint rule.
 - Shapes: `service:app/service/exam/board_pattern_service.py`, `service:app/service/exam/exam_service.py`, `service:app/service/exam/grading_service.py`, `service:app/service/exam/remark_grade_service.py`
+
+### exam/student-parent-role-name-and-ownership-gating (active)
+
+- **Decision**: Student and Parent are blocked by exact role name from the bulk results, eligibility lists, download-all and audit endpoints, and single-student results and hall-ticket download call ensure_student_access (own record or linked child).
+- **Why**: Students and parents hold exams:read, which alone guarded those endpoints and exposed every student's results and hall tickets.
+- **Alternatives**: Enforce the seeded exam_results and exam_hall_tickets *_own/_related permissions per endpoint.
+- **Tradeoff**: Custom roles holding exams:read are not blocked, and the single-student result endpoint has no publish check.
+- **Since**: 2026-10
+- Shapes: `endpoint:GET /exams/{exam_id}/audit`, `endpoint:GET /exams/{exam_id}/hall-tickets/download`, `endpoint:GET /exams/{exam_id}/hall-tickets/download-all`, `endpoint:GET /exams/{exam_id}/hall-tickets/eligible`, `endpoint:GET /exams/{exam_id}/results`, `endpoint:GET /exams/{exam_id}/results/{student_id}`, `feature:exam/student-parent-results`
 
 ### exam/subjects-from-class-subject-map
 
@@ -797,7 +811,7 @@ ABS is the grade for a subject with any absent component, no bands, or sub_max 0
 
 ### exam/audit-action
 
-Exam audit actions are results_computed, results_published, exam_unlocked, hall_tickets_computed, eligibility_overridden, hall_tickets_published and notification_queued.
+Exam audit actions are results_computed, results_published, exam_unlocked, hall_tickets_computed, eligibility_overridden, hall_tickets_published, notification_queued and exam_deleted.
 - Related: `service:app/service/exam/audit_service.py`, `table:exam_audit_log`
 
 ### exam/board-pattern

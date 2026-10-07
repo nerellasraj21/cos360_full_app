@@ -136,10 +136,10 @@ Student-parent links connect children to shared parent records; parents fetch th
 
 ### students/parents-master
 
-Search, view and edit parent records; parents only come into existence through admission.
+Create, search, view, edit and delete parent records; POST /parents/ creates the Parent login (username = email, else phone) together with the parents row.
 - Roles: Holders of parent_management permissions
-- Parity: Web only (/masters/parents); mobile has no parents master.
-- Note: POST /parents/ inserts a parents row without user_id (NOT NULL) and fails with 500, so standalone parent creation does not work.
+- Parity: Web /masters/parents and mobile app/masters/parents.tsx; both require email or phone on create.
+- Note: Staff hold parent_management create but not delete by default.
 - Implemented by: `endpoint:GET /parents`, `endpoint:GET /parents/salary-ranges/dropdown`, `endpoint:GET /parents/search`, `endpoint:PATCH /parents/{parent_id}`, `endpoint:POST /parents`, `service:app/service/masters/parent_service.py`, `table:parents`, `web:src/pages/masters/parents.tsx`
 
 ### students/student-documents
@@ -151,14 +151,14 @@ Upload general student documents (free-text document_type, unique per student) a
 
 ### students/student-photo
 
-Upload or remove a student photo (jpg/png/webp, max 2 MB) stored at media/student/photos/{student_id}.{ext} and returned as photo_url.
+Upload or remove a student photo (jpg/png/webp, max 2 MB) stored at media/{tenant_id}/student/photos/{student_id}.{ext} and returned as photo_url.
 - Implemented by: `endpoint:DELETE /students/admission/id/{student_id}/photo`, `endpoint:POST /students/admission/id/{student_id}/photo`, `service:app/service/student/admission_service.py`, `table:students`
 
 ### students/student-records
 
 List, search and view students, and activate or deactivate a student via users.is_active.
 - Roles: Admin, Staff, Teacher read all; Student own; Parent related (linked children).
-- Note: GET /students/admission/ defaults to limit=10 (max 100) and ignores active_only; /students/admission/students/dropdown honours active_only.
+- Note: GET /students/admission/ defaults to limit=10 (max 100); active_only=true keeps only active students.
 - Implemented by: `endpoint:GET /students/admission`, `endpoint:GET /students/admission/id/{student_id}`, `endpoint:GET /students/admission/search`, `endpoint:GET /students/admission/students/dropdown`, `endpoint:PATCH /students/admission/{student_id}/toggle-active`, `mobile:app/students/[id].tsx`, `mobile:app/students/index.tsx`, `service:app/service/student/admission_service.py`, `table:student_admissions`, `table:students`, `table:users`, `web:src/components/students/AdmissionTable.tsx`, `web:src/pages/students/StudentProfile.tsx`
 - Shaped by: [students/active-status-on-users](#studentsactive-status-on-users), [students/deactivate-instead-of-delete](#studentsdeactivate-instead-of-delete), [students/reselect-after-commit](#studentsreselect-after-commit)
 
@@ -173,12 +173,12 @@ Implements: `feature:students/admission`
 2. Resolve the Student and Parent role ids by name; fail if either role is missing.
 3. Derive admission_type from the payload, or pre_primary when student.is_primary == primary, else regular.
 4. Use a manual admission number only if unique in both student_admissions.admission_number and users.username `table:student_admissions`; otherwise generate it from the type sequence.
-5. Validate required fields (first_name, father name and phone, academic_year_id, admitted_class_id, address_line1) and reject father and mother sharing one email.
+5. Validate required fields (first_name, father phone, academic_year_id, admitted_class_id, address_line1; a blank parent name falls back to the relation label) and reject father and mother sharing one email.
 6. Look up provided parent emails among users with role Parent; reject an email already used by a non-Parent user.
 7. Create the student user with username = admission number, the hardcoded temporary password and is_first_login = TRUE, then flush() `table:users`.
 8. Create the students row (empty last_name, sentinel DOB 1900-01-01 when blank) and flush() `table:students`.
 9. For father and mother: reuse the existing Parent user and overwrite its parents row with the new payload, or create a user (email, else {admission_number}.father/.mother) and parents row `table:parents`.
-10. For a guardian with an email: reuse or create the same way; a guardian with a blank email is silently skipped.
+10. For a guardian with an email: reuse or create the same way; a guardian with details but no email is already rejected with 422 by the schema.
 11. Insert student_parent_links for each parent and the student_admissions row, then flush() `table:student_parent_links` `table:student_admissions`.
 12. Auto-apply mandatory (all_by_default) class fees inside try/except; a failure is logged and the admission continues `service:app/service/fee/fee_class_mapping_service.py`.
 13. Re-select the admission with its relationships, then commit() once and return the response.
@@ -194,7 +194,7 @@ flowchart TD
   s2 --> s3
   s4["4. Use a manual admission number only if unique in both student_admiss...<br/>table:student_admissions"]
   s3 --> s4
-  s5["5. Validate required fields (first_name, father name and phone, academ..."]
+  s5["5. Validate required fields (first_name, father phone, academic_year_i..."]
   s4 --> s5
   s6["6. Look up provided parent emails among users with role Parent; reject..."]
   s5 --> s6
@@ -273,7 +273,7 @@ Implements: `feature:students/admission`
 1. The form loads admission types `endpoint:GET /students/admission/admission-types/dropdown` and the next number preview `endpoint:GET /students/admission/next-admission-number` and pre-fills the admission number `web:src/components/students/MultiStepAdmissionForm.tsx` `mobile:app/students/admission.tsx`.
 2. The client posts the nested payload {admission fields, student: {..., father, mother, guardian?}} `endpoint:POST /students/admission`; on web academic_year_id and admitted_academic_year_id come from the header year store `web:src/lib/academicYearStore.ts`.
 3. The backend runs add_admission with flush() throughout and one commit() at the end `service:app/service/student/admission_service.py`.
-4. It returns StudentAdmissionResponse with parents nested at student.father, student.mother and student.guardian.
+4. It returns StudentAdmissionResponse; student.father, student.mother and student.guardian are null in this response, so clients re-read `endpoint:GET /students/admission/id/{student_id}` for the parents.
 
 - Result: users, students, parents, student_parent_links and student_admissions rows exist, and mandatory class fees are applied when possible.
 
@@ -284,7 +284,7 @@ flowchart TD
   s1 --> s2
   s3["3. The backend runs add_admission with flush() throughout and one comm...<br/>service:app/service/student/admission_service.py"]
   s2 --> s3
-  s4["4. It returns StudentAdmissionResponse with parents nested at student...."]
+  s4["4. It returns StudentAdmissionResponse; student.father, student.mother...<br/>endpoint:GET /students/admission/id/{student_id}"]
   s3 --> s4
 ```
 
@@ -321,7 +321,7 @@ flowchart TD
 Implements: `feature:students/mark-attendance`
 
 
-1. Pick class, section and date; the roster comes from `endpoint:GET /students/admission` without as_of_date `mobile:app/students/attendance.tsx`.
+1. Pick class, section and date; the roster comes from `endpoint:GET /students/admission` with active_only=true, paged 100 at a time, without as_of_date `mobile:app/students/attendance.tsx`.
 2. Load the day's rows `endpoint:GET /student/attendance/by-date/{attendance_date}` `mobile:src/api/students.ts`.
 3. On save, a student with an existing row whose status changed is patched `endpoint:PATCH /student/attendance/{attendance_id}`.
 4. A student without a row gets a new row, including present `endpoint:POST /student/attendance` `table:student_attendance`.
@@ -330,7 +330,7 @@ Implements: `feature:students/mark-attendance`
 
 ```mermaid
 flowchart TD
-  s1["1. Pick class, section and date; the roster comes from  without as_of_...<br/>endpoint:GET /students/admission<br/>mobile:app/students/attendance.tsx"]
+  s1["1. Pick class, section and date; the roster comes from  with active_on...<br/>endpoint:GET /students/admission<br/>mobile:app/students/attendance.tsx"]
   s2["2. Load the day's rows  .<br/>endpoint:GET /student/attendance/by-date/{attendance_date}<br/>mobile:src/api/students.ts"]
   s1 --> s2
   s3["3. On save, a student with an existing row whose status changed is pat...<br/>endpoint:PATCH /student/attendance/{attendance_id}"]
@@ -345,20 +345,18 @@ Implements: `feature:students/mark-attendance`
 
 
 1. Pick class, section and date in the staff view `web:src/pages/students/AttendancePage.tsx`.
-2. Load the roster `endpoint:GET /students/admission` with class_id, section_id and as_of_date; as_of_date hides students admitted later.
+2. Load the roster `endpoint:GET /students/admission` with class_id, section_id, as_of_date and active_only=true, paging 100 at a time until has_next is false; as_of_date hides students admitted later.
 3. Load existing rows for the day `endpoint:GET /student/attendance/by-date/{attendance_date}` `web:src/api/students/attendance.ts`.
 4. Every student without a row shows as present; the marker changes only exceptions.
 5. On save, rows that already exist are updated one by one, including back to present `endpoint:PATCH /student/attendance/{attendance_id}`.
 6. New non-present marks are sent as one list of {student_id, status, remarks} to the upsert `endpoint:PATCH /student/attendance/by-date/{attendance_date}`; students before their admission_date are skipped silently `table:student_attendance`.
-
-- Failure: the roster call sends no limit, so at most 10 students (including inactive ones) appear; pass limit=100 and filter on student.is_active.
 
 - Note: by-date PATCH takes raw dicts, so status must already be lowercase, and it cannot clear remarks.
 
 ```mermaid
 flowchart TD
   s1["1. Pick class, section and date in the staff view .<br/>web:src/pages/students/AttendancePage.tsx"]
-  s2["2. Load the roster  with class_id, section_id and as_of_date; as_of_da...<br/>endpoint:GET /students/admission"]
+  s2["2. Load the roster  with class_id, section_id, as_of_date and active_o...<br/>endpoint:GET /students/admission"]
   s1 --> s2
   s3["3. Load existing rows for the day  .<br/>endpoint:GET /student/attendance/by-date/{attendance_date}<br/>web:src/api/students/attendance.ts"]
   s2 --> s3
@@ -442,13 +440,13 @@ flowchart TD
 ### students/deactivate-instead-of-delete (active)
 
 - **Decision**: Students are deactivated with toggle-active; no client calls DELETE /students/admission/{admission_id}.
-- **Why**: Delete removes the student, the student user and every linked parent with their users, including parents shared with siblings, and then returns 500 after the commit.
+- **Why**: Delete is permanent (attendance, documents, certificates, fee mappings, transport, links, user) and is refused with 409 once the student has fee payments, concessions, old dues, exam marks or results, so deactivation is the only path that works for every student.
 - Shapes: `endpoint:DELETE /students/admission/{admission_id}`, `endpoint:PATCH /students/admission/{student_id}/toggle-active`, `feature:students/student-records`
 
 ### students/guardian-email-required-in-clients (active)
 
 - **Decision**: Both clients require the guardian email once a guardian name is entered.
-- **Why**: add_admission silently drops a guardian whose email is blank, so the client must prevent losing the guardian.
+- **Why**: The guardian login uses the email as username, and the API rejects (422) a guardian with details but no email, so clients catch it before submit.
 - Shapes: `concept:students/guardian`, `feature:students/admission`, `mobile:app/students/admission.tsx`, `web:src/components/students/admission-steps/ParentsStepForm.tsx`
 
 ### students/number-generated-on-save (active)
@@ -510,7 +508,7 @@ Daily attendance status: present, absent, late, half_day or leave (shared enum a
 
 ### students/guardian
 
-An optional third parent (besides father and mother) stored as a parents row linked with relation guardian; it is created only when it has an email.
+An optional third parent (besides father and mother) stored as a parents row linked with relation guardian; it requires an email, and a guardian with details but no email is rejected.
 - Related: `feature:students/admission`, `table:parents`, `table:student_parent_links`
 
 ### students/is-primary

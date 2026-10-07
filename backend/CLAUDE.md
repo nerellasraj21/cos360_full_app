@@ -12,7 +12,7 @@ Read the root `CLAUDE.md` first. Depth lives elsewhere — don't duplicate it he
 - `app/db/base.py` (`BaseOrg` = tenant tables with `tenant_id`, `BasePublic` = platform tables, one schema) · `app/db/tenant_session.py` (sessions, tenant resolution) · `app/db/rls.py` (RLS helper for migrations).
 - `app/tools/simple_permissions.py` (auth + permission checks) · `app/tools/error_handler.py` · `app/middleware/`.
 - `app/celery_app.py` + `app/tasks/` — Celery (broker from `REDIS_HOST/PORT/DB`, not `REDIS_URL`).
-- `migrations/` — Alembic. `scripts/` — ops/seed scripts (see bottom). `tests/` is gitignored except `tests/integration/test_tenant_*.py`, which need the local database.
+- `migrations/` - Alembic. `scripts/` - ops/seed scripts (see bottom). `legacy_migration/` - the old-database import tool. `tests/` is gitignored except the integration tests allowlisted in `.gitignore`, which need the local database.
 
 ## Layering
 - **Endpoint**: auth + permission check, call one service function, return. No business logic, no SQL.
@@ -54,7 +54,7 @@ return row                             # expire_on_commit=False keeps it readabl
    await check_role_plan_permission_with_error(db, request, current_user.get("role"), "<resource>", "<action>")
    ```
    Actions: `create read list update delete` (+ module-specific like `read_own`). `read` ≠ `list`.
-   Reuse resource names already seeded (grep `_ROLE_PERMISSIONS` in `app/api/v1/auth/seed_endpoints.py`).
+   Reuse resource names already in the permission catalog (`app/service/tenant/permission_catalog.py`).
    A new resource needs rows in both permission layers or everyone gets 403 — see `docs/permissions.md`.
    Super-admin routes use `Depends(get_current_super_admin)` instead.
 3. Path params are `uuid.UUID`, never `str` (asyncpg binding). Declare static paths (`/dropdown`) before `/{id}`.
@@ -116,7 +116,7 @@ except Exception as e:
 - `env.py` needs `MIGRATION_DATABASE_URL` (the owner role). The app role in `DATABASE_URL` cannot run DDL.
 - A new tenant table: inherit `BaseOrg`, and call `enable_tenant_rls(op, "<table>")` from `app.db.rls` in the same revision.
   `test_every_tenant_table_has_forced_rls` fails if one is missed.
-- Keep a single head (`alembic heads`). After a revision, a second `--autogenerate` must produce no operations.
+- Revision ids are sequential (`--rev-id 0008` after `0007`). Keep a single head (`alembic heads`). After a revision, a second `--autogenerate` must produce no operations.
 - Review `--autogenerate` output line by line.
 
 ## Run, lint, test (from `backend/`)
@@ -129,27 +129,39 @@ ruff check . && black --check . && pytest tests/unit/
 ```
 - Use the pinned `ruff==0.4.4` / `black==24.4.2` from `requirements-dev.txt`. Newer ruff reports different rules.
   Line length is 120. `migrations/`, `scripts/`, `test_scripts/` are excluded from ruff.
-- `pytest.ini` shadows `[tool.pytest.ini_options]` in `pyproject.toml` (only asyncio settings apply). Register
-  markers in `pytest.ini` if you rely on `-m`.
+- `pytest.ini` shadows `[tool.pytest.ini_options]` in `pyproject.toml`. Markers (`unit`, `api`, `integration`,
+  `tc(id)`) are registered in `pytest.ini`; add new ones there. Tag tests with their test case ID as in
+  `docs/testing/strategy.md`.
+- API tests (`tests/api/`) and every `scripts/qa/` script run only against the local database and `qa_` tenants,
+  through the test API on port 8100 (`docs/testing/test-environment.md`). Never weaken those guards.
 - Windows console: avoid non-ASCII in `print()` (cp1252 `UnicodeEncodeError`).
 
 ## Scripts (`backend/scripts/`)
 Scripts load `.env` and connect to whatever `DATABASE_URL` points at, which may be production Neon. Read a
-script before running it and prefer its dry-run mode. Most files there are one-off, already-applied patches
-(`apply_*_<schema>.py`, `add_*`, `_check_*`, `_inspect_*`, `fix_*`, person-specific seeds). Don't reuse them as
-templates for new schema changes — write an Alembic revision instead.
+script before running it and prefer its dry-run mode. Don't reuse them as templates for schema changes; write an
+Alembic revision instead.
 
-Reusable tools:
-- Moving data from the old per-schema databases into the shared schema: `python -m legacy_migration plan|migrate` (`backend/legacy_migration/`, procedure in `docs/operations/legacy-data-migration.md`). It only reads the source; run `plan` first.
-- Tenants are created with `POST /super_admin/system/tenants/` (`app/service/tenant/`). The scripts below clone per-tenant schemas and no longer apply to the shared schema.
-- Legacy tenant onboarding (clone `cos360_master`), in order: `create_little_bunny_tenant.py` (reference, edit the
-  constants) → `fix_tenant_enum_types.py <schema>` → `seed_master_data_little_bunny.py` (menus/roles/templates) →
-  `seed_resource_permissions_little_bunny.py` (role permissions; `cos360_master`'s copy is empty). Procedure:
-  `docs/operations/database-migrations.md#creating-a-tenant-schema`.
-- Drift/migration hygiene: `diagnose_schema_drift.py`, `_compare_schemas.py` (both compare `cos360_master` vs
-  `test_tenant_schema`), `check_duplicate_revisions.py`.
-- Data: `seed_cert_templates_direct.py [schema…]`, `find_stale_pre_admission_attendance.py <schema>|--all [--apply]`,
-  `cleanup_db.py` (`DRY_RUN`, `CLEANUP_SCHEMA`; keep-years hardcoded), `clear_test_tenant_data.py`,
-  `seed_fee_test_data.py` (fee chain in `test_tenant_schema`), `reseed_student_parent_permissions.py`.
-- Exports: `export_api_routes.py` writes `api_routes.json`, which is gitignored; `/openapi.json` has the same data live.
-- Deploy: `deploy.sh` (used by the VPS deploy — see backend-deploy doc).
+Work on the shared schema:
+- Tenants are created with `POST /super_admin/system/tenants/` (`app/service/tenant/`).
+- Demo tenant: `seed_demo_catalog.py [client_name]` (default `demo_school`) loads the menu catalog and the Full plan
+  and syncs the tenant's role permissions; `seed_demo_data.py` then loads sample data through the API
+  (`DEMO_API_URL`, `DEMO_TENANT`, `DEMO_ADMIN_USERNAME`, `DEMO_ADMIN_PASSWORD`; the tenant needs an admin and an
+  academic year first).
+- QA tenant for automated tests: `qa/setup_qa_tenant.py [--reset]` and `qa/run_test_api.py` (port 8100). Both
+  refuse to run unless `qa/_target.py` passes. Manual-test tenant: `qa/setup_manual_tenant.py [--reset] [--no-seed]`
+  provisions `qa_manual` with the same QA logins and loads `seed_demo_data.py` into it through the test API.
+  Procedure: `docs/testing/test-environment.md`.
+- Moving data from the old per-schema databases: `python -m legacy_migration plan|migrate` (`backend/legacy_migration/`,
+  procedure in `docs/operations/legacy-data-migration.md`). It only reads the source; run `plan` first.
+- `check_duplicate_revisions.py`, `export_api_routes.py` (writes the gitignored `api_routes.json`; `/openapi.json`
+  has the same data live), `start_celery_worker.py`, `deploy.sh` (the VPS deploy, see the backend-deploy doc).
+
+Legacy (schema-per-tenant; they target `cos360_master`, `test_tenant_schema` or `little_bunny` schemas, which the
+shared design does not have): `create_little_bunny_tenant.py`, `fix_tenant_enum_types.py`, `clone_structure_to_master.py`,
+`recreate_cos360_master.py`, `diagnose_schema_drift.py`, `_compare_schemas.py`, `cleanup_db.py`,
+`clear_test_tenant_data.py`, `find_stale_pre_admission_attendance.py`, `setup_issuable_certificates.py`,
+`set_staff_password.py`, `seed_cert_templates_direct.py`, `reseed_student_parent_permissions.py`,
+`seed_fee_collection_student_permission.py`, `seed_fee_test_data.py` and `seed_exam_pattern_test_data.py` (sample
+data now comes from `seed_demo_data.py` and `qa/setup_qa_tenant.py`), and the `seed_*_permissions.py`,
+`seed_*_menu*.py` and `seed_*_little_bunny.py` patches. Don't run them against the shared database; port the logic
+to a service or a migration if it is still needed.

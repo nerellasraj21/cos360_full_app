@@ -133,7 +133,7 @@ List staff (StaffOut with designation_obj) filtered by gender, or grouped by des
 
 ### staff/staff-photo
 
-Upload or remove a staff photo (jpg/jpeg/png/webp, max 2 MB) stored at media/staff/photos/{staff_id}.{ext} and returned as photo_url.
+Upload or remove a staff photo (jpg/jpeg/png/webp, max 2 MB) stored at media/{tenant_id}/staff/photos/{staff_id}.{ext} and returned as photo_url.
 - Flows: [staff/enroll-staff](#staffenroll-staff)
 - Implemented by: `endpoint:DELETE /staff/enrollment/{staff_id}/photo`, `endpoint:POST /staff/enrollment/{staff_id}/photo`, `service:app/service/masters/staff_service.py`, `table:staff`, `web:src/api/staff/staff.ts`
 - Shaped by: [staff/photo-upload-after-create](#staffphoto-upload-after-create)
@@ -228,10 +228,10 @@ Implements: `feature:staff/mark-staff-attendance`
 4. On save only modified rows are sent: non-present with no existing row `endpoint:POST /staff/attendance`.
 5. Non-present with an existing row `endpoint:PATCH /staff/attendance/{attendance_id}`.
 6. Switched back to present `endpoint:DELETE /staff/attendance/{attendance_id}` `table:staff_attendance`.
-7. The calls run in parallel with Promise.all `web:src/api/staff/attendance.ts`.
+7. The calls run in parallel: web with Promise.all `web:src/api/staff/attendance.ts`, mobile with Promise.allSettled.
 
-- Failure: without staff_attendance:delete the save partially fails and Promise.all hides which calls failed.
 - Failure: status must be lowercase (no before-validator, Present gives 422); a duplicate single create hits uq_staff_date and returns 500.
+- Failure: without staff_attendance:delete the save partially fails; web Promise.all hides which calls failed, mobile uses Promise.allSettled and keeps the failed rows pending.
 
 ```mermaid
 flowchart TD
@@ -246,7 +246,7 @@ flowchart TD
   s4 --> s5
   s6["6. Switched back to present  .<br/>endpoint:DELETE /staff/attendance/{attendance_id}<br/>table:staff_attendance"]
   s5 --> s6
-  s7["7. The calls run in parallel with Promise.all .<br/>web:src/api/staff/attendance.ts"]
+  s7["7. The calls run in parallel: web with Promise.all , mobile with Promi...<br/>web:src/api/staff/attendance.ts"]
   s6 --> s7
 ```
 

@@ -225,8 +225,8 @@ Implements: `feature:auth/logout`
 
 1. The client posts to `endpoint:POST /auth/logout` with the Bearer access token and optional refresh_token in the body.
 2. The backend inserts the SHA-256 hash of each token into `table:public.token_blacklist` with expires_at set to the token exp `service:app/service/auth/token_blacklist_service.py`.
-3. Every authenticated request checks the blacklist in get_current_user_token (app/tools/permission_decorators.py).
-4. Web clears the persisted auth store `web:src/lib/authStore.ts`; mobile reads its tokens, clears SecureStore, then fires the API call with those tokens without awaiting it `mobile:src/api/client.ts`.
+3. Every authenticated request checks the blacklist in get_current_user_token `service:app/tools/simple_permissions.py`.
+4. Web clears the persisted auth store `web:src/lib/authStore.ts`; mobile reads its tokens, clears SecureStore and the stored organisation, then fires the API call with those tokens without awaiting it `mobile:src/api/client.ts`.
 
 - Step 2b: An expired access token is skipped rather than rejected when a refresh_token is sent, so the refresh token is still revoked; with no valid token at all the endpoint returns 401.
 - Note: The blacklist fails open on DB errors, and cleanup_expired() exists but nothing schedules it.
@@ -236,7 +236,7 @@ flowchart TD
   s1["1. The client posts to  with the Bearer access token and optional refr...<br/>endpoint:POST /auth/logout"]
   s2["2. The backend inserts the SHA-256 hash of each token into  with expir...<br/>table:public.token_blacklist<br/>service:app/service/auth/token_blacklist_service.py"]
   s1 --> s2
-  s3["3. Every authenticated request checks the blacklist in get_current_use..."]
+  s3["3. Every authenticated request checks the blacklist in get_current_use...<br/>service:app/tools/simple_permissions.py"]
   s2 --> s3
   s4["4. Web clears the persisted auth store ; mobile reads its tokens, clea...<br/>web:src/lib/authStore.ts<br/>mobile:src/api/client.ts"]
   s3 --> s4
@@ -251,12 +251,12 @@ Implements: `feature:auth/tenant-login`
 - Trigger: A tenant user submits the login form on web or mobile.
 
 1. The client calls the public academic-year list, which uses the request tenant `endpoint:GET /auth/academic-years` `table:academic_years`, from `web:src/components/login-form.tsx` or `mobile:app/login.tsx`.
-2. The client posts username, password, academic_year_id and optional client_name `endpoint:POST /auth/login`. A missing or unknown year returns 400; an empty string returns 422.
+2. The client posts username, password, academic_year_id and optional client_name `endpoint:POST /auth/login`. A missing or empty year fails validation with 422; an unknown year returns 400.
 3. The backend resolves the identifier as users.username, then users.email, then staff.phone, and verifies the password `service:app/service/auth/multi_tenant_auth_service.py` `table:users` `table:staff`. Inactive users and wrong passwords get the same 401.
 4. If the role is Staff, Teacher, Student or Parent and is_first_login is TRUE, the flow switches to flow:auth/first-login-password-change.
 5. The backend returns LoginResponse with user, role, menu (tree), permissions ({resource: [actions]}), entity_id, academic_year_id/title, access_token and refresh_token.
-6. entity_id is the Student, Parent or Staff row id for those role names, otherwise null `table:students` `table:parents` `table:staff`.
-7. menu is built from menus JOIN role_menu_permissions WHERE can_view `table:menus` `table:role_menu_permissions`.
+6. entity_id is the Student row id for Student, the Parent row id for Parent, and the Staff row id for every other role that has one, else null `table:students` `table:parents` `table:staff`.
+7. menu is built from the shared menu catalog joined to the tenant role_menu_permissions WHERE can_view `table:public.menus` `table:role_menu_permissions`.
 8. permissions come from the tenant resource_permissions for the role `table:resource_permissions`.
 9. The client persists the whole snapshot. Web uses zustand auth-storage in localStorage `web:src/lib/authStore.ts`; mobile keeps tokens in SecureStore and the rest in AsyncStorage (services/authUtils.ts).
 10. Web only, Admin role: the login mutation activates the chosen academic year for the whole tenant `web:src/api/auth.ts` `endpoint:PUT /masters/academic_years/{academic_year_id}`; the backend deactivates all other years.
@@ -264,9 +264,9 @@ Implements: `feature:auth/tenant-login`
 
 - Result: The client renders the menu from the response and sends the access token on every request; the snapshot is fixed until the next login.
 
-- Note: client_name in the body only validates the tenant and fills the JWT claim; the DB session always uses the request tenant resolved by the tenant middleware.
 - Note: Mobile stores @auth/client_schema from response.client_name, falling back to the organization already stored at login; it never defaults to a test tenant.
 - Note: Access and refresh tokens carry a tenant_id claim, and login refuses a body client_name that resolves to a different tenant than the request.
+- Note: client_name in the body only validates the tenant and fills the JWT claim: an unknown one gets 401 Invalid connection, one different from the header tenant gets 400; the DB session always uses the header tenant.
 
 ```mermaid
 flowchart TD
@@ -279,9 +279,9 @@ flowchart TD
   s3 --> s4
   s5["5. The backend returns LoginResponse with user, role, menu (tree), per..."]
   s4 --> s5
-  s6["6. entity_id is the Student, Parent or Staff row id for those role nam...<br/>table:students<br/>table:parents<br/>table:staff"]
+  s6["6. entity_id is the Student row id for Student, the Parent row id for ...<br/>table:students<br/>table:parents<br/>table:staff"]
   s5 --> s6
-  s7["7. menu is built from menus JOIN role_menu_permissions WHERE can_view  .<br/>table:menus<br/>table:role_menu_permissions"]
+  s7["7. menu is built from the shared menu catalog joined to the tenant rol...<br/>table:public.menus<br/>table:role_menu_permissions"]
   s6 --> s7
   s8["8. permissions come from the tenant resource_permissions for the role .<br/>table:resource_permissions"]
   s7 --> s8
@@ -303,7 +303,7 @@ Implements: `feature:auth/token-refresh`
 
 1. The client posts refresh_token `endpoint:POST /auth/refresh`.
 2. The backend checks the token type is refresh and that the token is not blacklisted `service:app/service/auth/token_blacklist_service.py` `table:public.token_blacklist`.
-3. The backend re-validates that the tenant in the client_name claim exists `service:app/service/auth/multi_tenant_auth_service.py` `table:public.tenants`.
+3. The backend requires a tenant_id claim (401 without it) equal to the tenant named by the cschema header (403 if different); an unknown or inactive header tenant gets 404 `service:app/db/tenant_session.py` `table:public.tenants`.
 4. The backend re-reads the user for the tenant `table:users` `table:roles`: an inactive or missing user gets 401; the role claim comes from the user's current role, and the other claims are copied from the old refresh token.
 5. The backend returns a new access/refresh pair `service:app/tools/jwt_utils.py`; the old refresh token is not revoked.
 
@@ -315,7 +315,7 @@ flowchart TD
   s1["1. The client posts refresh_token .<br/>endpoint:POST /auth/refresh"]
   s2["2. The backend checks the token type is refresh and that the token is ...<br/>service:app/service/auth/token_blacklist_service.py<br/>table:public.token_blacklist"]
   s1 --> s2
-  s3["3. The backend re-validates that the tenant in the client_name claim e...<br/>service:app/service/auth/multi_tenant_auth_service.py<br/>table:public.tenants"]
+  s3["3. The backend requires a tenant_id claim (401 without it) equal to th...<br/>service:app/db/tenant_session.py<br/>table:public.tenants"]
   s2 --> s3
   s4["4. The backend re-reads the user for the tenant  : an inactive or miss...<br/>table:users<br/>table:roles"]
   s3 --> s4
@@ -386,7 +386,7 @@ flowchart TD
 
 ### auth/first-login-flag-raw-sql
 
-- **Decision**: users.is_first_login is not in the SQLAlchemy User model; it is read and written only with raw SQL inside try/except.
+- **Decision**: users.is_first_login is read and written only with raw SQL inside try/except, although the column is on the User model.
 - **Why**: The column was not on the User model when this was written, so raw SQL inside try/except kept login working if the read failed.
 - **Tradeoff**: A failed read silently skips the forced password change.
 - Note: users.is_first_login is on the User model and in the baseline migration, so the raw SQL is no longer needed for compatibility.
@@ -483,7 +483,7 @@ A JWT with token_type change_password and a 15-minute life, returned instead of 
 
 ### auth/entity-id
 
-The id of the Student, Parent or Staff row linked to the logged-in user, returned at login; null for other roles, and null for Teacher on normal login.
+The id of the Student row for Student, the Parent row for Parent, and the Staff row for any other role that has one, returned at login and set-password; null when no such row exists.
 - Related: `feature:auth/tenant-login`, `table:parents`, `table:staff`, `table:students`
 
 ### auth/first-login

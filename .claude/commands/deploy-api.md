@@ -10,26 +10,17 @@ Comprehensive deployment workflow for COS360 FastAPI multi-tenant application wi
 
 ### 1. Code Quality Checks
 ```bash
-# Run linting and formatting
-black app/ --check
-flake8 app/
-mypy app/
-
-# Security scanning
-bandit -r app/
-safety check
+# Lint and format with the versions pinned in requirements-dev.txt (from backend/)
+ruff check .
+black --check .
 ```
 
 ### 2. Test Suite Execution
 ```bash
-# Run comprehensive test suite
-pytest --cov=app --cov-report=html --cov-fail-under=80
-
-# Run integration tests
-pytest tests/integration/ -v
-
-# Performance testing
-locust -f tests/performance/load_test.py --headless --users 100 --spawn-rate 10 --run-time 300s
+# From backend/, against the local database only (docs/operations/testing.md)
+pytest tests/unit/
+pytest tests/integration -m integration
+pytest tests/api -m api        # needs the QA tenant and scripts/qa/run_test_api.py (docs/testing/test-environment.md)
 ```
 
 ### 3. Security Validation
@@ -42,13 +33,12 @@ locust -f tests/performance/load_test.py --headless --users 100 --spawn-rate 10 
 ### 4. Database Preparation
 
 #### Backup
-Back up `public`, `cos360_master`, `test_tenant_schema` and `little_bunny` as described in the Backups section of `docs/operations/database-migrations.md`. `cos360_main` (client `default`) is an empty legacy schema and is not backed up or migrated.
+Back up the shared database as described in the Backups section of `docs/operations/database-migrations.md` (a Neon branch or a `pg_dump` against the direct host).
 
 #### Migrations
-Apply pending revisions with the `/migration` workflow (`.claude/commands/migration.md`): `cos360_master` first, then each live tenant, one schema at a time with `SCHEMA_NAME` set. Every live schema must be migrated **before** the new code is deployed, or queries on new tables/columns return 500 for the schemas that lack them.
+Apply pending revisions with the `/migration` workflow (`.claude/commands/migration.md`): one `alembic upgrade head` as the owner role (`MIGRATION_DATABASE_URL`). The database must be migrated **before** the new code is deployed, or queries on new tables/columns return 500.
 ```powershell
-$env:SCHEMA_NAME='little_bunny'; alembic current
-python scripts/diagnose_schema_drift.py
+alembic heads; alembic current
 ```
 
 ## Deployment Process
@@ -57,8 +47,8 @@ python scripts/diagnose_schema_drift.py
 
 #### Production Environment Variables
 ```bash
-# Required environment variables for production
-DATABASE_URL=postgresql+asyncpg://<user>:<password>@<neon-host>/...
+# Required environment variables for production (names and full list: docs/operations/backend-deploy.md)
+DATABASE_URL=<app role URL, postgresql+asyncpg form, never the owner or a superuser>
 REDIS_URL=redis://localhost:6379
 SECRET_KEY=<secure-random-key>
 JWT_SECRET_KEY=<secure-jwt-key>
@@ -105,11 +95,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 # Test basic health endpoint
 curl -f http://localhost:8000/health
 
-# Test database connectivity
-curl -f http://localhost:8000/api/v1/auth/health
-
-# Test multi-tenant functionality
-curl -H "cschema: test_tenant" http://localhost:8000/api/v1/fee/categories/
+# Test tenant lookup (no token needed; 404 means unknown tenant)
+curl -f -H "cschema: <client_name>" http://localhost:8000/api/v1/auth/academic-years
 ```
 
 #### Performance Validation
@@ -125,13 +112,11 @@ curl -H "cschema: test_tenant" http://localhost:8000/api/v1/fee/categories/
 # Test tenant authentication
 curl -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -H "cschema: test_tenant" \
-  -d '{"username": "admin", "password": "testpass123"}'
+  -H "cschema: <client_name>" \
+  -d '{"username": "<admin user>", "password": "<password>", "academic_year_id": "<id from /auth/academic-years>"}'
 
-# Verify JWT token validation
-curl -H "Authorization: Bearer <token>" \
-     -H "cschema: test_tenant" \
-     http://localhost:8000/api/v1/fee/categories/
+# Verify JWT token validation (the tenant comes from the token; no cschema needed)
+curl -H "Authorization: Bearer <token>" http://localhost:8000/api/v1/fee/categories/
 ```
 
 #### Permission System Verification
@@ -169,20 +154,18 @@ async def get_metrics():
 # Fee Management
 curl -X POST http://localhost:8000/api/v1/fee/categories/ \
   -H "Authorization: Bearer <token>" \
-  -H "cschema: test_tenant" \
   -H "Content-Type: application/json" \
   -d '{"category_name": "Tuition", "academic_year_id": "<uuid>"}'
 
 # Student Management
 curl -X GET http://localhost:8000/api/v1/student/admissions/ \
-  -H "Authorization: Bearer <token>" \
-  -H "cschema: test_tenant"
+  -H "Authorization: Bearer <token>"
 
 # Staff Management
 curl -X GET http://localhost:8000/api/v1/masters/staff/ \
-  -H "Authorization: Bearer <token>" \
-  -H "cschema: test_tenant"
+  -H "Authorization: Bearer <token>"
 ```
+Run write checks only against a test tenant, never a live school.
 
 #### Data Integrity Verification
 - [ ] **Database Constraints**: All foreign keys and constraints intact
@@ -193,9 +176,9 @@ curl -X GET http://localhost:8000/api/v1/masters/staff/ \
 ## COS360-Specific Deployment Considerations
 
 ### Multi-Tenant Architecture
-1. **Schema Management**: Ensure all tenant schemas are properly configured
-2. **Tenant Detection**: Verify header-based tenant detection works correctly
-3. **Database Sessions**: Confirm tenant-specific database connections
+1. **Shared schema**: One database and one `alembic_version`; every tenant table has forced row-level security
+2. **Tenant Detection**: `cschema` picks the tenant at login; afterwards the token's `tenant_id` does, and a disagreeing header gets 403
+3. **Database Roles**: The API connects as the app role (no owner, no superuser, no `BYPASSRLS`)
 4. **Permission Synchronization**: Verify plan and role permissions are synchronized
 
 ### Business Operations
@@ -205,9 +188,9 @@ curl -X GET http://localhost:8000/api/v1/masters/staff/ \
 4. **Transport Management**: Validate route and vehicle assignments
 
 ### Performance Considerations
-1. **Database Connection Pooling**: Optimize for multiple tenant schemas
+1. **Database Connection Pooling**: Size uvicorn workers against the Neon connection limit (see backend-deploy doc)
 2. **Cache Configuration**: Redis caching for dropdown data
-3. **Query Optimization**: Efficient database queries across tenant schemas
+3. **Query Optimization**: Indexes on tenant tables lead with `tenant_id`
 4. **API Response Times**: Acceptable performance for real-time operations
 
 ## Rollback Plan
@@ -229,8 +212,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 
 ### Database Rollback
 ```powershell
-# Per schema, newest tenant first, cos360_master last
-$env:SCHEMA_NAME='<schema>'; alembic downgrade <previous_revision>; alembic current
+alembic downgrade <previous_revision>; alembic current
 ```
 
 ## Monitoring and Alerting

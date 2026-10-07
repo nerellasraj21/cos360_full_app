@@ -75,8 +75,9 @@ Certificate type master with unique names; delete is blocked while any certifica
 ### certificates/download-certificate
 
 Download a certificate file via a /media/ URL returned by the download endpoint; each download is audited.
-- Roles: Admin, Staff, Teacher any; Student own; Parent intended for linked children but always 403.
-- Parity: Only the web admin page prefixes the API origin; other web roles and mobile use the relative URL and break unless web and API share an origin.
+- Roles: Admin, Staff, Teacher any; Student own; Parent linked children only.
+- Parity: Every web certificate page prefixes the API origin; mobile passes the relative URL to Linking.openURL, which fails.
+- Note: In strict tenant mode a /media/ request without a cschema header or bearer token is rejected, so even a prefixed link fails as a plain browser navigation.
 - Flows: [certificates/download-certificate](#certificatesdownload-certificate)
 - Implemented by: `endpoint:GET /certificates/{certificate_id}/download`, `mobile:app/students/certificates.tsx`, `service:app/service/student/student_certificate_service.py`, `table:file_audit_log`, `web:src/pages/students/CertificateUploadPage.tsx`, `web:src/pages/students/MyCertificatesPage.tsx`, `web:src/pages/students/ParentCertificatePage.tsx`, `web:src/pages/students/StudentCertificatesPage.tsx`
 - Shaped by: [certificates/local-media-instead-of-s3](#certificateslocal-media-instead-of-s3), [certificates/prefix-origin-on-download](#certificatesprefix-origin-on-download)
@@ -85,7 +86,7 @@ Download a certificate file via a /media/ URL returned by the download endpoint;
 
 Generate a certificate from a template: the client fills placeholders, previews and prints, and the backend stores the exact HTML in generated_certificates.
 - Roles: Admin by role name to generate; issuable_certificates:read/delete for records
-- Parity: Mobile sends the raw template as edited_html, so placeholders are stored unfilled, with no preview or print.
+- Parity: Mobile fills placeholders from the student's admission (mobile/src/utils/certificateTemplate.ts) but leaves school_name, class, section and leaving dates unfilled, with no preview or print.
 - Note: Generated certificates are visible only to the admin generator, not in student/parent views or /students/documents/all.
 - Flows: [certificates/generate-issuable-certificate](#certificatesgenerate-issuable-certificate)
 - Implemented by: `endpoint:DELETE /issuable-certificates/issued/{certificate_id}`, `endpoint:GET /issuable-certificates/issued`, `endpoint:GET /issuable-certificates/issued/{certificate_id}`, `endpoint:GET /students/admission/id/{student_id}`, `endpoint:POST /issuable-certificates/generate`, `mobile:app/students/studentcertificates.tsx`, `service:app/service/student/issuable_certificate_service.py`, `table:generated_certificates`, `web:src/api/hooks/students/useIssuableCertificates.ts`, `web:src/components/students/CertificateEditor.tsx`, `web:src/components/students/IssuableCertificateGenerator.tsx`
@@ -131,7 +132,7 @@ Students view their own certificates, parents a linked child's, and teachers a r
 - Roles: Student (list_own), Parent (linked children), Teacher (read-only web page)
 - Parity: Mobile sends Teachers to the admin screen, where Admin-only endpoints return 403.
 - Note: List endpoints ignore category, so received and issued variants both return both kinds.
-- Note: GET /certificates/{certificate_id} never checks ownership, so a Student with read_own can read any certificate's metadata by id.
+- Note: GET /certificates/{certificate_id} uses read_own for Students and read_related for Parents and then checks ownership; a Student may use the /my-child/{student_id} variants only for their own id.
 - Flows: [certificates/view-certificates](#certificatesview-certificates)
 - Implemented by: `endpoint:GET /certificates/my`, `endpoint:GET /certificates/my-child/{student_id}`, `endpoint:GET /certificates/my-child/{student_id}/issued`, `endpoint:GET /certificates/my-child/{student_id}/received`, `endpoint:GET /certificates/{certificate_id}`, `mobile:app/students/certificates.tsx`, `mobile:app/students/mycertificates.tsx`, `service:app/service/student/student_certificate_service.py`, `table:student_certificates`, `web:src/pages/students/CertificatePage.tsx`, `web:src/pages/students/MyCertificatesPage.tsx`, `web:src/pages/students/ParentCertificatePage.tsx`, `web:src/pages/students/StudentCertificatesPage.tsx`
 - Shaped by: [certificates/parents-view-only](#certificatesparents-view-only)
@@ -174,11 +175,11 @@ Implements: `feature:certificates/download-certificate`
 
 
 1. Call `endpoint:GET /certificates/{certificate_id}/download`; it returns {presigned_url, expires_in_seconds: 900, certificate_id} and writes an audit row `table:file_audit_log`.
-2. presigned_url is the relative path /media/<key>; it never expires and is publicly readable.
+2. presigned_url is the relative path /media/<key>; it never expires and has no per-file auth check.
 3. The client prefixes the API origin with config.api.baseURL.replace(/\/api\/v\d+$/, '') as the admin page does `web:src/pages/students/CertificateUploadPage.tsx`.
 4. Open the URL with window.open on web or Linking.openURL on mobile `mobile:app/students/certificates.tsx`.
 
-- Failure: a Parent always gets 403 because download_certificate compares StudentParentLink.parent_id with the user id instead of the parents.id.
+- Failure: TenantMiddleware rejects a /media/ request that has no cschema header and no bearer token, so the opened link fails.
 
 ```mermaid
 flowchart TD
@@ -204,7 +205,7 @@ Implements: `feature:certificates/generate-issuable-certificate`
 4. Save with `endpoint:POST /issuable-certificates/generate` {student_id, template_id, edited_html, remarks?}; the backend stores the HTML exactly as sent `service:app/service/student/issuable_certificate_service.py` `table:generated_certificates`.
 5. Trigger the browser print dialog on the iframe; the PDF comes from Save as PDF.
 
-- Note: generate_certificate uses commit() -> refresh(), which breaks the repo DB rule; switch to flush() -> select() -> commit() when touching it.
+- Note: generate_certificate rejects an inactive template (400) and an unknown student (404), and saves with flush() -> select() -> commit().
 
 ```mermaid
 flowchart TD
@@ -296,12 +297,14 @@ flowchart TD
 - **Decision**: Certificate upload, admin lists, the selector, template writes and generate check role == Admin by role name in addition to the permission check.
 - **Why**: Not a deliberate choice. Access should come from the student_certificates permissions alone, not a hard-coded role name.
 - **Tradeoff**: A tenant Staff user holding every student_certificates permission still gets 403.
+- Note: The legacy POST /certificates/ and GET /certificates/ routes have no role-name check, so Staff can upload and Staff and Teacher can list through them.
 - Shapes: `endpoint:POST /certificates/received`, `feature:certificates/generate-issuable-certificate`, `feature:certificates/issuable-templates`, `feature:certificates/issued-certificate-files`, `feature:certificates/received-documents`
 
 ### certificates/case-insensitive-is-active (active)
 
 - **Decision**: is_active on issuable certificate tables is compared case-insensitively (func.lower(is_active) == true) until the column becomes Boolean.
-- **Why**: Create writes True while update with a boolean stores true or false, so exact matches miss rows.
+- **Why**: The column is a string written by hand (True on create, False on soft delete), so values may differ in case between rows written by the service and by scripts.
+- Note: PUT /issuable-certificates/templates/{template_id} with a boolean is_active assigns it to the string column and returns 500.
 - Shapes: `feature:certificates/issuable-templates`, `table:generated_certificates`, `table:issuable_certificate_templates`, `web:src/components/students/TemplateManager.tsx`
 
 ### certificates/client-side-fill-and-pdf (active)
@@ -309,7 +312,7 @@ flowchart TD
 - **Decision**: Template placeholder filling and PDF output happen on the client; the backend stores the final HTML exactly as sent.
 - **Why**: Avoids a server-side HTML-to-PDF dependency (wkhtmltopdf/WeasyPrint), lets the admin correct any field in the preview before saving, and the stored html_content is the exact printed version.
 - **Alternatives**: Server-side placeholder filling and PDF rendering.
-- **Tradeoff**: A client that skips filling (mobile) stores unfilled placeholders; there is no server PDF.
+- **Tradeoff**: Any placeholder a client does not fill (mobile leaves school_name and leaving dates) is stored unfilled; there is no server PDF.
 - Shapes: `feature:certificates/generate-issuable-certificate`, `flow:certificates/generate-issuable-certificate`, `table:generated_certificates`, `web:src/components/students/IssuableCertificateGenerator.tsx`
 
 ### certificates/local-media-instead-of-s3 (temporary)

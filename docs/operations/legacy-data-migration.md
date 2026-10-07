@@ -2,7 +2,7 @@
 
 How to move the data of the old schema-per-tenant database into the shared-schema database with `backend/legacy_migration`.
 
-_Last verified against code: 2026-10-01_
+_Last verified against code: 2026-10-07_
 
 ## Guarantees
 
@@ -32,7 +32,7 @@ _Last verified against code: 2026-10-01_
 
 ## Procedure
 
-Run from `backend/`.
+Run from `backend/` (the tool also loads `backend/.env`, so check which URLs it will pick up). `legacy_migration/` is not in the Docker image; run it from a checkout.
 
 1. **Plan.** Read-only, one tenant at a time if you prefer:
    ```bash
@@ -50,7 +50,7 @@ Run from `backend/`.
 4. **Check.** The tool re-counts every table through row-level security and marks a tenant failed if the counts differ from what it inserted. Then check the quarantine file, log in as an admin of the migrated school, and spot-check records.
 5. To redo a tenant, add `--replace`. It deletes that tenant's rows in the target first.
 
-Options: `--platform-schema` (default `public`), `--orphan-policy null|quarantine`, `--clear-media-references`, `--batch-size`, `--out-dir`.
+Options: `--tenant <client_name>` (repeatable; default all tenants), `--source-url-env` / `--target-url-env` (names of the env vars holding the URLs; defaults `SOURCE_DATABASE_URL` / `MIGRATION_DATABASE_URL`), `--platform-schema` (default `public`), `--orphan-policy null|quarantine`, `--clear-media-references`, `--batch-size` (default 1000), `--out-dir` (default `migration_reports`). `python -m legacy_migration --help` lists them.
 
 ## What it does
 

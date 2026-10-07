@@ -81,7 +81,7 @@ Maintain routes (unique route_name, start and end stops, typed number_of_stops, 
 ### transport/student-transport-assignment
 
 Assign a student to a trip and stop with fee_per_term and an optional pricing plan; a student cannot be on the same trip twice.
-- Roles: Admin, staff and teacher (student_transport permission).
+- Roles: student_transport permission; the default role seed gives Admin every action, Staff create/read/update/list (no delete) and Teacher none.
 - Parity: Web assigns from /students/studenttransport (with fee pre-fill); mobile has two assign screens, only app/students/transport.tsx offers the pricing picker. Student Trips screens are another view of the same API.
 - Note: Assignments are hard-deleted and have no is_active, fee_term_id or academic_year_id.
 - Flows: [transport/assign-student-transport](#transportassign-student-transport)
@@ -139,6 +139,7 @@ Implements: `feature:transport/trips`, `feature:transport/vehicles`
 3. It posts one trip for each route-driver row `endpoint:POST /masters/trips` `service:app/service/masters/transport/trip_service.py` `table:trips`, numbering them trip_number = 1..n.
 
 - Failure: A duplicate vehicle-route pair returns 400.
+- Failure: The dialog's driver options come from /staff/enrollments and send the staff id as driver_id, which fails the users.id foreign key, so the trips are not created.
 
 - Note: The create dialog sets last_inspected_date and pollution_renewal_date to today.
 
@@ -160,10 +161,11 @@ Implements: `feature:transport/student-transport-assignment`
 2. The pricing dropdown loads `endpoint:GET /masters/transport-pricing/dropdown` with vehicle_id of the selected trip (required).
 3. Web pre-fills fee_per_term from the first match: the student's transport fee mapping (fee type whose category or name matches /transport|bus/i), then the pricing plan amount, then the stop fees; the value stays editable.
 4. The client posts `endpoint:POST /students/student-transport` with {student_id, trip_id, stop_id, fee_per_term?, pricing_id?} `service:app/service/student/student_transport_service.py`.
-5. The backend checks the student, trip and stop exist, the student is not already on that trip, and pricing_id is active `table:trips` `table:route_stops` `table:transport_pricing`.
-6. If fee_per_term is omitted it defaults to stop.fees; if the stop has no fee the request fails with 'enter the amount manually'. The assignment is written `table:student_transport_assignments`.
+5. The backend checks the student, trip and stop exist, the student is not already on that trip, the stop is on the trip's route, and pricing_id is active `table:trips` `table:route_stops` `table:transport_pricing`.
+6. fee_per_term must be greater than 0; if omitted it defaults to stop.fees, and a stop with no fee or a fee of 0 fails with 'enter the amount manually'. The assignment is written `table:student_transport_assignments`.
 
-- Note: The backend does not check that stop_id is on the trip's route, and the stop list shows stops from every route.
+- Failure: A stop that is not on the trip's route returns 400 (create and PATCH). The stop list endpoint ignores route_id, so only the web assign dialog filters stops by the trip's route client-side.
+
 - Note: Pricing amount is a Decimal sent as a JSON string; wrap it in Number(). fee_per_term is a Float.
 
 ```mermaid
@@ -177,7 +179,7 @@ flowchart TD
   s3 --> s4
   s5["5. The backend checks the student, trip and stop exist, the student is...<br/>table:trips<br/>table:route_stops<br/>table:transport_pricing"]
   s4 --> s5
-  s6["6. If fee_per_term is omitted it defaults to stop.fees; if the stop ha...<br/>table:student_transport_assignments"]
+  s6["6. fee_per_term must be greater than 0; if omitted it defaults to stop...<br/>table:student_transport_assignments"]
   s5 --> s6
 ```
 
@@ -214,9 +216,7 @@ Implements: `feature:transport/transport-pricing`
 1. Admin posts `endpoint:POST /masters/transport-pricing` from `web:src/pages/transport/pricing.tsx` with vehicle_id, optional route_id, billing_cycle, cycle_name, amount and dates.
 2. The service checks the vehicle and route exist `service:app/service/masters/transport/transport_pricing_service.py` `table:vehicles` `table:routes`.
 3. It looks for an active plan with the same vehicle, route and billing_cycle whose dates overlap; a NULL-route plan is compared only with other NULL-route plans `table:transport_pricing`.
-4. A clash returns 409 with the id of the conflicting plan; otherwise the plan is saved.
-
-- Failure: If more than one plan already overlaps, scalar_one_or_none raises MultipleResultsFound and returns 500.
+4. A clash returns 400 with the id of the first conflicting plan; otherwise the plan is saved.
 
 ```mermaid
 flowchart TD
@@ -225,7 +225,7 @@ flowchart TD
   s1 --> s2
   s3["3. It looks for an active plan with the same vehicle, route and billin...<br/>table:transport_pricing"]
   s2 --> s3
-  s4["4. A clash returns 409 with the id of the conflicting plan; otherwise ..."]
+  s4["4. A clash returns 400 with the id of the first conflicting plan; othe..."]
   s3 --> s4
 ```
 
@@ -279,7 +279,7 @@ Implements: `feature:transport/student-transport-self-service`
 1. Client calls `endpoint:GET /students/student-transport/student/{student_id}` `web:src/pages/students/StudentTransportPage.tsx` `mobile:app/students/transport.tsx`.
 2. Role check: role Student must request their own id; role Parent must be linked through `table:student_parent_links`; anyone else needs student_transport:read. Role names are exact string matches.
 3. The service returns a list with nested trip.route, trip.vehicle, stop (with pickup and drop times), student and pricing `service:app/service/student/student_transport_service.py` `table:student_transport_assignments`.
-4. With no assignment the endpoint returns 404, not []; web fetchStudentTransportsByStudent turns the 404 into [].
+4. With no assignment the endpoint returns []; it returns 404 only for an unknown student.
 
 ```mermaid
 flowchart TD
@@ -288,7 +288,7 @@ flowchart TD
   s1 --> s2
   s3["3. The service returns a list with nested trip.route, trip.vehicle, st...<br/>service:app/service/student/student_transport_service.py<br/>table:student_transport_assignments"]
   s2 --> s3
-  s4["4. With no assignment the endpoint returns 404, not (); web fetchStude..."]
+  s4["4. With no assignment the endpoint returns (); it returns 404 only for..."]
   s3 --> s4
 ```
 
@@ -302,7 +302,7 @@ flowchart TD
 
 ### transport/cache-transport-dropdowns (unintended)
 
-- **Decision**: Route-type, trip-type, route and vehicle dropdowns are cached in memory for 5 minutes with @cache_dropdown (app/tools/cache_utils.py).
+- **Decision**: Route-type, trip-type and route dropdowns are cached in memory for 5 minutes with @cache_dropdown (app/tools/cache_utils.py); the vehicle dropdown is not cached.
 - **Why**: Not a deliberate design choice; the cache decorator was added without a recorded need.
 - **Tradeoff**: Invalidation only affects the current worker, so others can serve stale data for up to 5 minutes; the cache key includes the tenant id only when db is passed positionally.
 - Shapes: `endpoint:GET /masters/route-types/dropdown`, `endpoint:GET /masters/routes/dropdown`, `endpoint:GET /masters/trip-types/dropdown`, `endpoint:GET /masters/vehicles/dropdown`

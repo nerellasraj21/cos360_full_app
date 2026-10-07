@@ -46,10 +46,10 @@ Run each app's commands from inside its folder — there is no root package mana
 | | Install | Dev | Checks |
 |---|---|---|---|
 | backend | `python -m venv .venv` then `pip install -r requirements.txt -r requirements-dev.txt` | `uvicorn app.main:app --reload` | `ruff check .`, `black --check .`, `pytest tests/unit/` |
-| web | `npm install` | `npm run dev` | `npm run build:check`, `npm run lint` |
+| web | `npm install` | `npm run dev` | `npm run build:check`, `npm run lint`, `npm test` |
 | mobile | `npm install` | `npm start` | `npx tsc --noEmit`, `npm run lint`, `npm test` |
 
-Builds and deploys: `docs/operations/`.
+Builds and deploys: `docs/operations/`. Test phases and the QA environment: `docs/testing/`. API and UI tests run only against the local database and `qa_` tenants.
 
 ## Rules
 
@@ -57,7 +57,7 @@ Builds and deploys: `docs/operations/`.
 - **Never connect the API as the table owner or a superuser**: both bypass row-level security. The API uses `DATABASE_URL` (app role); Alembic uses `MIGRATION_DATABASE_URL` (owner role).
 - **Backend DB pattern**: `flush() → select() → commit()`, never `commit() → refresh()` (async sessions cannot lazy-load after commit). See `backend/CLAUDE.md`.
 - Don't introduce npm/yarn workspaces or hoisting — Expo is sensitive to it.
-- Local-only (gitignored) folders: `backend/tests/` (except `tests/integration/test_tenant_*.py`), `backend/test_scripts/`, `backend/docs/`, `backend/archive/`, `web/docs/`.
+- Local-only (gitignored) folders: `backend/tests/` (except the integration tests allowlisted in `backend/.gitignore`), `backend/test_scripts/`, `backend/docs/`, `backend/archive/`, `backend/media/`, `backend/migration_reports/`, `web/docs/`.
 
 ## Knowledge base - how project memory works
 
@@ -70,6 +70,8 @@ Project memory is hybrid, and every fact has exactly one home, all in git:
 | Access control rules end to end | `docs/permissions.md` |
 | A module's rules, gotchas, code map, parity, known gaps | `docs/modules/<module>.md` |
 | Deploy, migrations, builds, testing procedures | `docs/operations/` |
+| Test strategy, test case IDs, the QA test environment | `docs/testing/` |
+| Step-by-step feature behaviour and each feature's test cases | `docs/features/<module>.md` |
 | **Why** decisions were made, **flows** (ordered steps and what each step touches), **feature implementation maps**, domain **concepts** | Knowledge graph: `docs/graph/graph.jsonl`, via the `knowledge-graph` MCP server |
 
 Rules you must follow live in files; knowledge you look up lives in the graph. Index: `docs/README.md`. Graph contract: `docs/graph/SCHEMA.md`.

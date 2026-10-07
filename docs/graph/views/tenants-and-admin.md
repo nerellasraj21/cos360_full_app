@@ -71,7 +71,7 @@ A command-line tool that copies the old schema-per-tenant data into the shared d
 
 ### tenants-and-admin/menu-management
 
-Tenant admins create and list tenant menus.
+Tenant admins create and list menus; the calls act on the shared public.menus catalog, so a new row is visible to every school.
 - Roles: Tenant admin.
 - Parity: Web has no menu screen; mobile app/admin/menu.tsx lists and creates, but its update and delete call routes that do not exist.
 - Implemented by: `endpoint:GET /auth/menus`, `endpoint:POST /auth/menus`, `mobile:app/admin/menu.tsx`, `mobile:src/api/auth.ts`, `service:app/service/auth/menu_service.py`, `table:menus`
@@ -99,9 +99,9 @@ Grant a new feature/resource to existing tenants by writing both permission laye
 Tenant admins create, rename and delete custom roles and grant their resource_permissions one at a time, in bulk or from a template.
 - Roles: Tenant admin (role_management:*).
 - Parity: Web /masters/rolespermissions and mobile app/masters/rolespermissions.tsx both create roles; both call a nonexistent /admin/role-mgmt/roles/{id} for edit and delete, and mobile gets 422s on permission updates and templates.
-- Note: Admin, Teacher, Staff, Student and Parent cannot be renamed or deleted; a custom role with assigned users cannot be deleted.
-- Note: GET /admin/role-mgmt/roles/ has its permission check commented out, and /test/ and /debug-roles/ are mounted; debug-roles prints request headers including Authorization.
 - Note: The hardcoded permission templates use resource names runtime checks never use (fee_management, student_management), so applying one grants almost nothing.
+- Note: Admin, Teacher, Staff, Student and Parent cannot be renamed or deleted; a custom role with assigned users is refused unless force=true, and the forced delete fails with 500.
+- Note: Every role-mgmt endpoint requires role_management with the matching action.
 - Flows: [tenants-and-admin/manage-roles](#tenants-and-adminmanage-roles)
 - Implemented by: `endpoint:DELETE /admin/role-mgmt/{role_id}`, `endpoint:GET /admin/role-mgmt/roles`, `endpoint:GET /admin/role-mgmt/roles/{role_id}/permissions`, `endpoint:GET /admin/role-mgmt/templates`, `endpoint:GET /admin/role-mgmt/{role_id}/delete-validation`, `endpoint:GET /auth/resource-permissions/matrix/all`, `endpoint:POST /admin/role-mgmt`, `endpoint:POST /admin/role-mgmt/roles/{role_id}/apply-template`, `endpoint:POST /admin/role-mgmt/roles/{role_id}/permissions/bulk`, `endpoint:POST /auth/resource-permissions`, `endpoint:POST /auth/resource-permissions/bulk`, `endpoint:PUT /admin/role-mgmt/roles/{role_id}/permissions`, `endpoint:PUT /admin/role-mgmt/{role_id}`, `mobile:app/masters/rolespermissions.tsx`, `mobile:src/api/masters.ts`, `service:app/service/auth/resource_permission_service.py`, `table:resource_permissions`, `table:roles`, `web:src/api/auth.ts`, `web:src/pages/auth/RolesPermissionsPage.tsx`
 - Shaped by: [tenants-and-admin/protected-system-role-names](#tenants-and-adminprotected-system-role-names)
@@ -127,7 +127,7 @@ Super admins read any tenant's users, students, stats, reports and roles, and wr
 
 ### tenants-and-admin/system-health
 
-Super admins see system health and usage statistics; every super-admin action is written to super_admin_audit.
+Super admins see system health and usage statistics; usage-stats answers 500 because its payload holds a SQL func.now() that cannot be JSON-encoded.
 - Roles: Super admin.
 - Implemented by: `endpoint:GET /super_admin/auth/health`, `endpoint:GET /super_admin/system/health`, `endpoint:GET /super_admin/system/usage-stats`, `service:app/service/super_admin/super_admin_service.py`, `table:public.super_admin_audit`
 
@@ -145,11 +145,12 @@ Super admins list, create and toggle tenants active or inactive, and assign a pl
 
 ### tenants-and-admin/tenant-onboarding
 
-Create a new school tenant with one super-admin call that seeds roles, plan-limited permissions, menu access and an optional first Admin; an academic year is created separately.
-- Roles: Platform operator running backend scripts.
-- Note: Onboarding is script-based (backend/scripts/create_little_bunny_tenant.py and the seed_* pattern scripts); there is no working API or UI path.
+Create a new school tenant with one super-admin call that seeds roles, plan-limited permissions, menu access, a default academic year and an optional first Admin.
+- Roles: Super admin.
+- Parity: No super-admin UI on web or mobile; the call is made directly against the API.
+- Note: The legacy scripts (create_little_bunny_tenant.py and the seed_* family) clone per-tenant schemas and do not apply to the shared database.
 - Flows: [tenants-and-admin/onboard-tenant](#tenants-and-adminonboard-tenant)
-- Implemented by: `mobile:app/login.tsx`, `table:academic_years`, `table:issuable_certificate_templates`, `table:menus`, `table:public.tenants`, `table:resource_permissions`, `table:role_menu_permissions`, `table:roles`, `table:users`
+- Implemented by: `endpoint:POST /super_admin/system/tenants`, `mobile:app/login.tsx`, `service:app/service/tenant/provisioning_service.py`, `service:app/service/tenant/role_seed_service.py`, `table:academic_years`, `table:issuable_certificate_templates`, `table:public.menus`, `table:public.tenants`, `table:resource_permissions`, `table:role_menu_permissions`, `table:roles`, `table:users`
 - Shaped by: [platform/provision-in-one-transaction](#platformprovision-in-one-transaction), [platform/schema-per-tenant](#platformschema-per-tenant), [tenants-and-admin/clone-from-master-template](#tenants-and-adminclone-from-master-template), [tenants-and-admin/idempotent-seed-scripts](#tenants-and-adminidempotent-seed-scripts)
 
 ### tenants-and-admin/user-management
@@ -172,22 +173,22 @@ Implements: `feature:tenants-and-admin/resource-rollout`
 
 - Trigger: A new feature/resource must become usable in existing tenants.
 
-1. Write a backend/scripts/seed_<feature>_permissions.py-style script that writes both permission layers.
-2. Insert public.plan_resource_access rows for every active plan `table:public.plan_resource_access`.
-3. Insert each tenant's resource_permissions per role; Admin gets all actions, other roles as designed `table:resource_permissions`.
-4. If the feature adds a sidebar entry, insert menus `table:menus` and role_menu_permissions `table:role_menu_permissions`.
+1. Add the resource's pairs to the catalog in permission_catalog.py, used by role seeding `service:app/service/tenant/role_seed_service.py`
+2. Add the resource and its actions to public.plan_resource_access for every plan that should include it `table:public.plan_resource_access`
+3. If the feature adds a sidebar entry, add it to the shared menu catalog and the plan's plan_menu_access `table:public.menus` `table:public.plan_menu_access`
+4. For each tenant, re-apply its plan or run the seed as its Admin; missing role permissions and role menu links are inserted `endpoint:PUT /super_admin/system/tenants/{tenant_id}/plan` `endpoint:POST /auth/seed/all-role-permissions` `table:resource_permissions` `table:role_menu_permissions`
 5. Users log out and log back in to receive the new menu and permission snapshot.
 
-- Note: Scripts are insert-only (WHERE NOT EXISTS / ON CONFLICT DO NOTHING); reseed_student_parent_permissions.py does a full delete and re-insert when rows must change.
+- Note: Seeding is insert-only (ON CONFLICT DO NOTHING), so a revoked grant stays revoked; re-applying the plan also deletes grants and menu links the plan no longer allows.
 
 ```mermaid
 flowchart TD
-  s1["1. Write a backend/scripts/seed_<feature>_permissions.py-style script ..."]
-  s2["2. Insert public.plan_resource_access rows for every active plan .<br/>table:public.plan_resource_access"]
+  s1["1. Add the resource's pairs to the catalog in permission_catalog.py, u...<br/>service:app/service/tenant/role_seed_service.py"]
+  s2["2. Add the resource and its actions to public.plan_resource_access for...<br/>table:public.plan_resource_access"]
   s1 --> s2
-  s3["3. Insert each tenant's resource_permissions per role; Admin gets all ...<br/>table:resource_permissions"]
+  s3["3. If the feature adds a sidebar entry, add it to the shared menu cata...<br/>table:public.menus<br/>table:public.plan_menu_access"]
   s2 --> s3
-  s4["4. If the feature adds a sidebar entry, insert menus  and role_menu_pe...<br/>table:menus<br/>table:role_menu_permissions"]
+  s4["4. For each tenant, re-apply its plan or run the seed as its Admin; mi...<br/>endpoint:PUT /super_admin/system/tenants/{tenant_id}/plan<br/>endpoint:POST /auth/seed/all-role-permissions<br/>table:resource_permissions<br/>table:role_menu_permissions"]
   s3 --> s4
   s5["5. Users log out and log back in to receive the new menu and permissio..."]
   s4 --> s5
@@ -205,9 +206,11 @@ Implements: `feature:tenants-and-admin/role-management`
 3. Or grant in bulk with a permissions list `endpoint:POST /admin/role-mgmt/roles/{role_id}/permissions/bulk`, or apply a named template with ?template_name= `endpoint:POST /admin/role-mgmt/roles/{role_id}/apply-template`.
 4. Assign the role to users `endpoint:PUT /admin/users/{user_id}/role`.
 5. Rename the role `endpoint:PUT /admin/role-mgmt/{role_id}`; system role names are rejected.
-6. Preview deletion `endpoint:GET /admin/role-mgmt/{role_id}/delete-validation`, then delete `endpoint:DELETE /admin/role-mgmt/{role_id}`; system roles and roles with assigned users cannot be deleted.
+6. Preview deletion `endpoint:GET /admin/role-mgmt/{role_id}/delete-validation`, then delete `endpoint:DELETE /admin/role-mgmt/{role_id}`; system roles are refused with 403 and roles with assigned users with 400 unless force=true.
 
 - Result: Users see the new permissions and menus only after logging out and back in.
+
+- Failure: A forced delete of a role with users, or a delete of a role that still has role_menu_permissions rows, fails with 500 (users.role_id is NOT NULL; foreign key).
 
 ```mermaid
 flowchart TD
@@ -220,7 +223,7 @@ flowchart TD
   s3 --> s4
   s5["5. Rename the role ; system role names are rejected.<br/>endpoint:PUT /admin/role-mgmt/{role_id}"]
   s4 --> s5
-  s6["6. Preview deletion , then delete ; system roles and roles with assign...<br/>endpoint:GET /admin/role-mgmt/{role_id}/delete-validation<br/>endpoint:DELETE /admin/role-mgmt/{role_id}"]
+  s6["6. Preview deletion , then delete ; system roles are refused with 403 ...<br/>endpoint:GET /admin/role-mgmt/{role_id}/delete-validation<br/>endpoint:DELETE /admin/role-mgmt/{role_id}"]
   s5 --> s6
 ```
 
@@ -305,24 +308,24 @@ Implements: `feature:tenants-and-admin/tenant-onboarding`
 - Trigger: A new school signs up. A super admin provisions it with one API call.
 - Precondition: The shared menu catalog and the plan with its plan_resource_access and plan_menu_access rows already exist.
 
-1. A super admin calls POST /super_admin/system/tenants with client_name and plan_id as query parameters and an optional JSON body holding the first Admin's username, email and password.
-2. TenantProvisioningService validates client_name (2 to 63 characters of lowercase letters, digits, hyphen or underscore), the plan, and that the name is free `service:app/service/tenant/provisioning_service.py`
+1. A super admin calls POST /super_admin/system/tenants with client_name and plan_id as query parameters and an optional JSON body holding the first Admin's username, email and password `endpoint:POST /super_admin/system/tenants`
+2. TenantProvisioningService validates client_name (2 to 63 characters of lowercase letters, digits, hyphen or underscore), that the plan exists and is active (404 otherwise), and that the name is free (409 otherwise) `service:app/service/tenant/provisioning_service.py`
 3. It opens one transaction with the new tenant id on the session, inserts the tenants row and flushes `table:public.tenants`
 4. RoleSeedService creates the five system roles Admin, Teacher, Staff, Student and Parent `service:app/service/tenant/role_seed_service.py` `table:roles`
 5. It grants each role the catalog permissions limited to the plan's resource actions; Admin gets every plan action plus role_management `table:resource_permissions`
-6. It links each role to the plan's menus, and Student and Parent only to the student-facing menu URLs `table:role_menu_permissions`
-7. If credentials were given it creates the Admin user with a hashed password `table:users`
-8. The transaction commits, and any failure rolls everything back so no half-created tenant remains.
-9. Seed an academic year `table:academic_years`, because without one nobody can log in. Certificate templates are not seeded by provisioning.
+6. It links each system role to the plan's menus, and Student and Parent only to the student-facing menu URLs `table:role_menu_permissions`
+7. If the tenant has no academic year it creates an active one from June 1 to March 31, titled like 2026-2027, because nobody can log in without one `table:academic_years`
+8. If credentials were given it creates the Admin user with a hashed password `table:users`
+9. The transaction commits, and any failure rolls everything back so no half-created tenant remains.
 10. Give the school its client_name; the mobile login screen validates the typed code with GET /auth/academic-years, so no client list needs editing `mobile:app/login.tsx`
 
-- Result: A tenant row with roles, permissions limited to its plan, menu access and optionally an Admin, ready for an academic year.
+- Result: A tenant row with roles, permissions limited to its plan, menu access, an academic year and optionally an Admin. Certificate templates are not seeded.
 
 - Failure: A plan with no plan_resource_access rows fails with 409 and creates nothing.
 
 ```mermaid
 flowchart TD
-  s1["1. A super admin calls POST /super_admin/system/tenants with client_na..."]
+  s1["1. A super admin calls POST /super_admin/system/tenants with client_na...<br/>endpoint:POST /super_admin/system/tenants"]
   s2["2. TenantProvisioningService validates client_name (2 to 63 characters...<br/>service:app/service/tenant/provisioning_service.py"]
   s1 --> s2
   s3["3. It opens one transaction with the new tenant id on the session, ins...<br/>table:public.tenants"]
@@ -331,13 +334,13 @@ flowchart TD
   s3 --> s4
   s5["5. It grants each role the catalog permissions limited to the plan's r...<br/>table:resource_permissions"]
   s4 --> s5
-  s6["6. It links each role to the plan's menus, and Student and Parent only...<br/>table:role_menu_permissions"]
+  s6["6. It links each system role to the plan's menus, and Student and Pare...<br/>table:role_menu_permissions"]
   s5 --> s6
-  s7["7. If credentials were given it creates the Admin user with a hashed p...<br/>table:users"]
+  s7["7. If the tenant has no academic year it creates an active one from Ju...<br/>table:academic_years"]
   s6 --> s7
-  s8["8. The transaction commits, and any failure rolls everything back so n..."]
+  s8["8. If credentials were given it creates the Admin user with a hashed p...<br/>table:users"]
   s7 --> s8
-  s9["9. Seed an academic year , because without one nobody can log in. Cert...<br/>table:academic_years"]
+  s9["9. The transaction commits, and any failure rolls everything back so n..."]
   s8 --> s9
   s10["10. Give the school its client_name; the mobile login screen validates ...<br/>mobile:app/login.tsx"]
   s9 --> s10
@@ -355,8 +358,8 @@ Implements: `feature:tenants-and-admin/plan-management`, `feature:tenants-and-ad
 3. get_current_super_admin requires the user_type claim to equal super_admin `service:app/tools/simple_permissions.py`.
 4. To work on one tenant's data, use /super_admin/tenant-data/{tenant_id}/... `endpoint:GET /super_admin/tenant-data/{tenant_id}/users` `endpoint:POST /super_admin/tenant-data/{tenant_id}/roles/{role_id}/permissions`; the tenant id is checked against public.tenants `service:app/service/super_admin/database_service.py`
 5. The X-SuperAdmin-Target-Tenant header only sets request state; the endpoints do not use it.
-6. Each action writes a row to `table:public.super_admin_audit`.
-7. There is no super-admin refresh endpoint, so the session ends when the 24 h access token expires.
+6. Account actions and the /super_admin/system tenant actions write a row to `table:public.super_admin_audit`; plan edits and tenant-data reads and writes do not.
+7. There is no super-admin refresh or logout endpoint (the refresh token from login is rejected by /auth/refresh), so the session ends when the 24 h access token expires.
 
 ```mermaid
 flowchart TD
@@ -369,9 +372,9 @@ flowchart TD
   s3 --> s4
   s5["5. The X-SuperAdmin-Target-Tenant header only sets request state; the ..."]
   s4 --> s5
-  s6["6. Each action writes a row to .<br/>table:public.super_admin_audit"]
+  s6["6. Account actions and the /super_admin/system tenant actions write a ...<br/>table:public.super_admin_audit"]
   s5 --> s6
-  s7["7. There is no super-admin refresh endpoint, so the session ends when ..."]
+  s7["7. There is no super-admin refresh or logout endpoint (the refresh tok..."]
   s6 --> s7
 ```
 

@@ -49,30 +49,33 @@ graph LR
   n20 -.->|shapes| n4
   n21[/"home-screen-not-permission-guarded"/]
   n21 -.->|shapes| n6
-  n22[/"menu-driven-module-hubs"/]
+  n22[/"menu-card-home-dashboard"/]
   n22 -.->|shapes| n7
-  n22 -.->|shapes| n16
-  n23[/"mobile-home-union-of-cards"/]
-  n23 -.->|shapes| n6
-  n23 -.->|shapes| n15
-  n24[/"per-group-report-permissions"/]
-  n24 -.->|shapes| n1
-  n24 -.->|shapes| n3
-  n24 -.->|shapes| n4
-  n24 -.->|shapes| n8
-  n24 -.->|shapes| n9
-  n24 -.->|shapes| n10
-  n25[/"report-audit-in-public-schema"/]
-  n25 -.->|shapes| n2
-  n26[/"tenant-id-from-request"/]
-  n26 -.->|shapes| n9
-  n26 -.->|shapes| n10
-  n26 -.->|shapes| n14
-  n27[/"tenant-schema-via-tenant-service"/]
-  n27 -.->|shapes| n2
+  n22 -.->|shapes| n11
+  n23[/"menu-driven-module-hubs"/]
+  n23 -.->|shapes| n7
+  n23 -.->|shapes| n16
+  n24[/"mobile-home-union-of-cards"/]
+  n24 -.->|shapes| n6
+  n24 -.->|shapes| n15
+  n25[/"per-group-report-permissions"/]
+  n25 -.->|shapes| n1
+  n25 -.->|shapes| n3
+  n25 -.->|shapes| n4
+  n25 -.->|shapes| n8
+  n25 -.->|shapes| n9
+  n25 -.->|shapes| n10
+  n26[/"report-audit-in-public-schema"/]
+  n26 -.->|shapes| n2
+  n27[/"tenant-id-from-request"/]
   n27 -.->|shapes| n9
   n27 -.->|shapes| n10
   n27 -.->|shapes| n14
+  n28[/"tenant-schema-via-tenant-service"/]
+  n28 -.->|shapes| n2
+  n28 -.->|shapes| n9
+  n28 -.->|shapes| n10
+  n28 -.->|shapes| n14
 ```
 
 ## Features
@@ -130,13 +133,14 @@ Mobile home: greeting hero card and a grid of module cards in web sidebar order,
 
 ### reports-dashboards/module-hubs
 
-Hub pages (web /admin, /masters, /reports, /students, /transport; mobile masters and reports tabs) show a Coming Soon banner plus one card per child of the module's backend menu node.
+Hub pages (web /admin, /masters, /reports, /students, /transport; mobile masters and reports tabs) show one card per child of the module's backend menu node.
 - Parity: Mobile has two report hubs: (tabs)/reports.tsx merges menu and permission list; reports/index.tsx is permission-only. The menu /reports path maps to the tab.
 - Note: A card navigates if the menu item has a path and is greyed out otherwise; descriptions come from a hard-coded descriptionMap keyed by menu name.
 - Note: Hubs are only as complete as the seeded menu; seed a menu child when adding a report or master screen.
+- Note: The web Reports hub falls back to Fee Reports and Expense Reports cards, gated by fee_reports:read and expense_reports:read, when the Reports menu node has no children.
 - Flows: [reports-dashboards/mobile-hub-and-home](#reports-dashboardsmobile-hub-and-home), [reports-dashboards/web-module-hub](#reports-dashboardsweb-module-hub)
 - Implemented by: `mobile:app/(tabs)/masters.tsx`, `mobile:app/(tabs)/reports.tsx`, `mobile:app/reports/index.tsx`, `table:menus`, `web:src/components/ui/sidebar.tsx`, `web:src/lib/authStore.ts`, `web:src/routes/_app/admin/index.tsx`, `web:src/routes/_app/masters/index.tsx`, `web:src/routes/_app/reports/index.tsx`, `web:src/routes/_app/students/index.tsx`, `web:src/routes/_app/transport/index.tsx`
-- Shaped by: [reports-dashboards/empty-home-and-coming-soon-hubs](#reports-dashboardsempty-home-and-coming-soon-hubs), [reports-dashboards/menu-driven-module-hubs](#reports-dashboardsmenu-driven-module-hubs)
+- Shaped by: [reports-dashboards/empty-home-and-coming-soon-hubs](#reports-dashboardsempty-home-and-coming-soon-hubs), [reports-dashboards/menu-card-home-dashboard](#reports-dashboardsmenu-card-home-dashboard), [reports-dashboards/menu-driven-module-hubs](#reports-dashboardsmenu-driven-module-hubs)
 
 ### reports-dashboards/report-export
 
@@ -161,17 +165,16 @@ Staff summary and per-staff detail reports with export.
 Student summary and per-student detail reports with csv/xlsx/pdf export.
 - Roles: student_reports:read and :export.
 - Parity: No web page; mobile student-reports screen aggregates /student/attendance/search on the client instead.
-- Note: A bare except turns permission 403s into 500s on these endpoints.
 - Flows: [reports-dashboards/fetch-report](#reports-dashboardsfetch-report)
 - Implemented by: `endpoint:GET /reports/students/details/{student_id}`, `endpoint:GET /reports/students/summary`, `endpoint:POST /reports/students/export`, `service:app/service/reports/student_report_service.py`
 - Shaped by: [reports-dashboards/per-group-report-permissions](#reports-dashboardsper-group-report-permissions), [reports-dashboards/tenant-id-from-request](#reports-dashboardstenant-id-from-request), [reports-dashboards/tenant-schema-via-tenant-service](#reports-dashboardstenant-schema-via-tenant-service)
 
 ### reports-dashboards/web-home-dashboard
 
-Web home at /_app/dashboard (/ redirects there); currently just a page header with no widgets.
-- Parity: Mobile home has a module card grid; web users navigate through the sidebar and hubs.
+Web home at /_app/dashboard (/ redirects there): a welcome header and one card per top-level entry of the processed menu (useMenuData, Dashboard excluded), navigating with getModuleUrl.
+- Parity: Both homes show module cards; web uses the processed menu only, mobile merges the menu with its permission registry.
 - Implemented by: `web:src/routes/_app/dashboard.tsx`
-- Shaped by: [reports-dashboards/empty-home-and-coming-soon-hubs](#reports-dashboardsempty-home-and-coming-soon-hubs)
+- Shaped by: [reports-dashboards/empty-home-and-coming-soon-hubs](#reports-dashboardsempty-home-and-coming-soon-hubs), [reports-dashboards/menu-card-home-dashboard](#reports-dashboardsmenu-card-home-dashboard)
 
 ## Flows
 
@@ -186,9 +189,7 @@ Implements: `feature:reports-dashboards/export-audit-download`, `feature:reports
 4. The client polls `endpoint:GET /reports/audit/{audit_id}` and fetches the file with `endpoint:GET /reports/download/{audit_id}`; `endpoint:GET /reports/audit` lists history.
 
 - Failure: create_background_export_job passes filename, user_id and tenant_id to log_export_request, which does not accept them, so the call raises TypeError and the export returns 500.
-- Failure: The response advertises /api/v1/reports/export-status/{id}, which does not exist; the real route is /reports/audit/{id}.
-- Failure: The tasks open their session with async with get_tenant_db(tenant_id), but get_tenant_db is a FastAPI dependency that takes a Request.
-- Failure: The tasks build filters with the defaults, so they would export only 100 rows, and they save files on the worker's local disk, which a separate API container cannot serve.
+- Failure: The tasks call the report once with the request filters instead of fetch_all_rows, so they would export one page (100 rows by default), and they save files on the worker's local disk, which a separate API container cannot serve.
 
 - Note: No endpoint calls this path; every export streams in the request `decision:reports-dashboards/exports-return-every-row`.
 
@@ -211,18 +212,18 @@ Implements: `feature:reports-dashboards/report-export`
 
 
 1. Client calls POST /reports/<group>/export (for example `endpoint:POST /reports/fees/export`) with {report_type, format: csv|xlsx|pdf, filters:{...}, filename?} and reads the response as a blob.
-2. The endpoint checks <group>_reports:export; an unknown format or report_type returns 400.
+2. The endpoint checks <group>_reports:export; a format other than csv, xlsx or pdf is a 422 and an unknown report_type is a 400.
 3. The service fetches every matching row, ignoring page and page_size `service:app/service/reports/base_report_service.py` `decision:reports-dashboards/exports-return-every-row`.
-4. The file is generated in-process (csv, openpyxl xlsx, reportlab pdf) and streamed straight back as a download; no audit row is written.
+4. The file is generated in memory (csv, openpyxl xlsx, reportlab pdf) and returned in the response body, with the request filename unsanitised in Content-Disposition; no audit row is written.
 
 ```mermaid
 flowchart TD
   s1["1. Client calls POST /reports/<group>/export (for example ) with {repo...<br/>endpoint:POST /reports/fees/export"]
-  s2["2. The endpoint checks <group>_reports:export; an unknown format or re..."]
+  s2["2. The endpoint checks <group>_reports:export; a format other than csv..."]
   s1 --> s2
   s3["3. The service fetches every matching row, ignoring page and page_size  .<br/>service:app/service/reports/base_report_service.py<br/>decision:reports-dashboards/exports-return-every-row"]
   s2 --> s3
-  s4["4. The file is generated in-process (csv, openpyxl xlsx, reportlab pdf..."]
+  s4["4. The file is generated in memory (csv, openpyxl xlsx, reportlab pdf)..."]
   s3 --> s4
 ```
 
@@ -261,7 +262,7 @@ Implements: `feature:reports-dashboards/mobile-home-dashboard`, `feature:reports
 1. roleTopLevelMenu(menu, role) `mobile:src/lib/menuUtils.ts` applies the web role rules: teachers get no Fee module; teachers and students get no school settings; students and parents get no Communication, Reports, Masters or Transport.
 2. Backend menu names are mapped to known cards through MENU_NAME_TO_MODULE `mobile:app/(tabs)/index.tsx`, which covers aliases such as Fee and Fee Management.
 3. Unknown menu entries that have a path get a generic card, with the route mapped by mapPath `mobile:components/navigation/menuMap.ts`.
-4. Before the menu has loaded, a permission-gated fallback list is used `mobile:app/(tabs)/masters.tsx` `mobile:app/(tabs)/reports.tsx`.
+4. Mobile Masters shows the menu children and uses a permission-gated fallback list only while the menu has none `mobile:app/(tabs)/masters.tsx`; the mobile Reports tab always merges a permission-gated list with the menu children that have a path `mobile:app/(tabs)/reports.tsx`.
 5. Home shows the union of permission cards (static MODULES registry with resource(s), alwaysShow, hideForRoles) and top-level menu cards, in web sidebar order; if none is visible it shows a lock empty-state.
 
 ```mermaid
@@ -271,7 +272,7 @@ flowchart TD
   s1 --> s2
   s3["3. Unknown menu entries that have a path get a generic card, with the ...<br/>mobile:components/navigation/menuMap.ts"]
   s2 --> s3
-  s4["4. Before the menu has loaded, a permission-gated fallback list is use...<br/>mobile:app/(tabs)/masters.tsx<br/>mobile:app/(tabs)/reports.tsx"]
+  s4["4. Mobile Masters shows the menu children and uses a permission-gated ...<br/>mobile:app/(tabs)/masters.tsx<br/>mobile:app/(tabs)/reports.tsx"]
   s3 --> s4
   s5["5. Home shows the union of permission cards (static MODULES registry w..."]
   s4 --> s5
@@ -306,11 +307,12 @@ Shaped by: [reports-dashboards/menu-driven-module-hubs](#reports-dashboardsmenu-
 
 ## Decisions
 
-### reports-dashboards/empty-home-and-coming-soon-hubs
+### reports-dashboards/empty-home-and-coming-soon-hubs (superseded)
 
 - **Decision**: The web home dashboard is intentionally empty and hubs show a Coming Soon banner.
 - **Why**: Module-specific reports live inside each module (fee, expense, exam grading) until a unified reporting hub is built.
 - Shapes: `feature:reports-dashboards/module-hubs`, `feature:reports-dashboards/web-home-dashboard`, `web:src/routes/_app/dashboard.tsx`
+- Superseded by: `decision:reports-dashboards/menu-card-home-dashboard`
 
 ### reports-dashboards/export-size-thresholds (superseded)
 
@@ -343,6 +345,15 @@ Shaped by: [reports-dashboards/menu-driven-module-hubs](#reports-dashboardsmenu-
 - **Why**: A profile:read_own gate once blanked it for roles without that grant.
 - Shapes: `feature:reports-dashboards/mobile-home-dashboard`, `mobile:app/(tabs)/index.tsx`
 
+### reports-dashboards/menu-card-home-dashboard (active)
+
+- **Decision**: The web home dashboard shows one card per top-level module from the processed menu, and hubs no longer show a Coming Soon banner.
+- **Why**: An empty home and placeholder banners made the app look unfinished; the menu already lists what the user may open, so the home reuses it the way the mobile home does.
+- **Alternatives**: Keeping the home empty until a unified reporting dashboard with widgets is built.
+- **Since**: 2026-10
+- Shapes: `feature:reports-dashboards/module-hubs`, `feature:reports-dashboards/web-home-dashboard`
+- Supersedes: `decision:reports-dashboards/empty-home-and-coming-soon-hubs`
+
 ### reports-dashboards/menu-driven-module-hubs
 
 - **Decision**: Module hubs render cards from the plan+role-scoped backend menu, not a hard-coded list (web; mobile also keeps permission fallbacks). The same applies to the Masters hub.
@@ -371,8 +382,8 @@ Shaped by: [reports-dashboards/menu-driven-module-hubs](#reports-dashboardsmenu-
 
 ### reports-dashboards/tenant-id-from-request (active)
 
-- **Decision**: Report endpoints take the tenant id from the request (get_tenant_id_from_request), and report cache keys include the tenant id.
-- **Why**: request.state.schema_name was never set and current_schema() is the same for every tenant now, so keys built from it would mix tenants.
+- **Decision**: Report endpoints take the tenant id from the request (get_tenant_id_from_request); report_audit queries also filter on that tenant id and the user id.
+- **Why**: request.state.schema_name was never set and current_schema() is the same for every tenant now; report_audit is a platform table without row-level security, so only the explicit filter keeps tenants apart.
 - **Since**: 2026-10
 - Shapes: `feature:reports-dashboards/staff-reports`, `feature:reports-dashboards/student-reports`, `flow:reports-dashboards/fetch-report`
 - Supersedes: `decision:reports-dashboards/tenant-schema-via-tenant-service`

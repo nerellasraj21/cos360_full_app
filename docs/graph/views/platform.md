@@ -22,42 +22,53 @@ graph LR
   n9[/"blocking-io-in-executor"/]
   n10[/"celery-background-jobs"/]
   n11[/"cschema-header"/]
-  n12[/"dual-layer-permissions"/]
-  n13[/"flush-select-commit"/]
-  n13 -.->|shapes| n4
-  n14[/"jwt-token-types"/]
-  n15[/"live-permission-lookup"/]
-  n15 -.->|shapes| n3
-  n16[/"local-media-storage"/]
-  n17[/"menus-separate-from-permissions"/]
-  n18[/"monorepo"/]
-  n18 -.->|shapes| n1
-  n18 -.->|shapes| n0
-  n19[/"no-js-workspaces"/]
+  n12[/"demo-data-through-api"/]
+  n12 -.->|shapes| n0
+  n13[/"dual-layer-permissions"/]
+  n14[/"flush-select-commit"/]
+  n14 -.->|shapes| n4
+  n15[/"jwt-token-types"/]
+  n16[/"live-permission-lookup"/]
+  n16 -.->|shapes| n3
+  n17[/"local-media-storage"/]
+  n18[/"menus-separate-from-permissions"/]
+  n19[/"migrations-outside-container-start"/]
   n19 -.->|shapes| n0
-  n20[/"provision-in-one-transaction"/]
-  n21[/"role-only-runtime-check"/]
-  n21 -.->|shapes| n3
-  n22[/"schema-per-tenant"/]
+  n20[/"monorepo"/]
+  n20 -.->|shapes| n1
+  n20 -.->|shapes| n0
+  n21[/"neon-over-rds"/]
+  n21 -.->|shapes| n0
+  n22[/"no-js-workspaces"/]
   n22 -.->|shapes| n0
-  n23[/"scoped-denial-returns-404"/]
-  n24[/"shared-schema-rls"/]
-  n24 -.->|shapes| n0
-  n25[/"tasks-receive-tenant-id"/]
-  n26[/"tasks-receive-tenant-schema"/]
-  n27[/"tenant-cache-hits-only"/]
-  n28[/"tenant-default-name-pinning"/]
-  n29[/"tenant-from-token"/]
-  n29 -.->|shapes| n4
-  n30[/"tenant-models-via-search-path"/]
-  n31[/"tenant-scoped-uniques"/]
-  n31 -.->|shapes| n0
-  n32[/"token-lifetimes"/]
-  n32 -.->|shapes| n5
-  n33[/"uuid-primary-keys"/]
-  n33 -.->|shapes| n1
-  n34[/"varchar-over-postgres-enums"/]
-  n34 -.->|shapes| n1
+  n23[/"provision-in-one-transaction"/]
+  n24[/"role-only-runtime-check"/]
+  n24 -.->|shapes| n3
+  n25[/"schema-per-tenant"/]
+  n25 -.->|shapes| n0
+  n26[/"scoped-denial-returns-404"/]
+  n27[/"shared-schema-rls"/]
+  n27 -.->|shapes| n0
+  n28[/"tasks-receive-tenant-id"/]
+  n29[/"tasks-receive-tenant-schema"/]
+  n30[/"tenant-cache-hits-only"/]
+  n31[/"tenant-default-name-pinning"/]
+  n32[/"tenant-from-token"/]
+  n32 -.->|shapes| n4
+  n33[/"tenant-models-via-search-path"/]
+  n34[/"tenant-scoped-uniques"/]
+  n34 -.->|shapes| n0
+  n35[/"tests-only-local-qa-tenant"/]
+  n35 -.->|shapes| n0
+  n36[/"token-lifetimes"/]
+  n36 -.->|shapes| n5
+  n37[/"two-uvicorn-workers"/]
+  n38[/"upstash-redis-broker"/]
+  n38 -.->|shapes| n0
+  n39[/"uuid-primary-keys"/]
+  n39 -.->|shapes| n1
+  n40[/"varchar-over-postgres-enums"/]
+  n40 -.->|shapes| n1
 ```
 
 ## Flows
@@ -104,26 +115,28 @@ Shaped by: [platform/alembic-per-schema](#platformalembic-per-schema), [platform
 - Trigger: A new resource or action is added to the API.
 
 1. The backend endpoint calls check_role_plan_permission_with_error, or check_user_resource_access when students or parents need _own or _related access, with the same resource string used everywhere `service:app/tools/simple_permissions.py` `service:app/tools/enhanced_permissions.py`
-2. Plan layer: add (resource_name, actions) to public.plan_resource_access for every active plan, following backend/scripts/seed_communication_permissions.py; not checked at runtime but keeps the plan catalog and super-admin screens truthful `table:public.plans`
-3. Role layer: add the (resource, action) pairs per role to ROLE_PERMISSIONS in app/service/tenant/permission_catalog.py (Admin every action, both read and list, Student and Parent the _own or _related variants), then run POST /auth/seed/all-role-permissions for each tenant `table:resource_permissions` `table:roles`
-4. Defaults for future tenants: add the rows to _ROLE_PERMISSIONS in seed_endpoints.py `service:app/api/v1/auth/seed_endpoints.py` `endpoint:POST /auth/seed/all-role-permissions`
-5. Only for a new page: add a tenant menus row (parent_id, level, display_order) and role_menu_permissions can_view per role, and for Student or Parent add the URL to _STUDENT_PARENT_MENU_URLS `table:menus` `table:role_menu_permissions`
+2. Catalog: add the pairs to ALL_ADMIN (the Admin set, which also defines the Full plan) and to ROLE_PERMISSIONS for the other roles in app/service/tenant/permission_catalog.py; both read and list, and _own or _related variants for Student and Parent `service:app/service/tenant/role_seed_service.py`
+3. Plan layer: add (resource_name, actions) to public.plan_resource_access for every plan that should include it, including any _own or _related actions, because role seeding grants only actions the plan lists `table:public.plan_resource_access`
+4. Existing tenants: re-apply the plan or run the seed as the tenant Admin; both insert only missing rows, so revoked grants stay revoked `endpoint:PUT /super_admin/system/tenants/{tenant_id}/plan` `endpoint:POST /auth/seed/all-role-permissions` `table:resource_permissions` `table:roles`
+5. Only for a new page: add the entry to the shared menu catalog and the plan's plan_menu_access; re-seeding links it to the system roles, and Student or Parent see it only if its URL is in STUDENT_PARENT_MENU_URLS `table:public.menus` `table:public.plan_menu_access` `table:role_menu_permissions`
 6. Web: add the key to the permission constants, gate buttons and pages with usePermission or PermissionGuard, and update both Teacher and Staff matrices if those roles are capped `web:src/constants/permissions.ts` `web:src/hooks/usePermission.ts` `web:src/components/PermissionGuard.tsx` `web:src/lib/teacherPermissionMatrix.ts` `web:src/lib/staffPermissionMatrix.ts`
 7. Mobile: add the resource to src/types/permissions.ts and src/constants/permissions.ts, mirror any matrix change, and gate the tab, tile or screen `mobile:src/types/permissions.ts` `mobile:src/constants/permissions.ts` `mobile:src/lib/teacherPermissionMatrix.ts` `mobile:src/lib/staffPermissionMatrix.ts` `mobile:src/hooks/useMobilePermission.ts`
 8. Log out and back in, because both clients cache permissions and menus from the login response, then confirm 403 turns into 200 for the intended roles only `endpoint:POST /auth/login`
 
 - Failure: A resource with no role-layer rows returns 403 for everyone, including Admin.
 
+- Note: The backend/scripts seed_*_permissions.py and seed_*_menu*.py scripts target per-tenant schemas and do not apply to the shared database.
+
 ```mermaid
 flowchart TD
   s1["1. The backend endpoint calls check_role_plan_permission_with_error, o...<br/>service:app/tools/simple_permissions.py<br/>service:app/tools/enhanced_permissions.py"]
-  s2["2. Plan layer: add (resource_name, actions) to public.plan_resource_ac...<br/>table:public.plans"]
+  s2["2. Catalog: add the pairs to ALL_ADMIN (the Admin set, which also defi...<br/>service:app/service/tenant/role_seed_service.py"]
   s1 --> s2
-  s3["3. Role layer: add the (resource, action) pairs per role to ROLE_PERMI...<br/>table:resource_permissions<br/>table:roles"]
+  s3["3. Plan layer: add (resource_name, actions) to public.plan_resource_ac...<br/>table:public.plan_resource_access"]
   s2 --> s3
-  s4["4. Defaults for future tenants: add the rows to _ROLE_PERMISSIONS in s...<br/>service:app/api/v1/auth/seed_endpoints.py<br/>endpoint:POST /auth/seed/all-role-permissions"]
+  s4["4. Existing tenants: re-apply the plan or run the seed as the tenant A...<br/>endpoint:PUT /super_admin/system/tenants/{tenant_id}/plan<br/>endpoint:POST /auth/seed/all-role-permissions<br/>table:resource_permissions<br/>table:roles"]
   s3 --> s4
-  s5["5. Only for a new page: add a tenant menus row (parent_id, level, disp...<br/>table:menus<br/>table:role_menu_permissions"]
+  s5["5. Only for a new page: add the entry to the shared menu catalog and t...<br/>table:public.menus<br/>table:public.plan_menu_access<br/>table:role_menu_permissions"]
   s4 --> s5
   s6["6. Web: add the key to the permission constants, gate buttons and page...<br/>web:src/constants/permissions.ts<br/>web:src/hooks/usePermission.ts<br/>web:src/components/PermissionGuard.tsx<br/>web:src/lib/teacherPermissionMatrix.ts<br/>web:src/lib/staffPermissionMatrix.ts"]
   s5 --> s6
@@ -145,6 +158,8 @@ flowchart TD
 6. Scope own allows only the user's entity id, related allows a parent's linked children, all allows any id; a targeted id outside the scope returns 404 `service:app/service/auth/user_context_service.py`
 
 - Result: Checks are live queries on every request, so a grant change applies on the backend at once; clients see it only after the next login.
+
+- Note: Single-student endpoints in exam results, hall tickets, certificates and student documents also call ensure_student_access in app/tools/ownership.py, which returns 403 when a Student or Parent targets a student outside their own record or linked children.
 
 ```mermaid
 flowchart TD
@@ -179,9 +194,11 @@ Shaped by: [platform/live-permission-lookup](#platformlive-permission-lookup), [
 10. The result is serialised through the endpoint response_model; Numeric columns become strings and datetimes are naive UTC.
 11. HTTPException gives {detail}, request validation gives 422 with a detail list, and uncaught exceptions become {error_code, message, details, request_id} from GlobalErrorMiddleware `service:app/middleware/error_middleware.py`
 
-- Failure: An HTTPException raised inside a middleware, such as TenantMiddleware in strict mode, is not handled by FastAPI and surfaces as a plain 500.
+- Failure: TenantMiddleware returns its own errors as JSON detail responses (400 for a missing or invalid cschema with no bearer token in strict mode); an HTTPException raised by any other middleware would surface as a plain 500.
+- Failure: An expired, tampered or non-access bearer token without a cschema header gets 400 Tenant must be specified from get_tenant_db, not 401, because the tenant session opens before the handler checks auth; web then does not refresh.
 
 - Note: Row-level security filters every tenant table by the tenant set on the transaction, so a query that omits a tenant filter still returns only that tenant's rows.
+- Note: TenantMiddleware lowercases the cschema value and strips every character except a-z, 0-9, underscore and hyphen before lookup, so a client_name with a space or capitals cannot be matched.
 
 ```mermaid
 flowchart TD
@@ -217,9 +234,11 @@ Shaped by: [platform/flush-select-commit](#platformflush-select-commit), [platfo
 1. The request interceptor had attached the stored access token from expo-secure-store; cschema is sent only on requests without a token and on refresh, from the stored organization code `mobile:src/api/client.ts`
 2. The response interceptor marks the request as retried and reuses the shared in-flight refreshPromise, so concurrent 401s trigger a single refresh `mobile:src/api/client.ts`
 3. refreshAccessToken in services/authUtils.ts posts {refresh_token} through apiClient `endpoint:POST /auth/refresh`
-4. The backend verifies the refresh token type, rejects blacklisted tokens, checks the token's tenant is still active, and returns a new access and refresh pair with the current role and expires_in `endpoint:POST /auth/refresh` `service:app/tools/jwt_utils.py` `service:app/service/auth/token_blacklist_service.py` `service:app/service/auth/multi_tenant_auth_service.py`
+4. The backend checks token type and blacklist, requires a tenant_id claim equal to the cschema tenant (401 if missing, 403 if different), re-reads the user (401 if inactive) and returns a new pair with the current role and expires_in `endpoint:POST /auth/refresh` `service:app/tools/jwt_utils.py` `service:app/service/auth/token_blacklist_service.py` `service:app/db/tenant_session.py`
 5. The client stores the new tokens with an expiry of expires_in (86400 s), and retries the original request with the new bearer token `mobile:src/api/client.ts`
 6. If refresh returns nothing or throws, the client calls the onSessionExpired callback registered by AuthProvider, which dispatches LOGOUT and returns to the login screen `mobile:src/api/client.ts`
+
+- Note: The request interceptor does not attach an access token past its stored expiry, so the call goes out with only the cschema header, gets 401 and enters this flow.
 
 ```mermaid
 flowchart TD
@@ -228,7 +247,7 @@ flowchart TD
   s1 --> s2
   s3["3. refreshAccessToken in services/authUtils.ts posts {refresh_token} t...<br/>endpoint:POST /auth/refresh"]
   s2 --> s3
-  s4["4. The backend verifies the refresh token type, rejects blacklisted to...<br/>endpoint:POST /auth/refresh<br/>service:app/tools/jwt_utils.py<br/>service:app/service/auth/token_blacklist_service.py<br/>service:app/service/auth/multi_tenant_auth_service.py"]
+  s4["4. The backend checks token type and blacklist, requires a tenant_id c...<br/>endpoint:POST /auth/refresh<br/>service:app/tools/jwt_utils.py<br/>service:app/service/auth/token_blacklist_service.py<br/>service:app/db/tenant_session.py"]
   s3 --> s4
   s5["5. The client stores the new tokens with an expiry of expires_in (8640...<br/>mobile:src/api/client.ts"]
   s4 --> s5
@@ -246,6 +265,8 @@ Shaped by: [platform/token-lifetimes](#platformtoken-lifetimes)
 2. Otherwise it reads refreshToken from the persisted auth store and joins the single in-flight refresh, starting one if none is running: POST {refresh_token} to `endpoint:POST /auth/refresh` with the current tenant header `web:src/api/index.ts` `web:src/lib/config.ts`
 3. On success the new access and refresh tokens are stored with refreshTokens and every waiting request is retried once with the new bearer token `web:src/lib/authStore.ts`
 4. If the refresh fails, it calls logout() on the store and redirects to /login `web:src/lib/authStore.ts`
+
+- Note: Web keeps sending an expired access token without a cschema header, which most endpoints answer with 400 rather than 401, so this flow does not start for an expired token.
 
 ```mermaid
 flowchart TD
@@ -295,6 +316,14 @@ flowchart TD
 - Shapes: `concept:platform/cschema`, `mobile:src/api/client.ts`, `service:app/middleware/tenant_middleware.py`, `web:src/api/index.ts`
 - Superseded by: `decision:platform/tenant-from-token`
 
+### platform/demo-data-through-api (active)
+
+- **Decision**: The demo tenant is seeded in two steps: scripts/seed_demo_catalog.py loads the menu catalog, the Full plan and role permissions through the tenant services, and scripts/seed_demo_data.py loads sample data by calling the HTTP API as the tenant admin.
+- **Why**: Going through the app's own services and endpoints means demo data passes the same validation, permissions and row-level security as data entered by users, and seeding doubles as an end-to-end check.
+- **Alternatives**: Direct SQL inserts, as the older per-schema seed scripts did.
+- **Tradeoff**: Seeding needs a running backend, and the tenant needs an admin login and an academic year first.
+- Shapes: `module:platform`
+
 ### platform/dual-layer-permissions (active)
 
 - **Decision**: A permission is a (resource, action) pair held in two layers: the plan layer (public.plan_resource_access per subscription plan) says which resources a school's plan includes, and the role layer (tenant resource_permissions) says what each role may do. The intended rule is access = plan AND role.
@@ -334,16 +363,31 @@ flowchart TD
 
 ### platform/menus-separate-from-permissions (active)
 
-- **Decision**: Sidebar menus are a separate grant (tenant menus plus role_menu_permissions.can_view) returned as a tree at login. A menu grant does not imply API access, and a resource grant does not show a menu.
+- **Decision**: Sidebar menus are a separate grant (catalog menus plus tenant role_menu_permissions.can_view) returned as a tree at login. A menu grant does not imply API access, and a resource grant does not show a menu.
 - **Why**: The sidebar comes from role_menu_permissions at login so that menu visibility is per role and controlled by data rather than code (docs/modules/tenants-and-admin.md). Why menus are not derived from resource grants is not recorded.
-- **Tradeoff**: A new page needs both a menu row with role grants and resource grants, and plan assignment recreates tenant menus flat from public.plan_menu_access, dropping parent_id.
+- **Tradeoff**: A new page needs a catalog menu row, plan_menu_access and role grants as well as resource grants, and custom roles get no menus from seeding.
 - Shapes: `concept:platform/menu`, `feature:tenants-and-admin/menu-management`, `flow:auth/normal-login`, `table:menus`, `table:role_menu_permissions`
+
+### platform/migrations-outside-container-start (active)
+
+- **Decision**: The API container never runs Alembic on start; start.sh only starts uvicorn, and migrations run once as a separate step with the owner role (MIGRATION_DATABASE_URL) before the new code is deployed.
+- **Why**: Startup stays fast, several containers cannot race to migrate, and the API container needs only the app role, which has no DDL rights.
+- Note: In the planned AWS deployment this step is a one-off ECS task run by the deploy pipeline before the service update.
+- Shapes: `module:platform`
 
 ### platform/monorepo (active)
 
 - **Decision**: backend, web and mobile live in one repository, each in its own folder with its own toolchain, with the history of the three original repositories preserved and CI workflows path-filtered per app.
 - **Why**: A feature that touches the API must change backend, web and mobile together, and one repository lets that happen in a single change (root CLAUDE.md, cross-app contract).
 - Shapes: `flow:platform/add-feature-end-to-end`, `module:platform`
+
+### platform/neon-over-rds (active)
+
+- **Decision**: The database stays on Neon PostgreSQL; Amazon RDS is not used, including for the planned AWS deployment.
+- **Why**: Neon costs far less at COS360's scale (the AWS plan estimates about 96 USD per month in total against about 640 with RDS) and already provides a connection pooler, branching for dev and staging, and point-in-time restore.
+- **Alternatives**: Amazon RDS with a PgBouncer sidecar.
+- **Tradeoff**: The database stays in Neon's region while the planned compute is in ap-south-1.
+- Shapes: `module:platform`
 
 ### platform/no-js-workspaces (active)
 
@@ -384,6 +428,7 @@ flowchart TD
 
 - **Decision**: When a scoped check denies a targeted id outside the user's own or related scope, the backend returns 404, not 403. Clients treat both as not found or no access.
 - **Why**: A student or parent cannot probe whether records outside their own scope exist.
+- Note: Only check_user_resource_access follows this rule. ensure_student_access in app/tools/ownership.py returns 403 for the same kind of denial, so the behaviour is not uniform across endpoints.
 - Shapes: `concept:platform/access-scope`, `service:app/tools/enhanced_permissions.py`
 
 ### platform/shared-schema-rls (active)
@@ -463,6 +508,14 @@ flowchart TD
 - **Since**: 2026-10
 - Shapes: `module:platform`, `service:app/db/base.py`
 
+### platform/tests-only-local-qa-tenant (active)
+
+- **Decision**: API tests, UI automation and the QA scripts run only against the local cos360_unischema database and tenants whose client_name starts with qa_; scripts/qa/_target.py and tests/api/support.py refuse to start otherwise.
+- **Why**: The shared Neon database holds a live school, and tests create and delete rows, so the target is checked in code rather than trusted to configuration.
+- **Why**: The local app role is not the owner and has no BYPASSRLS, so row-level security behaves exactly as in production.
+- Note: QA logins live in backend/.env.test, which is gitignored; the procedure is docs/testing/test-environment.md.
+- Shapes: `module:platform`
+
 ### platform/token-lifetimes (active)
 
 - **Decision**: Access tokens live 24 hours and refresh tokens 7 days, hard-coded in jwt_utils.py. The ACCESS_TOKEN_EXPIRE_MINUTES setting (default 30) is unused; login and refresh responses return expires_in from ACCESS_TOKEN_EXPIRES_IN.
@@ -470,6 +523,21 @@ flowchart TD
 - **Alternatives**: The configurable ACCESS_TOKEN_EXPIRE_MINUTES lifetime of 30 minutes, which the earlier backend security notes described as the intended short-lived access token.
 - **Tradeoff**: A leaked access token stays valid for up to 24 hours unless logout blacklists it.
 - Shapes: `flow:platform/token-refresh-mobile`, `service:app/tools/jwt_utils.py`
+
+### platform/two-uvicorn-workers (active)
+
+- **Decision**: The AWS plan runs the API with at most 2 uvicorn workers per task, instead of the 4 that start.sh uses today.
+- **Why**: One async worker already serves high concurrency, while every extra worker opens its own connection pools (tenant_session.py and session.py) against Neon's connection limit.
+- **Tradeoff**: CPU-bound work in a request blocks more of the task's capacity.
+- Shapes: `service:app/db/tenant_session.py`
+
+### platform/upstash-redis-broker (active)
+
+- **Decision**: The planned AWS deployment uses Upstash serverless Redis (a rediss:// URL kept in Secrets Manager) for the Celery broker and the rate limiter, not ElastiCache.
+- **Why**: No Redis cluster, subnet group or security group to run inside the VPC, and a lower monthly cost.
+- **Alternatives**: Amazon ElastiCache.
+- **Tradeoff**: app/celery_app.py builds the broker from REDIS_HOST, REDIS_PORT and REDIS_DB, so it must be changed to read REDIS_URL first.
+- Shapes: `module:platform`
 
 ### platform/uuid-primary-keys (active)
 
@@ -509,10 +577,10 @@ The request header that names the tenant. Its value is the tenant's client_name 
 
 ### platform/menu
 
-A sidebar entry in the tenant menus tree (levels L0 to L3 via parent_id, ordered by display_order); a role sees it when role_menu_permissions grants can_view.
-- Note: Master menus live in public.menus; each tenant has its own menus tree.
+A sidebar entry in the shared menus catalog (levels L0 to L3 via parent_id, ordered by display_order); a role sees it when its tenant role_menu_permissions row grants can_view.
 - Note: Login returns the granted tree from build_hierarchical_menu; a child whose parent is not granted is dropped.
 - Note: Web reshapes the backend menu in menuUtils.ts; mobile tabs and hubs are hardcoded, then filtered by permissions and the backend menu.
+- Note: There is one shared menu catalog in public.menus for all tenants; plan_menu_access says which entries a plan includes, and each tenant's role_menu_permissions grants them to roles.
 - Related: `feature:tenants-and-admin/menu-management`, `mobile:app/(tabs)/_layout.tsx`, `service:app/service/auth/multi_tenant_auth_service.py`, `table:menus`, `table:public.menus`, `table:public.plan_menu_access`, `table:role_menu_permissions`, `web:src/lib/menuUtils.ts`
 
 ### platform/permission
@@ -549,8 +617,8 @@ cos360_master, the structure-only schema that new tenant schemas are cloned from
 
 A school using COS360: one row in public.tenants (client_name, plan_id, is_active). Its data lives in the shared tables, identified by tenant_id and protected by row-level security. schema_name is legacy and null for new tenants.
 - Note: client_name is unique and is the value clients send as a login hint; the tenant id is what tokens and rows carry.
-- Note: client_name matching is exact and case-sensitive and names may contain spaces; mobile lowercases and trims what the user types.
 - Note: Only active tenants resolve; an unknown or inactive client_name gets 404 from get_tenant_db.
+- Note: client_name matching is exact, and TenantMiddleware lowercases the header and strips everything except a-z, 0-9, underscore and hyphen, so only names in that form are reachable; provisioning enforces it for new tenants.
 - Related: `concept:platform/plan`, `feature:tenants-and-admin/tenant-management`, `service:app/db/tenant_session.py`, `table:public.tenants`
 
 ### platform/user-type

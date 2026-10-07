@@ -2,7 +2,7 @@
 
 How the backend, web and mobile apps fit together: tenancy, request lifecycle, auth, client contract, storage, background jobs, and cross-cutting gotchas.
 
-_Last verified against code: 2026-10-01_
+_Last verified against code: 2026-10-07_
 
 Decisions and system flows: [platform graph view](graph/views/platform.md) (source: docs/graph/graph.jsonl).
 
@@ -20,38 +20,40 @@ Related: `docs/permissions.md` (permission system end to end), `docs/modules/*.m
 - Models: `backend/app/db/base.py`. One `MetaData` with no schema, so every table lands in `public`, and one registry shared by both bases. `BaseOrg` adds `tenant_id` (FK to `tenants.id`) through the `TenantScoped` mixin; never declare it on a model.
 - **Uniqueness is per tenant.** `scope_uniques_to_tenant()` (run by `load_all_models()`) adds `tenant_id` to every unique constraint and unique index on a tenant table, except single-column primary-key uniques. A foreign key to a natural key must be composite with `tenant_id`, as `fee_student_mappings` to `student_admissions.admission_number` is.
 - **RLS:** policy `tenant_isolation` compares `tenant_id` with `NULLIF(current_setting('app.tenant_id', true), '')::uuid` for reads and writes, with `ENABLE` and `FORCE ROW LEVEL SECURITY`. `app/db/rls.py` has `enable_tenant_rls`, which every migration that adds a tenant table must call. `test_every_tenant_table_has_forced_rls` fails if one is missed. An unset tenant matches no rows, and an insert without a tenant fails with a NOT NULL error.
-- **Two database roles.** The owner role runs migrations (`MIGRATION_DATABASE_URL`). The app role (`DATABASE_URL`) is not the owner, not a superuser and has no `BYPASSRLS`, so it cannot run DDL: never create tables lazily at runtime (`token_blacklist` used to; it is now a migrated model).
+- **Two database roles.** The owner role runs migrations (`MIGRATION_DATABASE_URL`). The app role (`DATABASE_URL`) is not the owner, not a superuser and has no `BYPASSRLS`, so it cannot run DDL: never create tables lazily at runtime.
 - `public.tenants` holds `client_name` (the login hint), `plan_id` and `is_active`. `schema_name` is legacy, nullable, and null for new tenants.
 
 ### How a request finds its tenant
-1. `TenantMiddleware` (`backend/app/middleware/tenant_middleware.py`) sets `request.state.client_name` from the sanitised `cschema` header, or `None` when there is a bearer token and no header.
+1. `TenantMiddleware` (`backend/app/middleware/tenant_middleware.py`) sets `request.state.client_name` from the sanitised `cschema` header, or `None` when there is a bearer token and no header. Sanitising lowercases the value and strips every character except `a-z`, `0-9`, `_` and `-`, so a `client_name` stored with a space or capitals can never be matched. With `TENANT_STRICT_MODE` on (the default), a request with neither header nor bearer token gets **400** as a JSON `{detail}` response from the middleware. `/health`, `/docs`, `/redoc`, `/openapi.json` and `/favicon.ico` bypass it, and `/api/v1/super_admin/` paths take a separate branch that ignores `cschema`.
 2. `resolve_request_tenant_id` (`backend/app/db/tenant_session.py`) decides the tenant:
    - A valid access token with a `tenant_id` claim wins. A `cschema` header, if sent, must resolve to the same tenant or the request gets **403**. The tenant must be active, else **401**.
    - A valid token with no `tenant_id` claim gets **401** ("log in again"), except `user_type: super_admin`, which uses the header.
-   - With no valid token (login, `/auth/academic-years`, refresh, set-password) the header is looked up in `public.tenants` through `TenantService.get_tenant_id`. An unknown or inactive name gets **404**.
+   - With no valid access token (login, `/auth/academic-years`, refresh) the header is looked up in `public.tenants` through `TenantService.get_tenant_id`. An unknown or inactive name gets **404**, and no header at all gets **400** "Tenant must be specified".
+   - An expired, tampered or non-access token (refresh or change-password) counts as "no valid token". Sent without a `cschema` header it gets **400**, not 401, from any endpoint that opens its tenant session before the handler checks auth, which is most of them. See known gaps.
+   - Set-password does not use the header: it takes the tenant from the change-password token's `tenant_id` claim.
 3. `open_tenant_session` stores the id in `session.info["tenant_id"]`, and an `after_begin` listener runs `set_config('app.tenant_id', <id>, true)` at the start of **every** transaction. The scope is re-applied after each commit and cannot leak between pooled connections.
 4. Celery tasks and scripts use `open_tenant_session(tenant_id)`. A session with no tenant sees no rows and cannot insert.
 - The tenant lookup cache lives in process memory with a 60 s TTL. Deactivating a tenant takes effect within that time in other workers, and at once in the process that handled the change (`TenantService.clear_cache()`).
 
 ### Creating and changing a tenant
-- `POST /api/v1/super_admin/system/tenants/?client_name=&plan_id=` plus an optional JSON body `{username, email, password}` calls `TenantProvisioningService.provision` (`backend/app/service/tenant/provisioning_service.py`). One transaction inserts the `tenants` row, the five system roles, their permissions, the role menu links and the optional first Admin. Any failure rolls everything back.
+- `POST /api/v1/super_admin/system/tenants/?client_name=&plan_id=` plus an optional JSON body `{username, email, password}` calls `TenantProvisioningService.provision` (`backend/app/service/tenant/provisioning_service.py`). `client_name` must be 2 to 63 characters of lowercase letters, digits, `-` or `_`. One transaction inserts the `tenants` row, the five system roles, their permissions, the role menu links, a default active academic year (June 1 to March 31) when the tenant has none, and the optional first Admin. Any failure rolls everything back.
 - `RoleSeedService` (`role_seed_service.py`) grants each role the catalog in `permission_catalog.py` limited to the plan's `plan_resource_access` actions. Admin gets every plan action plus `role_management`. Student and Parent get only the student-facing menu URLs. A plan with no resources fails with 409.
 - `PUT /super_admin/system/tenants/{id}/plan` calls `change_plan`. It adds what the new plan grants and **removes** permissions and menu links it no longer allows, in one transaction. Users, custom roles and other data are untouched.
 - `POST /auth/seed/all-role-permissions` (Admin only) re-runs `seed_defaults` for the caller's tenant. It keeps existing rows, so a permission an admin revoked is not granted again.
-- Not seeded by provisioning: the academic year (nobody can log in without one), certificate templates, and the shared menu catalog with its plan access, which must exist first (`CatalogService` can import menus and build a full plan).
+- Not seeded by provisioning: certificate templates, and the shared menu catalog with its plan access, which must exist first. `CatalogService` (`catalog_service.py`) can import menus and build a `Full` plan from the Admin catalog; `backend/scripts/seed_demo_catalog.py` drives it for a demo tenant.
 
 ### Migrations
 - Alembic uses one schema and one `alembic_version`. `backend/migrations/versions/` starts at a baseline (`0001`). The old per-schema revisions are kept in `migrations/legacy_versions/` for reference and cannot be applied.
 - `migrations/env.py` requires `MIGRATION_DATABASE_URL` (the owner role) and sets no `search_path`. On a clean database `alembic upgrade head` creates everything and autogenerate reports no drift.
 
-### Known gaps (shared-schema migration)
-Converted: models and base, session layer, middleware, login, refresh and set-password, provisioning, role seeding, token blacklist, Celery tasks and their call sites, report endpoints and cache keys, certificates and media paths, expense, super-admin tenant data, and the permission services. Not converted:
-- `POST /super_admin/setup/initialize` and `GET /super_admin/setup/status` (`setup_endpoints.py`) are unauthenticated. Initialize creates a super admin with a hardcoded password and returns it, and its `CREATE TABLE IF NOT EXISTS` cannot run as the app role.
-- `/auth/seed/*` except `all-role-permissions` is unauthenticated.
-- `app/db/session.py` is the older helper that builds an engine per call. Plan, super-admin auth, seed and setup code still import its `get_public_db`.
-- Web and mobile are converted: the tenant comes from the token and the header is sent only on tokenless auth calls. The legacy organizations screens on web no longer show a schema.
-- `scripts/` still assume per-tenant schemas.
-- `permission_endpoints.py` still has the `/test/` and `/debug-roles/` leftovers.
+### Known gaps (tenancy)
+- `POST /super_admin/setup/initialize` and `GET /super_admin/setup/status` (`setup_endpoints.py`) are unauthenticated. Initialize takes the password from `SUPER_ADMIN_INITIAL_PASSWORD` (400 if unset), refuses with 409 once a super admin exists, echoes the password in its response, and runs `CREATE TABLE IF NOT EXISTS`, which the app role cannot run.
+- `POST /auth/seed/permission-data`, `GET /auth/seed/verify-permission-data` and `POST /auth/seed/location-data` are unauthenticated and write or read platform data. `all-role-permissions` and `caste-data` require the `Admin` role.
+- `app/db/session.py` is the older helper that builds an engine per call. Plan, super-admin auth, seed and setup endpoints and `PlanService` still import its `get_public_db`.
+- An invalid or expired bearer token without a `cschema` header gets 400 instead of 401 (step 2 above). Web sends no header on authenticated calls and refreshes only on 401, so an expired web access token produces 400s instead of a refresh. Mobile does not send an access token it knows is expired, so it gets 401 and refreshes.
+- Tenants whose `client_name` contains characters the middleware strips (spaces, capitals) cannot be addressed through `cschema`.
+- Most of `backend/scripts/` (the `seed_*_permissions.py`, `seed_*_menu*.py`, `create_little_bunny_tenant.py` family) still assume per-tenant schemas; the shared-schema tools are listed in `backend/CLAUDE.md`.
+
 ## 2. Request lifecycle and layering
 
 Middleware order is outermost to innermost, because Starlette runs the last-added middleware first: `CORSMiddleware` → `TenantMiddleware` → `SuperAdminMiddleware` → `RequestContextMiddleware` → `GlobalErrorMiddleware` → router. All of them are registered in `backend/app/main.py`.
@@ -73,14 +75,15 @@ async def create_x(body: XCreate, request: Request, db: AsyncSession = Depends(g
 
 - Tokens are HS256 JWTs signed with `JWT_SECRET_KEY` (`backend/app/tools/jwt_utils.py`). Access tokens last **24 h** and refresh tokens **7 d**. Both lifetimes are hard-coded; `ACCESS_TOKEN_EXPIRE_MINUTES` in config is unused. The claim `token_type` is `access` / `refresh` / `change_password`.
 - **Tenant user token claims:** `sub` (user UUID), `username`, `role` (role **name**), `tenant_id`, `client_name`, `academic_year_id`, `academic_year_title`, `exp`, `token_type`. The token does NOT contain permissions or `user_type`. `tenant_id` is what selects the tenant after login.
-- **Super admin token:** `user_type: "super_admin"` plus `sub`, `username` and `permissions` (a list of strings). Issued by `POST /super_admin/auth/login` from `public.super_admin_users`, which locks the account for 30 min after 5 failures.
+- **Super admin token:** `user_type: "super_admin"` plus `sub`, `username` and `permissions` (a list of strings). Issued by `POST /super_admin/auth/login` from `public.super_admin_users`, which locks the account for 30 min after 5 failures. The login also returns a refresh token, but `/auth/refresh` rejects it (no `tenant_id`), and there is no super-admin refresh or logout endpoint.
 - **Login:** `POST /auth/login` `{username, password, academic_year_id (required), client_name?}`.
   - `username` may be a username, an email, or a staff phone number, tried in that order.
   - The response has `user`, `role{id,name,description}`, `menu` (tree), `permissions` (`{resource: [actions]}`), `entity_id`, academic year, `access_token`, `refresh_token`, `expires_in`, `tenant_id` and `client_name`. The set-password response has the same fields. The refresh response has no `tenant_id` or `client_name`.
-  - The body `client_name` is optional. If sent, it must name the same tenant as the `cschema` header or login returns 400.
+  - The body `client_name` is optional. If sent, it must name an active tenant (401 "Invalid connection" otherwise) and the same tenant as the `cschema` header (400 otherwise).
+  - A missing `academic_year_id` fails validation with 422; an unknown one returns 400.
   - `GET /auth/academic-years` is public and is called before login.
-- **First login:** for roles `Staff`/`Teacher`/`Student`/`Parent` with `users.is_first_login = TRUE`, login returns `{requires_password_change, change_password_token (15 min), academic_year_*}`. The client then calls `POST /auth/staff/set-password` (used for every role), which returns a full login response. `is_first_login` is read and written with raw SQL only; it is not in the ORM model.
-- **Refresh:** `POST /api/v1/auth/refresh` `{refresh_token}` returns a new access and refresh token pair. It checks the blacklist, that the refresh token's `tenant_id` matches the request tenant (403 otherwise), and that the user is still active. Tokens without `tenant_id` get 401.
+- **First login:** for roles `Staff`/`Teacher`/`Student`/`Parent` with `users.is_first_login = TRUE`, login returns `{requires_password_change, change_password_token (15 min), academic_year_*}`. The client then calls `POST /auth/staff/set-password` (used for every role), which returns a full login response. `is_first_login` is a migrated column on the `User` model, but the auth and enrolment code still reads and writes it with raw SQL.
+- **Refresh:** `POST /api/v1/auth/refresh` `{refresh_token}` (with the `cschema` header, no bearer) returns a new access and refresh token pair and `expires_in`. It checks the blacklist, that the refresh token has a `tenant_id` (401 otherwise) equal to the header's tenant (403 otherwise), and that the user is still active (401), and it re-reads the role name. The old refresh token stays valid.
 - **Logout:** `POST /auth/logout` blacklists the access token, and the refresh token if one is sent, in `public.token_blacklist` (SHA-256 hashes; a migrated table, not created at runtime). `get_current_user_token` checks the blacklist on **every** request, which costs one extra DB query per request. A database error in that check fails open.
 - The tenant comes from the token's `tenant_id`, and a `cschema` header that disagrees is rejected with 403, so a token cannot be replayed against another tenant. Tokens issued before this claim existed are rejected with 401.
 - Super-admin routes (`/api/v1/super_admin/...`) use `Depends(get_current_super_admin)`, which requires `user_type == "super_admin"`. `SuperAdminMiddleware` only sets flags on `request.state`. Tenant data is reached through a tenant id in the path (`/super_admin/tenant-data/{tenant_id}/...`), which is validated against `public.tenants` before a tenant session is opened for it.
@@ -92,7 +95,7 @@ async def create_x(body: XCreate, request: Request, db: AsyncSession = Depends(g
 | Base URL | `VITE_API_BASE_URL` (includes `/api/v1`) | `EXPO_PUBLIC_API_URL` (includes `/api/v1`) |
 | `cschema` value | Subdomain of `window.location.hostname`, else `VITE_DEFAULT_TENANT` (`getTenantFromHostname`, `lib/config.ts`). Sent only on requests without an access token and on refresh | The organisation code the user typed on the login screen, checked against the server with `GET /auth/academic-years`, stored in AsyncStorage. Sent only on requests without an access token and on refresh. No default tenant |
 | Token storage | Zustand `persist` → `localStorage['auth-storage']` (tokens, permissions, menu) | `expo-secure-store` for tokens; AsyncStorage for user/role/permissions/menu/schema |
-| Refresh on 401 | Calls `/auth/refresh` with a shared in-flight refresh, retries once, logs out if the refresh fails | Calls `/auth/refresh` with a shared in-flight lock; assumes 1 h expiry because there is no `expires_in` |
+| Refresh on 401 | Calls `/auth/refresh` with a shared in-flight refresh, retries once, logs out if the refresh fails. An expired token is still sent, so it gets 400, not 401 (section 1 known gaps) | Calls `/auth/refresh` with a shared in-flight lock. Token expiry comes from `expires_in` (fallback 3600 s); an access token past that expiry is not sent, so the call gets 401 and refreshes |
 | Error text | `detail` (string, array or object) copied into `error.message` | `services/errorHandler.ts` copies `detail` or `message` into `error.message` |
 
 - Both clients send `Authorization: Bearer` and, for parents, `X-Student-ID`, `X-Academic-Year-ID`, `X-Class-ID`. They send `cschema` only on login, `/auth/academic-years`, set-password and refresh. **The backend ignores the `X-*` headers.** Child scoping comes from the `student_id` in the path or query plus `_related` permissions.
@@ -100,9 +103,10 @@ async def create_x(body: XCreate, request: Request, db: AsyncSession = Depends(g
   - `HTTPException` raised in an endpoint or dependency gives FastAPI's `{"detail": ...}`.
   - Request validation errors give 422 `{"detail": [{loc,msg,type}]}`.
   - Uncaught exceptions are caught by `GlobalErrorMiddleware` and return `{error_code, message, details{correlation_id,...}, request_id}`. `IntegrityError`/`OperationalError` map to 400 and other errors to 500.
-  - An `HTTPException` raised **inside a middleware** (for example `TenantMiddleware` in strict mode) is not handled by FastAPI and surfaces as a plain 500.
+  - FastAPI does not handle an `HTTPException` raised inside a middleware. `TenantMiddleware` therefore returns its own errors as a JSON `{detail}` response; a new middleware must do the same or the error surfaces as a plain 500.
+  - Admin, auth and super-admin endpoints return generic 500 `detail` texts; the exception text goes to the log only.
 - Responses carry an `X-Correlation-ID` header.
-- Ownership denials on `_own`/`_related` resources return **404, not 403**, on purpose. Clients should treat both as "not found / no access".
+- Ownership denials are not uniform. `check_user_resource_access` returns **404** for a targeted id outside the user's `_own`/`_related` scope, on purpose. `ensure_student_access` (`backend/app/tools/ownership.py`), used by exam results, hall tickets, certificates and student documents, returns **403**. Clients should treat both as "not found / no access".
 - `Numeric` columns serialise as **strings** (`"4.50"`). Cast with `Number()` before doing maths.
 - Datetime columns are `TIMESTAMP WITHOUT TIME ZONE`. On the backend use naive UTC (`datetime.utcnow()`).
 - Path IDs are UUIDs. Type FastAPI path params as `uuid.UUID`, not `str`, because asyncpg binding needs it.
@@ -110,7 +114,8 @@ async def create_x(body: XCreate, request: Request, db: AsyncSession = Depends(g
 
 ## 5. File storage
 
-- Files are stored on local disk under `backend/media/` and served **publicly with no auth** by `app.mount("/media", StaticFiles(...))` in `main.py`. Anyone who has the URL can fetch the file.
+- Files are stored on local disk under `backend/media/` and served **with no auth or tenant check** by `app.mount("/media", StaticFiles(...))` in `main.py`. Anyone who has the URL can fetch the file.
+- `/media` is not on the `TenantMiddleware` bypass list. In strict mode a request that carries neither a `cschema` header nor a bearer token (a plain `<img src>` or browser link) gets **400**. Any `cschema` value or any `Bearer` header gets through, because the middleware only sanitises the header here.
 - Clients build URLs as `baseURL.replace(/\/api\/v\d+$/, '') + photo_url`, because stored paths start with `/media/...`.
 - Layouts:
   - Student and staff photos and school images go to `media/<tenant_id>/{student/photos,staff/photos,school/images,school/signatures}/...`. Files and stored URLs written before the shared-schema change keep their old unprefixed paths, and nothing is moved on disk.
@@ -135,14 +140,13 @@ async def create_x(body: XCreate, request: Request, db: AsyncSession = Depends(g
 
 - **Swagger/ReDoc** at `/docs` and `/redoc` sit behind HTTP Basic, with credentials hard-coded in `main.py`.
 - **CORS** comes from `ALLOWED_ORIGINS` (default `["*"]`) with `allow_credentials=True`.
-- **Rate limiting:** slowapi `limiter` is registered, but without `SlowAPIMiddleware` the default `1000/hour` limit is never applied. Only endpoints decorated with `@rate_limit_api()` / `@rate_limit_dropdown()` / `@rate_limit_create()` are limited. Keep the parentheses; the endpoint must also take `request: Request`. `/auth/login` is not limited. Storage is Redis if it is reachable at import time, otherwise in-memory per process.
+- **Rate limiting:** slowapi `limiter` is registered, but without `SlowAPIMiddleware` the default `1000/hour` limit is never applied. Only endpoints decorated with `@rate_limit_api()` / `@rate_limit_dropdown()` / `@rate_limit_create()` are limited. Keep the parentheses; the endpoint must also take `request: Request`. `rate_limit_login()` exists but `/auth/login` does not use it. Storage is Redis if it is reachable at import time, otherwise in-memory per process. `RATE_LIMIT_ENABLED=false` turns the limiter off; set it only for automated test environments.
 - **Processes:** prod runs `uvicorn --workers 4` (`backend/start.sh`). The tenant lookup cache (60 s TTL) and the in-memory rate limits are **per process**.
 - **Model before migration:** a model column that doesn't exist in the database breaks every query on that model with a 500. Apply the migration **before** deploying the code that adds the column.
 - **Unauthenticated routers still mounted in every environment:**
-  - `/auth/seed/*`, except `POST /auth/seed/all-role-permissions`, which now needs an Admin
+  - `/auth/seed/permission-data`, `/auth/seed/verify-permission-data`, `/auth/seed/location-data`
   - `/super_admin/setup/initialize` and `/super_admin/setup/status`
 
-  The old `/auth/test-setup/*` and `/auth/fix-permissions/*` routers were removed.
   See the security notes in `docs/permissions.md`.
 - **Logging:** `configure_logging` writes to `cos360_errors.log`, and many services log at INFO/"DEBUG n" on every request.
 - **Web academic year side effect:** an Admin login on web calls `updateAcademicYear(id, { is_active: true })` (`web/src/api/auth.ts`), and the backend then deactivates every other year. Logging in with a non-current year changes the active year for the whole tenant. The `academic_year_id` inside the JWT is not used by the backend to scope queries.
