@@ -105,3 +105,4 @@ Dead code: mobile `src/api/certificates.ts` (only re-exported by `src/api/index.
   - `setup_issuable_certificates.py` puts the schema argument straight into `SET search_path` with no quoting.
   - It falls back to a placeholder localhost `DATABASE_URL`.
   - Run it only with trusted schema names and an explicit `DATABASE_URL`.
+- UI-CER-01: mobile Issue Certificate with an attached file fails on Expo web ("Expected UploadFile, received: <class 'str'>"); same family as the mobile expense attachment upload; check on a native device.

@@ -94,3 +94,4 @@ Endpoint prefixes:
 - No capacity field or capacity check. GPS, trip logs and parent notifications are not built.
 - The trips service uses `commit()` -> `refresh()` and the pricing service commits before reloading; neither follows the repo's flush -> select -> commit pattern.
 - An unapproved redesign proposal (Feb 2026, not kept) asked for a 3-step assign wizard, the student's class/section shown when assigning, a payment schedule (monthly/quarterly/yearly/bulk), bulk assign, and a trip roster grouped by stop. None of it is implemented.
+- UI-TRN-01: web Assign Transport crashes when a trip is chosen (empty-string Select value for the "None" pricing option; same root cause as UI-STU-02). UI-TRN-02: the mobile My Transport screen shows blanks and NaN because it treats the array response as one object.

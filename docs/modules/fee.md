@@ -138,3 +138,4 @@ Seed data for the full fee chain: `backend/scripts/seed_demo_data.py`. `backend/
 - Cheque/DD payments mark old fees as paid straight away, even though the transaction is still `pending` and could bounce. This only applies to the auto-distribute path.
 - Fee audit writes (`_write_audit_log` in the collection, concession and old-fee services) insert into `audit_logs`, which does not exist, so nothing is recorded. Each write runs in a savepoint before the commit, so the failure never affects the request.
 - No online payment gateway: parents cannot pay in-app. Every payment is recorded by staff, with UPI/bank references typed in by hand.
+- UI-FEE-01: the mandatory class mapping toast says "Fee applied to 0 of 1 students" although applied. UI-FEE-02: the Approved By menu of the first concession row is clipped. UI-FEE-03: Fee Summary keeps the old Payable Amount after Save All Concessions until reload.

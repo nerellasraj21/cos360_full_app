@@ -135,3 +135,4 @@ How requests resolve to a tenant is in [../architecture.md](../architecture.md).
 - Over-long names and a negative tenant-list `limit` give 500 (gotcha 20); usage stats always fail (gotcha 21).
 - A school Admin can write to the shared menu catalog (gotcha 18).
 - Admin actions (user edits, password resets, role changes) have no tenant-side audit trail, and plan edits and tenant-data access have no super-admin audit row.
+- UI-TEN-01: mobile Add Permission resource chips come from `/auth/available-resources` (32 items, no students, exams or communications); web uses `dropdown/resources`, which has them.

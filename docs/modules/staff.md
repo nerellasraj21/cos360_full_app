@@ -91,3 +91,4 @@ Related: `docs/architecture.md` (file storage), `docs/permissions.md`, `docs/mod
 - There is no "my attendance" endpoint for staff. A staff member sees their attendance only if they hold `staff_attendance:list`.
 - `staff.is_active` and `users.is_active` are not kept in sync (rule 5). Orphaned users are left behind after delete (rule 6).
 - The `/staff/send-attendance-summary` and `/staff/send-interview-calls` SMS triggers are not called by any client (see `communication.md`).
+- UI-STF-01: View Staff Details right after enrolling shows no qualifications (the create response is cached for 5 minutes). UI-STF-02: staff attendance statuses shown after switching the date away and back are the cached pre-save ones.

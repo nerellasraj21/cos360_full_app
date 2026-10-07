@@ -88,3 +88,4 @@ Endpoint prefixes:
 - `/expense/audit/transactions/{id}/summary` is defined twice in `expense_audit_endpoints.py`. The second definition is never reached.
 - There are no budgets, no multi-level approval, and no recurring expenses.
 - The combined fee-plus-expense view lives in `/reports/financial` (`service/reports/financial_report_service.py`), not in this module.
+- UI-EXP-01: the audit summary counters render blank because the web reads `total_logs`, `creation_logs`, `update_logs` and `approval_logs` while the endpoint returns `total_entries` and `action_breakdown`. Mobile attachment upload sends the file as a plain object on Expo web (422); needs a native device check.

@@ -106,3 +106,4 @@ Validation rules:
 - There is no validation of time overlaps, `from < to`, or that a subject is mapped to the section. The backend accepts any existing subject UUID.
 - With the default role seed, students and parents cannot use the mobile timetable viewer or calendar (403), and staff and teachers cannot read timetables. See "What it does".
 - Web `api/hooks/masters/timetable.ts` is dead code that targets non-existent `/masters/timetables/*` routes. `api/timetable.ts` also calls `PATCH /students/timetable/slots/bulk`, which does not exist (the real path is `/students/timetable/timetable/slots/bulk`). It is unused.
+- UI-TTC-01 and UI-TTC-02: on web, creating a holiday from a day cell and drag and drop are blocked by the missing `holidays:create` and `holidays:update` aliases (the client gates on `holidays:*`, the backend and seed use `holiday_management:*`).
